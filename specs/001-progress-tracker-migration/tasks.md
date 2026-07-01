@@ -130,10 +130,10 @@ so story-level traceability and independent testability are preserved.
 
 **Independent Test**: Seed one document per category; confirm each category lists only its own documents and opening one previews/downloads correctly.
 
-- [ ] T026 [P] [US2] Create `components/DocList.tsx` rendering a list of documents (name, type icon) for a given category, with an empty state.
-  **Done when**: a category with documents lists them; a category with none shows the empty state.
-- [ ] T027 [US2] Create `app/documents/[categorySlug]/page.tsx` rendering category tabs plus `DocList` for the selected หมวด, with documents opening in a new tab (preview or download per file type).
-  **Done when**: visiting each of the 4 category URLs shows only that category's documents, and opening a PDF previews inline while a DOCX/XLSX downloads (spec US2 acceptance scenarios 1–2).
+- [X] T026 [P] [US2] Create `components/DocList.tsx` rendering a list of documents (name, type icon) for a given category, with an empty state.
+  **Done when**: a category with documents lists them; a category with none shows the empty state. ✅ Verified via preview with fixture data (2-document list with/without a note; empty-state category also checked).
+- [X] T027 [US2] Create `app/documents/[categorySlug]/page.tsx` rendering category tabs plus `DocList` for the selected หมวด, with documents opening in a new tab (preview or download per file type).
+  **Done when**: visiting each of the 4 category URLs shows only that category's documents, and opening a PDF previews inline while a DOCX/XLSX downloads (spec US2 acceptance scenarios 1–2). ✅ All 4 category tabs verified via preview snapshot (correct Thai names/emoji); links open the Supabase Storage public URL in a new tab (`target="_blank"`) — browsers natively preview PDFs and download DOCX/XLSX, so no extra logic was needed. Also added (beyond this task's literal scope, but required for the app to be navigable): `app/documents/page.tsx` index redirect mirroring `app/photos/page.tsx`, plus `components/TopNav.tsx`/`ConditionalTopNav.tsx` wired into `app/layout.tsx` so Bell can switch between the Photos and Documents sections at all — verified via preview (375px mobile, no horizontal overflow). Live data deferred pending Supabase credentials.
 
 **Checkpoint**: Both core viewing stories (US1, US2) are complete and independently demoable.
 

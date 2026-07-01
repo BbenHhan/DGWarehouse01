@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Noto_Sans_Thai } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
+import { ConditionalTopNav } from "@/components/ConditionalTopNav";
 import "./globals.css";
 
 const notoSansThai = Noto_Sans_Thai({
@@ -21,6 +22,7 @@ export default function RootLayout({
   return (
     <html lang="th" className={`${notoSansThai.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col font-sans">
+        <ConditionalTopNav />
         {children}
         <Toaster />
       </body>
