@@ -107,18 +107,18 @@ so story-level traceability and independent testability are preserved.
 
 **Independent Test**: Seed one room/work-type/week with several photos; confirm navigation shows exactly those photos and the lightbox steps through them.
 
-- [ ] T020 [P] [US1] Create `app/page.tsx` redirecting `/` to `/photos`.
-  **Done when**: visiting `/` while signed in lands on `/photos`.
-- [ ] T021 [P] [US1] Create `app/photos/page.tsx` listing the 6 rooms and redirecting to the first room's first work type.
-  **Done when**: visiting `/photos` shows all 6 rooms (or redirects into the first one) with correct Thai names and emoji.
-- [ ] T022 [P] [US1] Create `components/RoomWorkTypeNav.tsx` rendering room tabs, work-type tabs, and week tabs, using `lib/data.ts` helpers.
-  **Done when**: switching room/work-type/week tabs updates the active selection and is usable via keyboard and touch.
-- [ ] T023 [P] [US1] Create `components/PhotoGrid.tsx` rendering a responsive grid of photo thumbnails (using Next.js `<Image>`) for a given week, with an empty state when there are no photos.
-  **Done when**: a week with photos renders a thumbnail grid; a week with none shows the empty state with an upload prompt.
-- [ ] T024 [P] [US1] Create `components/Lightbox.tsx`: a full-screen photo viewer with next/previous navigation within the current week's photo list.
-  **Done when**: opening any thumbnail launches the lightbox on that photo, and next/previous correctly cycles through the same week's photos.
-- [ ] T025 [US1] Create `app/photos/[roomSlug]/[workTypeSlug]/page.tsx` composing `RoomWorkTypeNav`, `PhotoGrid`, and `Lightbox` for the selected room/work-type/week.
-  **Done when**: navigating to a specific room+work-type URL shows that combination's week tabs and photos, and tapping a photo opens the lightbox (spec US1 acceptance scenarios 1–3).
+- [X] T020 [P] [US1] Create `app/page.tsx` redirecting `/` to `/photos`.
+  **Done when**: visiting `/` while signed in lands on `/photos`. ✅ Verified redirect chain `/` → `/photos` → `/photos/{room}/{workType}` via preview logs.
+- [X] T021 [P] [US1] Create `app/photos/page.tsx` listing the 6 rooms and redirecting to the first room's first work type.
+  **Done when**: visiting `/photos` shows all 6 rooms (or redirects into the first one) with correct Thai names and emoji. ✅ Redirects to the first room/work-type per `sort_order`; the room list itself renders as tabs on the destination page (`RoomWorkTypeNav`), verified below.
+- [X] T022 [P] [US1] Create `components/RoomWorkTypeNav.tsx` rendering room tabs, work-type tabs, and week tabs, using `lib/data.ts` helpers.
+  **Done when**: switching room/work-type/week tabs updates the active selection and is usable via keyboard and touch. ✅ Implemented as links (not client state) so the URL is the source of truth for room/work-type/week — data comes from the parent Server Component (which uses `lib/data.ts`), not fetched inside this component. Verified via preview snapshot with fixture data: all 3 rooms, 3 work types, 2 weeks rendered with correct Thai text and emoji.
+- [X] T023 [P] [US1] Create `components/PhotoGrid.tsx` rendering a responsive grid of photo thumbnails (using Next.js `<Image>`) for a given week, with an empty state when there are no photos.
+  **Done when**: a week with photos renders a thumbnail grid; a week with none shows the empty state with an upload prompt. ✅ Verified both states via preview with fixture data (2-photo grid; empty state renders when a week has none).
+- [X] T024 [P] [US1] Create `components/Lightbox.tsx`: a full-screen photo viewer with next/previous navigation within the current week's photo list.
+  **Done when**: opening any thumbnail launches the lightbox on that photo, and next/previous correctly cycles through the same week's photos. ✅ Verified via preview: clicking a thumbnail opens the dialog with filename, close button, and prev/next controls (all Thai `aria-label`s present).
+- [X] T025 [US1] Create `app/photos/[roomSlug]/[workTypeSlug]/page.tsx` composing `RoomWorkTypeNav`, `PhotoGrid`, and `Lightbox` for the selected room/work-type/week.
+  **Done when**: navigating to a specific room+work-type URL shows that combination's week tabs and photos, and tapping a photo opens the lightbox (spec US1 acceptance scenarios 1–3). ✅ Full flow verified end-to-end with temporary fixture data (see Phase 5 note below) and mobile viewport (375px, no horizontal overflow — SC-004); fixtures were then fully reverted and `tsc --noEmit` re-confirmed clean against the real `lib/data.ts`/`middleware.ts`. Live data from a real Supabase project remains deferred pending credentials.
 
 **Checkpoint**: Photo viewing (the MVP) works end-to-end and is independently demoable.
 
