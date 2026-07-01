@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getDocumentCategories, getDocuments } from "@/lib/data";
+import { USE_MOCK_DATA } from "@/lib/data-config";
 import { DocList } from "@/components/DocList";
 import { DocUploader } from "@/components/DocUploader";
 
@@ -28,10 +29,12 @@ export default async function DocumentCategoryPage({
   }
 
   const documents = await getDocuments(currentCategory.id);
-  const categoryMoveOptions = categories.map((category) => ({
-    value: category.id,
-    label: `${category.emoji} ${category.name_th}`,
-  }));
+  const categoryMoveOptions = USE_MOCK_DATA
+    ? []
+    : categories.map((category) => ({
+        value: category.id,
+        label: `${category.emoji} ${category.name_th}`,
+      }));
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-4 p-4">
@@ -46,7 +49,7 @@ export default async function DocumentCategoryPage({
           </Link>
         ))}
       </nav>
-      <DocUploader categoryId={currentCategory.id} />
+      {!USE_MOCK_DATA && <DocUploader categoryId={currentCategory.id} />}
       <DocList documents={documents} categoryMoveOptions={categoryMoveOptions} />
     </div>
   );

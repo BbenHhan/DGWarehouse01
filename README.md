@@ -14,6 +14,31 @@ project's non-negotiable principles, and
 [specs/001-progress-tracker-migration/](specs/001-progress-tracker-migration/)
 for the full spec/plan/tasks behind this build.
 
+## v1 status: read-only mock data, no backend yet
+
+This version (**v1**, `package.json` version `1.0.0`) is a **display-only**
+build:
+
+- **Auth is disabled** (`lib/auth-config.ts`, `AUTH_REQUIRED = false`) — no
+  login required.
+- **Data is read directly from the local v7 folder**
+  (`lib/data-config.ts`, `USE_MOCK_DATA = true`), not from Supabase. See
+  `lib/mock/source.ts` for the folder → room/work-type/week/photo mapping and
+  `app/api/mock-file/[...segments]/route.ts` for how files are streamed from
+  disk. Set `MOCK_DATA_ROOT` in `.env.local` if the v7 folder isn't at
+  `D:\Claude\Projects\DGWarehouse`.
+- **Upload/edit/delete UI is hidden** while `USE_MOCK_DATA` is true — the
+  Supabase-backed Server Actions and components for all of that are fully
+  built (see Phases 2–10 of
+  [tasks.md](specs/001-progress-tracker-migration/tasks.md)) but intentionally
+  not wired up yet, per project direction to ship a display-first v1.
+- This mode **only works when run on the machine that has the v7 folder** —
+  it isn't meant to be deployed to Vercel as-is.
+
+Flip `AUTH_REQUIRED` and `USE_MOCK_DATA` back to `true`/`false` respectively
+once a real Supabase project exists (see below) to get the fully-working
+version with auth and upload/edit/delete back.
+
 ## Local setup
 
 1. **Install dependencies**
@@ -22,11 +47,14 @@ for the full spec/plan/tasks behind this build.
    npm install
    ```
 
-2. **Set up a Supabase project** (or use an existing one) — see
-   [DEPLOYMENT.md](DEPLOYMENT.md) for the full walkthrough (running the
+2. **(v1, current)** No further setup needed — `npm run dev` reads directly
+   from the local v7 folder. Skip to step 4.
+
+   **(future, once ready for the real backend)** Set up a Supabase project
+   — see [DEPLOYMENT.md](DEPLOYMENT.md) for the full walkthrough (running the
    migrations in `supabase/migrations/`, enabling Auth providers, etc.).
 
-3. **Configure environment variables**
+3. **(future)** Configure environment variables
 
    ```bash
    cp .env.local.example .env.local
@@ -42,9 +70,7 @@ for the full spec/plan/tasks behind this build.
    npm run dev
    ```
 
-   Open [http://localhost:3000](http://localhost:3000). You'll be redirected
-   to `/login` until you sign in with the one account provisioned in Supabase
-   Auth (magic link or Google OAuth).
+   Open [http://localhost:3000](http://localhost:3000).
 
 ## Project structure
 

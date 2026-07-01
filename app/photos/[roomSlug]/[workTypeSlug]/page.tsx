@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { getAllWeeks, getPhotos, getRooms, getWeeks, getWorkTypes } from "@/lib/data";
+import { USE_MOCK_DATA } from "@/lib/data-config";
 import { RoomWorkTypeNav } from "@/components/RoomWorkTypeNav";
 import { PhotoGrid } from "@/components/PhotoGrid";
 import { PhotoUploader } from "@/components/PhotoUploader";
@@ -29,15 +30,17 @@ export default async function RoomWorkTypePage({
 
   // Photos can move to any room/work-type/week (FR-008), so the EditModal
   // "move to" list spans every week, not just this room/work-type's.
-  const allWeeks = await getAllWeeks();
-  const weekMoveOptions = allWeeks.map((week) => {
-    const room = rooms.find((r) => r.id === week.room_id);
-    const workType = workTypes.find((w) => w.id === week.work_type_id);
-    return {
-      value: week.id,
-      label: `${room?.emoji ?? ""} ${room?.name_th ?? ""} · ${workType?.emoji ?? ""} ${workType?.name_th ?? ""} · ${week.label}`,
-    };
-  });
+  // Skipped entirely in mock mode (v1) since edit/upload UI is hidden there.
+  const weekMoveOptions = USE_MOCK_DATA
+    ? []
+    : (await getAllWeeks()).map((week) => {
+        const room = rooms.find((r) => r.id === week.room_id);
+        const workType = workTypes.find((w) => w.id === week.work_type_id);
+        return {
+          value: week.id,
+          label: `${room?.emoji ?? ""} ${room?.name_th ?? ""} · ${workType?.emoji ?? ""} ${workType?.name_th ?? ""} · ${week.label}`,
+        };
+      });
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-4 p-4">
@@ -49,10 +52,12 @@ export default async function RoomWorkTypePage({
         currentWorkTypeSlug={workTypeSlug}
         selectedWeekId={selectedWeek?.id}
       />
-      <div className="flex flex-wrap items-center gap-2">
-        {selectedWeek && <PhotoUploader weekId={selectedWeek.id} />}
-        <AddWeekButton roomId={currentRoom.id} workTypeId={currentWorkType.id} />
-      </div>
+      {!USE_MOCK_DATA && (
+        <div className="flex flex-wrap items-center gap-2">
+          {selectedWeek && <PhotoUploader weekId={selectedWeek.id} />}
+          <AddWeekButton roomId={currentRoom.id} workTypeId={currentWorkType.id} />
+        </div>
+      )}
       <PhotoGrid photos={photos} weekMoveOptions={weekMoveOptions} />
     </div>
   );
