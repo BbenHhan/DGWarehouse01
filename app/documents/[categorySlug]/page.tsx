@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getDocumentCategories, getDocuments } from "@/lib/data";
 import { DocList } from "@/components/DocList";
+import { DocUploader } from "@/components/DocUploader";
 
 function tabClass(active: boolean) {
   return [
@@ -41,6 +42,7 @@ export default async function DocumentCategoryPage({
           </Link>
         ))}
       </nav>
+      <DocUploader categoryId={currentCategory.id} />
       <DocList documents={documents} />
     </div>
   );

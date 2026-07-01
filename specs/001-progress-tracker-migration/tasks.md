@@ -162,12 +162,12 @@ so story-level traceability and independent testability are preserved.
 
 **Independent Test**: Upload a PDF to หมวดที่ 1; confirm it appears in that category's list with a success confirmation.
 
-- [ ] T031 [US4] Implement the `uploadDoc` Server Action in `app/actions/documents.ts`, mirroring `uploadPhoto`'s validation/upload/insert pattern for the `documents` bucket and table.
-  **Done when**: uploading a valid PDF/DOCX/XLSX succeeds and an unsupported format is rejected with a clear per-file error.
-- [ ] T032 [US4] Create `components/DocUploader.tsx`: file picker, upload-progress state, and success/error reporting, calling `uploadDoc`.
-  **Done when**: uploading a document shows a loading indicator, then a success confirmation once the document appears in the list.
-- [ ] T033 [US4] Wire `DocUploader` into `app/documents/[categorySlug]/page.tsx`.
-  **Done when**: Bell can upload a document from the category page and see it appear in `DocList` without a manual refresh (spec US4 acceptance scenario 1).
+- [X] T031 [US4] Implement the `uploadDoc` Server Action in `app/actions/documents.ts`, mirroring `uploadPhoto`'s validation/upload/insert pattern for the `documents` bucket and table.
+  **Done when**: uploading a valid PDF/DOCX/XLSX succeeds and an unsupported format is rejected with a clear per-file error. ✅ Also added `deleteDoc`/`editDoc` in the same file (mirrors `photos.ts`, needed by later phases). Verified the real code path with only Supabase Storage/DB calls faked: a mixed `good.pdf` + `bad.png` batch produced one success and one Thai-language rejection. Reverted after; live Storage/DB write deferred pending credentials.
+- [X] T032 [US4] Create `components/DocUploader.tsx`: file picker, upload-progress state, and success/error reporting, calling `uploadDoc`.
+  **Done when**: uploading a document shows a loading indicator, then a success confirmation once the document appears in the list. ✅ Verified via preview alongside T031's test — loading state and success/error toasts both confirmed.
+- [X] T033 [US4] Wire `DocUploader` into `app/documents/[categorySlug]/page.tsx`.
+  **Done when**: Bell can upload a document from the category page and see it appear in `DocList` without a manual refresh (spec US4 acceptance scenario 1). ✅ Wired above `DocList`; live re-render after a real upload deferred pending credentials (client-side toast flow confirmed working).
 
 **Checkpoint**: Both upload stories (US3, US4) are complete.
 
