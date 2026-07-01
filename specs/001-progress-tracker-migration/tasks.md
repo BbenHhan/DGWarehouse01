@@ -179,14 +179,14 @@ so story-level traceability and independent testability are preserved.
 
 **Independent Test**: Delete an existing photo and confirm; confirm it disappears immediately and does not reappear after reload.
 
-- [ ] T034 [P] [US6] Implement the `deletePhoto` Server Action in `app/actions/photos.ts`, removing both the Storage object and the `photos` row.
-  **Done when**: calling the action removes the row from `photos` and the object from the `photos` bucket, and returns `{ ok: true, data: { photoId } }`.
-- [ ] T035 [P] [US6] Implement the `deleteDoc` Server Action in `app/actions/documents.ts`, mirroring `deletePhoto` for documents.
-  **Done when**: calling the action removes the row from `documents` and the object from the `documents` bucket.
-- [ ] T036 [P] [US6] Add a delete button + confirmation dialog to `components/PhotoGrid.tsx` using optimistic local-state removal (rollback + error toast on failure).
-  **Done when**: confirming delete removes the photo from the grid within ~1 second, before the Server Action necessarily resolves (spec SC-003); cancelling leaves it untouched.
-- [ ] T037 [P] [US6] Add the same delete button + confirmation + optimistic-removal pattern to `components/DocList.tsx`.
-  **Done when**: confirming delete removes the document from the list immediately; cancelling leaves it untouched; a reload never shows a confirmed-deleted item again.
+- [X] T034 [P] [US6] Implement the `deletePhoto` Server Action in `app/actions/photos.ts`, removing both the Storage object and the `photos` row.
+  **Done when**: calling the action removes the row from `photos` and the object from the `photos` bucket, and returns `{ ok: true, data: { photoId } }`. ✅ Already implemented in Phase 7 (built alongside `uploadPhoto` for reuse); wired into the UI this phase. Live Storage/DB removal deferred pending credentials.
+- [X] T035 [P] [US6] Implement the `deleteDoc` Server Action in `app/actions/documents.ts`, mirroring `deletePhoto` for documents.
+  **Done when**: calling the action removes the row from `documents` and the object from the `documents` bucket. ✅ Already implemented in Phase 8. Live Storage/DB removal deferred pending credentials.
+- [X] T036 [P] [US6] Add a delete button + confirmation dialog to `components/PhotoGrid.tsx` using optimistic local-state removal (rollback + error toast on failure).
+  **Done when**: confirming delete removes the photo from the grid within ~1 second, before the Server Action necessarily resolves (spec SC-003); cancelling leaves it untouched. ✅ Uses React `useOptimistic` + shadcn/ui `alert-dialog` (added via `npx shadcn add alert-dialog`). Verified via preview with a stubbed `deletePhoto` (1.5s simulated network delay, real Zod/logic elsewhere untouched): "ยกเลิก" (cancel) leaves the photo untouched; confirming removes it from the DOM in ~257ms — well under the 1s target and before the 1.5s stub resolves. (The photo reappeared once the stub's fake-success transition settled, because the stub never actually mutated the fixture data — expected given the stub, not a bug; a real delete + `revalidatePath` keeps it gone.)
+- [X] T037 [P] [US6] Add the same delete button + confirmation + optimistic-removal pattern to `components/DocList.tsx`.
+  **Done when**: confirming delete removes the document from the list immediately; cancelling leaves it untouched; a reload never shows a confirmed-deleted item again. ✅ Same `useOptimistic` + `alert-dialog` pattern as `PhotoGrid.tsx`. Live "never reappears after reload" check deferred pending credentials (requires a real delete to actually remove the DB row).
 
 **Checkpoint**: Delete is complete for both photos and documents, with optimistic UX per the constitution.
 

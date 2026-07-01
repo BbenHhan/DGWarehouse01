@@ -1,9 +1,42 @@
-import { FileText } from "lucide-react";
+"use client";
+
+import { useOptimistic, useTransition } from "react";
+import { FileText, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 import type { Document } from "@/lib/types";
 import { publicFileUrl } from "@/lib/storage";
+import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { deleteDoc } from "@/app/actions/documents";
 
 export function DocList({ documents }: { documents: Document[] }) {
-  if (documents.length === 0) {
+  const [, startTransition] = useTransition();
+  const [optimisticDocuments, removeOptimisticDocument] = useOptimistic(
+    documents,
+    (state, documentId: string) => state.filter((doc) => doc.id !== documentId)
+  );
+
+  function handleDelete(documentId: string) {
+    startTransition(async () => {
+      removeOptimisticDocument(documentId);
+      const result = await deleteDoc(documentId);
+      if (!result.ok) {
+        toast.error(result.error);
+      }
+    });
+  }
+
+  if (optimisticDocuments.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center gap-1 rounded-lg border border-dashed p-12 text-center text-muted-foreground">
         <p>ยังไม่มีเอกสารในหมวดนี้</p>
@@ -14,13 +47,13 @@ export function DocList({ documents }: { documents: Document[] }) {
 
   return (
     <ul className="divide-y divide-border rounded-lg border">
-      {documents.map((doc) => (
-        <li key={doc.id}>
+      {optimisticDocuments.map((doc) => (
+        <li key={doc.id} className="flex items-center gap-3 p-3">
           <a
             href={publicFileUrl("documents", doc.storage_path)}
             target="_blank"
             rel="noreferrer"
-            className="flex items-center gap-3 p-3 hover:bg-accent"
+            className="flex min-w-0 flex-1 items-center gap-3 hover:opacity-80"
           >
             <FileText className="h-5 w-5 shrink-0 text-muted-foreground" />
             <div className="min-w-0 flex-1">
@@ -30,6 +63,33 @@ export function DocList({ documents }: { documents: Document[] }) {
               )}
             </div>
           </a>
+
+          <AlertDialog>
+            <AlertDialogTrigger
+              render={
+                <Button
+                  type="button"
+                  size="icon-sm"
+                  variant="destructive"
+                  aria-label={`ลบเอกสาร ${doc.file_name}`}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              }
+            />
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>ลบเอกสารนี้?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  การลบนี้ไม่สามารถย้อนกลับได้ เอกสารจะถูกลบออกทันที
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>ยกเลิก</AlertDialogCancel>
+                <AlertDialogAction onClick={() => handleDelete(doc.id)}>ลบ</AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </li>
       ))}
     </ul>
