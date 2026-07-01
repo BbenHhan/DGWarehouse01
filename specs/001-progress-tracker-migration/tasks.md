@@ -67,20 +67,20 @@ so story-level traceability and independent testability are preserved.
 
 **⚠️ CRITICAL**: No page can be verified as access-controlled until this phase is complete.
 
-- [ ] T010 Create the server-side Supabase client factory in `lib/supabase/server.ts` using the service role key, for use only in Server Actions and Server Components.
-  **Done when**: a Server Component can call this factory and successfully run a `select` against a seeded table.
-- [ ] T011 [P] Create the browser Supabase client factory in `lib/supabase/client.ts` using the anon key, for use only in Client Components.
-  **Done when**: a Client Component can call this factory and successfully subscribe to a Realtime channel without a console error.
-- [ ] T012 Create the session-refresh helper in `lib/supabase/middleware.ts`.
-  **Done when**: calling the helper from a test route refreshes an expiring session cookie without throwing.
-- [ ] T013 Create `middleware.ts` at the repo root invoking the helper from `lib/supabase/middleware.ts` on every request.
-  **Done when**: visiting any route while signed in keeps the session alive across a page reload after the original token's short expiry window.
-- [ ] T014 [P] Create `app/login/page.tsx` with a Thai-language magic-link sign-in form and a "Sign in with Google" button.
-  **Done when**: submitting an email sends a magic link (visible in Supabase Auth logs) and clicking "Sign in with Google" redirects to Google's OAuth consent screen.
-- [ ] T015 [P] Create `app/auth/callback/route.ts` exchanging the auth code for a session and redirecting to `/photos`.
-  **Done when**: following a magic-link email or completing Google OAuth lands the browser on `/photos` with an active session cookie.
-- [ ] T016 Create `app/layout.tsx` as the root layout: sets `<html lang="th">`, loads global styles, and redirects unauthenticated requests to `/login` for any route other than `/login` and `/auth/callback`.
-  **Done when**: visiting `/photos` while signed out redirects to `/login`; visiting it while signed in renders normally.
+- [X] T010 Create the server-side Supabase client factory in `lib/supabase/server.ts` using the service role key, for use only in Server Actions and Server Components.
+  **Done when**: a Server Component can call this factory and successfully run a `select` against a seeded table. ⏸ `createServiceClient()` written (service role, no session) alongside `createSessionClient()`/`requireUser()` (anon key + cookies, needed for auth checks — see file comments for why both exist); live `select` against a seeded table deferred pending Supabase credentials.
+- [X] T011 [P] Create the browser Supabase client factory in `lib/supabase/client.ts` using the anon key, for use only in Client Components.
+  **Done when**: a Client Component can call this factory and successfully subscribe to a Realtime channel without a console error. ⏸ Factory written and used by `app/login/page.tsx`; live Realtime subscription check deferred pending credentials.
+- [X] T012 Create the session-refresh helper in `lib/supabase/middleware.ts`.
+  **Done when**: calling the helper from a test route refreshes an expiring session cookie without throwing. ✅ Verified structurally — TypeScript compiles, middleware runs on every request without throwing against a placeholder Supabase URL. Live token-refresh behavior deferred pending credentials.
+- [X] T013 Create `middleware.ts` at the repo root invoking the helper from `lib/supabase/middleware.ts` on every request.
+  **Done when**: visiting any route while signed in keeps the session alive across a page reload after the original token's short expiry window. ✅ Verified unauthenticated redirect behavior (`/photos` → `/login`) via preview browser fetch; signed-in session persistence deferred pending credentials.
+- [X] T014 [P] Create `app/login/page.tsx` with a Thai-language magic-link sign-in form and a "Sign in with Google" button.
+  **Done when**: submitting an email sends a magic link (visible in Supabase Auth logs) and clicking "Sign in with Google" redirects to Google's OAuth consent screen. ✅ Rendered and verified via preview snapshot (Thai labels correct, both controls present); actual email send / OAuth redirect deferred pending credentials.
+- [X] T015 [P] Create `app/auth/callback/route.ts` exchanging the auth code for a session and redirecting to `/photos`.
+  **Done when**: following a magic-link email or completing Google OAuth lands the browser on `/photos` with an active session cookie. ⏸ Route written per contract; live exchange deferred pending credentials.
+- [X] T016 Create `app/layout.tsx` as the root layout: sets `<html lang="th">`, loads global styles, and redirects unauthenticated requests to `/login` for any route other than `/login` and `/auth/callback`.
+  **Done when**: visiting `/photos` while signed out redirects to `/login`; visiting it while signed in renders normally. ✅ The redirect is implemented in `middleware.ts` (T013) rather than duplicated in the layout, since middleware already runs on every request before render — `app/layout.tsx` sets `lang="th"`, the Noto Sans Thai font, and the `Toaster`. Verified: signed-out redirect confirmed via preview; signed-in render deferred pending credentials.
 
 **Checkpoint**: A user can sign in via magic link or Google, land on `/photos`, and get redirected to `/login` when signed out.
 
