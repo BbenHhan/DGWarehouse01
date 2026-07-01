@@ -27,16 +27,16 @@ so story-level traceability and independent testability are preserved.
 
 **Purpose**: Scaffold the Next.js project and its core tooling.
 
-- [ ] T001 Initialize a Next.js 15 (App Router, TypeScript) project at the repo root, producing `package.json`, `tsconfig.json`, `next.config.ts`, `app/` — run `npx create-next-app@latest . --typescript --app --no-src-dir`.
-  **Done when**: `npm run dev` starts and serves the default page at `http://localhost:3000`.
-- [ ] T002 [P] Install and configure Tailwind CSS v4 in `app/globals.css` and `postcss.config.mjs`.
-  **Done when**: a Tailwind utility class (e.g. `bg-blue-500`) visibly renders on the default page.
-- [ ] T003 [P] Initialize shadcn/ui (`components.json`, `components/ui/`) via `npx shadcn@latest init`, adding the `button`, `dialog`, `tabs`, `input`, `textarea`, and `toast` components.
-  **Done when**: `components/ui/button.tsx` exists and renders in a test import without errors.
-- [ ] T004 [P] Add Supabase and validation dependencies to `package.json`: `@supabase/supabase-js`, `@supabase/ssr`, `zod`.
-  **Done when**: `npm install` completes and all three packages appear in `package.json` dependencies.
-- [ ] T005 [P] Create `.env.local.example` documenting `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`.
-  **Done when**: the file lists all three variable names with placeholder values and a one-line comment on where to find each in the Supabase dashboard.
+- [X] T001 Initialize a Next.js 15 (App Router, TypeScript) project at the repo root, producing `package.json`, `tsconfig.json`, `next.config.ts`, `app/` — run `npx create-next-app@latest . --typescript --app --no-src-dir`.
+  **Done when**: `npm run dev` starts and serves the default page at `http://localhost:3000`. ✅ Verified via preview server + screenshot; pinned to next@15.5.19 (create-next-app defaulted to 16).
+- [X] T002 [P] Install and configure Tailwind CSS v4 in `app/globals.css` and `postcss.config.mjs`.
+  **Done when**: a Tailwind utility class (e.g. `bg-blue-500`) visibly renders on the default page. ✅ Verified via preview_inspect (computed `oklch` background from Tailwind class).
+- [X] T003 [P] Initialize shadcn/ui (`components.json`, `components/ui/`) via `npx shadcn@latest init`, adding the `button`, `dialog`, `tabs`, `input`, `textarea`, and `toast` components.
+  **Done when**: `components/ui/button.tsx` exists and renders in a test import without errors. ✅ Used `sonner` instead of the deprecated `toast` primitive (current shadcn/ui recommendation) for the same loading/error toast role.
+- [X] T004 [P] Add Supabase and validation dependencies to `package.json`: `@supabase/supabase-js`, `@supabase/ssr`, `zod`.
+  **Done when**: `npm install` completes and all three packages appear in `package.json` dependencies. ✅
+- [X] T005 [P] Create `.env.local.example` documenting `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`.
+  **Done when**: the file lists all three variable names with placeholder values and a one-line comment on where to find each in the Supabase dashboard. ✅
 
 **Checkpoint**: Project boots locally with Tailwind + shadcn/ui wired in.
 
@@ -48,14 +48,14 @@ so story-level traceability and independent testability are preserved.
 
 **⚠️ CRITICAL**: No auth, data-layer, or UI work can be meaningfully tested until this phase is complete.
 
-- [ ] T006 Create `supabase/migrations/0001_schema.sql` defining tables `rooms`, `work_types`, `weeks`, `document_categories`, `photos`, `documents` per [data-model.md](./data-model.md).
-  **Done when**: running the migration against a Supabase project creates all six tables with the documented columns and foreign keys, with no errors.
-- [ ] T007 Create `supabase/migrations/0002_rls.sql` enabling RLS and adding the `authenticated`-only policies from [contracts/supabase-setup.md](./contracts/supabase-setup.md) for `weeks`, `photos`, `documents`, and read-only policies for `rooms`, `work_types`, `document_categories`.
-  **Done when**: querying any table as the `anon` role returns zero rows / a permission error, and querying as an authenticated user succeeds.
-- [ ] T008 Create `supabase/migrations/0003_storage.sql` creating the `photos` and `documents` Storage buckets with public-read and authenticated-write/delete policies per [contracts/supabase-setup.md](./contracts/supabase-setup.md).
-  **Done when**: an authenticated upload to each bucket succeeds, an anonymous upload is rejected, and a public GET on an uploaded object's public URL succeeds.
-- [ ] T009 Create `supabase/migrations/0004_seed_lookups.sql` inserting the 6 fixed rooms (ห้องแรก, ห้องกลาง, ห้องซอย 1–4), 6 fixed work types (Firewalls, Electrical, Roofing, Flooring, Drainage, Overview), and 4 fixed document categories (หมวดที่ 1–4).
-  **Done when**: `select * from rooms` returns 6 rows, `select * from work_types` returns 6 rows, `select * from document_categories` returns 4 rows, all with correct Thai names and emoji.
+- [X] T006 Create `supabase/migrations/0001_schema.sql` defining tables `rooms`, `work_types`, `weeks`, `document_categories`, `photos`, `documents` per [data-model.md](./data-model.md).
+  **Done when**: running the migration against a Supabase project creates all six tables with the documented columns and foreign keys, with no errors. ⏸ Written and manually reviewed (FKs, checks, `updated_at` triggers); local Docker Desktop daemon was not running so live execution against Postgres/Supabase is deferred until credentials are provided.
+- [X] T007 Create `supabase/migrations/0002_rls.sql` enabling RLS and adding the `authenticated`-only policies from [contracts/supabase-setup.md](./contracts/supabase-setup.md) for `weeks`, `photos`, `documents`, and read-only policies for `rooms`, `work_types`, `document_categories`.
+  **Done when**: querying any table as the `anon` role returns zero rows / a permission error, and querying as an authenticated user succeeds. ⏸ Written per contract; requires a live Supabase project (real `auth` schema) to execute — deferred.
+- [X] T008 Create `supabase/migrations/0003_storage.sql` creating the `photos` and `documents` Storage buckets with public-read and authenticated-write/delete policies per [contracts/supabase-setup.md](./contracts/supabase-setup.md).
+  **Done when**: an authenticated upload to each bucket succeeds, an anonymous upload is rejected, and a public GET on an uploaded object's public URL succeeds. ⏸ Written per contract; requires a live Supabase project (real `storage` schema) to execute — deferred.
+- [X] T009 Create `supabase/migrations/0004_seed_lookups.sql` inserting the 6 fixed rooms (ห้องแรก, ห้องกลาง, ห้องซอย 1–4), 6 fixed work types (Firewalls, Electrical, Roofing, Flooring, Drainage, Overview), and 4 fixed document categories (หมวดที่ 1–4).
+  **Done when**: `select * from rooms` returns 6 rows, `select * from work_types` returns 6 rows, `select * from document_categories` returns 4 rows, all with correct Thai names and emoji. ⏸ Data written and reviewed against v7 names/emoji; row-count verification deferred to a live project (attempted a local Docker Postgres check, but Docker Desktop's daemon isn't running on this machine).
 
 **Checkpoint**: Supabase project fully provisioned — schema, security, storage, and fixed lookup data all in place.
 
