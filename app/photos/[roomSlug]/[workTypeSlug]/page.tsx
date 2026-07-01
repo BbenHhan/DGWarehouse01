@@ -2,6 +2,8 @@ import { notFound } from "next/navigation";
 import { getPhotos, getRooms, getWeeks, getWorkTypes } from "@/lib/data";
 import { RoomWorkTypeNav } from "@/components/RoomWorkTypeNav";
 import { PhotoGrid } from "@/components/PhotoGrid";
+import { PhotoUploader } from "@/components/PhotoUploader";
+import { AddWeekButton } from "@/components/AddWeekButton";
 
 export default async function RoomWorkTypePage({
   params,
@@ -35,6 +37,10 @@ export default async function RoomWorkTypePage({
         currentWorkTypeSlug={workTypeSlug}
         selectedWeekId={selectedWeek?.id}
       />
+      <div className="flex flex-wrap items-center gap-2">
+        {selectedWeek && <PhotoUploader weekId={selectedWeek.id} />}
+        <AddWeekButton roomId={currentRoom.id} workTypeId={currentWorkType.id} />
+      </div>
       <PhotoGrid photos={photos} />
     </div>
   );
