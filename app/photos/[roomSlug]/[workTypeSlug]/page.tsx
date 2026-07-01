@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { getPhotos, getRooms, getWeeks, getWorkTypes } from "@/lib/data";
+import { getAllWeeks, getPhotos, getRooms, getWeeks, getWorkTypes } from "@/lib/data";
 import { RoomWorkTypeNav } from "@/components/RoomWorkTypeNav";
 import { PhotoGrid } from "@/components/PhotoGrid";
 import { PhotoUploader } from "@/components/PhotoUploader";
@@ -27,6 +27,18 @@ export default async function RoomWorkTypePage({
   const selectedWeek = weeks.find((week) => week.id === weekIdParam) ?? weeks[weeks.length - 1];
   const photos = selectedWeek ? await getPhotos(selectedWeek.id) : [];
 
+  // Photos can move to any room/work-type/week (FR-008), so the EditModal
+  // "move to" list spans every week, not just this room/work-type's.
+  const allWeeks = await getAllWeeks();
+  const weekMoveOptions = allWeeks.map((week) => {
+    const room = rooms.find((r) => r.id === week.room_id);
+    const workType = workTypes.find((w) => w.id === week.work_type_id);
+    return {
+      value: week.id,
+      label: `${room?.emoji ?? ""} ${room?.name_th ?? ""} · ${workType?.emoji ?? ""} ${workType?.name_th ?? ""} · ${week.label}`,
+    };
+  });
+
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-4 p-4">
       <RoomWorkTypeNav
@@ -41,7 +53,7 @@ export default async function RoomWorkTypePage({
         {selectedWeek && <PhotoUploader weekId={selectedWeek.id} />}
         <AddWeekButton roomId={currentRoom.id} workTypeId={currentWorkType.id} />
       </div>
-      <PhotoGrid photos={photos} />
+      <PhotoGrid photos={photos} weekMoveOptions={weekMoveOptions} />
     </div>
   );
 }

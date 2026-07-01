@@ -32,6 +32,16 @@ export async function getWeeks(roomId: string, workTypeId: string): Promise<Week
   return data;
 }
 
+// Unfiltered — used only to populate the "move to a different week" picker
+// in EditModal, since a photo can move to any room/work-type/week (FR-008).
+export async function getAllWeeks(): Promise<Week[]> {
+  await requireUser();
+  const supabase = createServiceClient();
+  const { data, error } = await supabase.from("weeks").select("*").order("created_at");
+  if (error) throw error;
+  return data;
+}
+
 export async function getPhotos(weekId: string): Promise<Photo[]> {
   await requireUser();
   const supabase = createServiceClient();

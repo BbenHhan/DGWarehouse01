@@ -18,8 +18,17 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { deleteDoc } from "@/app/actions/documents";
+import { EditModal } from "@/components/EditModal";
 
-export function DocList({ documents }: { documents: Document[] }) {
+type CategoryMoveOption = { value: string; label: string };
+
+export function DocList({
+  documents,
+  categoryMoveOptions,
+}: {
+  documents: Document[];
+  categoryMoveOptions: CategoryMoveOption[];
+}) {
   const [, startTransition] = useTransition();
   const [optimisticDocuments, removeOptimisticDocument] = useOptimistic(
     documents,
@@ -64,32 +73,41 @@ export function DocList({ documents }: { documents: Document[] }) {
             </div>
           </a>
 
-          <AlertDialog>
-            <AlertDialogTrigger
-              render={
-                <Button
-                  type="button"
-                  size="icon-sm"
-                  variant="destructive"
-                  aria-label={`ลบเอกสาร ${doc.file_name}`}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              }
+          <div className="flex shrink-0 gap-1">
+            <EditModal
+              kind="document"
+              item={doc}
+              moveOptions={categoryMoveOptions}
+              moveLabel="ย้ายไปหมวด"
             />
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>ลบเอกสารนี้?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  การลบนี้ไม่สามารถย้อนกลับได้ เอกสารจะถูกลบออกทันที
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>ยกเลิก</AlertDialogCancel>
-                <AlertDialogAction onClick={() => handleDelete(doc.id)}>ลบ</AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
+
+            <AlertDialog>
+              <AlertDialogTrigger
+                render={
+                  <Button
+                    type="button"
+                    size="icon-sm"
+                    variant="destructive"
+                    aria-label={`ลบเอกสาร ${doc.file_name}`}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                }
+              />
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>ลบเอกสารนี้?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    การลบนี้ไม่สามารถย้อนกลับได้ เอกสารจะถูกลบออกทันที
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>ยกเลิก</AlertDialogCancel>
+                  <AlertDialogAction onClick={() => handleDelete(doc.id)}>ลบ</AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
         </li>
       ))}
     </ul>

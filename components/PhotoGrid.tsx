@@ -20,8 +20,17 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { deletePhoto } from "@/app/actions/photos";
+import { EditModal } from "@/components/EditModal";
 
-export function PhotoGrid({ photos }: { photos: Photo[] }) {
+type WeekMoveOption = { value: string; label: string };
+
+export function PhotoGrid({
+  photos,
+  weekMoveOptions,
+}: {
+  photos: Photo[];
+  weekMoveOptions: WeekMoveOption[];
+}) {
   const [openIndex, setOpenIndex] = useState<number | null>(null);
   const [, startTransition] = useTransition();
   const [optimisticPhotos, removeOptimisticPhoto] = useOptimistic(
@@ -68,34 +77,41 @@ export function PhotoGrid({ photos }: { photos: Photo[] }) {
               />
             </button>
 
-            <AlertDialog>
-              <AlertDialogTrigger
-                render={
-                  <Button
-                    type="button"
-                    size="icon-sm"
-                    variant="destructive"
-                    className="absolute top-1 right-1"
-                    onClick={(e) => e.stopPropagation()}
-                    aria-label={`ลบรูป ${photo.file_name}`}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                }
+            <div className="absolute top-1 right-1 flex gap-1" onClick={(e) => e.stopPropagation()}>
+              <EditModal
+                kind="photo"
+                item={photo}
+                moveOptions={weekMoveOptions}
+                moveLabel="ย้ายไปสัปดาห์"
               />
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>ลบรูปภาพนี้?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    การลบนี้ไม่สามารถย้อนกลับได้ รูปภาพจะถูกลบออกทันที
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>ยกเลิก</AlertDialogCancel>
-                  <AlertDialogAction onClick={() => handleDelete(photo.id)}>ลบ</AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
+
+              <AlertDialog>
+                <AlertDialogTrigger
+                  render={
+                    <Button
+                      type="button"
+                      size="icon-sm"
+                      variant="destructive"
+                      aria-label={`ลบรูป ${photo.file_name}`}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  }
+                />
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>ลบรูปภาพนี้?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      การลบนี้ไม่สามารถย้อนกลับได้ รูปภาพจะถูกลบออกทันที
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>ยกเลิก</AlertDialogCancel>
+                    <AlertDialogAction onClick={() => handleDelete(photo.id)}>ลบ</AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </div>
           </div>
         ))}
       </div>

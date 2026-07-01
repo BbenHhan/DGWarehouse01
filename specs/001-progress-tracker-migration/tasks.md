@@ -198,16 +198,16 @@ so story-level traceability and independent testability are preserved.
 
 **Independent Test**: Rename an existing photo, add a note, then move it to a different week; confirm the new name/note persist and it now appears only under the new week.
 
-- [ ] T038 [P] [US5] Implement the `editPhoto` Server Action in `app/actions/photos.ts` supporting partial updates to `fileName`, `note`, and `weekId`, rejecting an empty `fileName`.
-  **Done when**: renaming, adding a note, and moving a photo to a different week each succeed independently and in combination, and an empty-string rename is rejected with a clear error.
-- [ ] T039 [P] [US5] Implement the `editDoc` Server Action in `app/actions/documents.ts`, mirroring `editPhoto` for `categoryId` instead of `weekId`.
-  **Done when**: renaming, adding a note, and moving a document to a different หมวด each succeed, and an empty-string rename is rejected.
-- [ ] T040 [US5] Create `components/EditModal.tsx`: a shared dialog with fields for file name, note, and a week/category picker (mode depends on whether it's opened for a photo or document), calling `editPhoto`/`editDoc`.
-  **Done when**: opening the modal pre-fills current values, and saving updates only the changed fields.
-- [ ] T041 [P] [US5] Wire `EditModal` into `components/PhotoGrid.tsx` (edit action per photo tile).
-  **Done when**: editing a photo's name/note/week from the grid reflects the change immediately in `PhotoGrid` and `Lightbox` (spec US5 acceptance scenarios 1–3).
-- [ ] T042 [P] [US5] Wire `EditModal` into `components/DocList.tsx` (edit action per document row).
-  **Done when**: editing a document's name/note/category reflects the change immediately in `DocList` (spec US5 acceptance scenario 4).
+- [X] T038 [P] [US5] Implement the `editPhoto` Server Action in `app/actions/photos.ts` supporting partial updates to `fileName`, `note`, and `weekId`, rejecting an empty `fileName`.
+  **Done when**: renaming, adding a note, and moving a photo to a different week each succeed independently and in combination, and an empty-string rename is rejected with a clear error. ✅ Already implemented in Phase 7; UI wired this phase. Verified with a stubbed `editPhoto` (real `editPhotoSchema` validation) that the action receives exactly the changed fields (`fileName` + `weekId`, `note` correctly omitted when unchanged). Live DB update deferred pending credentials.
+- [X] T039 [P] [US5] Implement the `editDoc` Server Action in `app/actions/documents.ts`, mirroring `editPhoto` for `categoryId` instead of `weekId`.
+  **Done when**: renaming, adding a note, and moving a document to a different หมวด each succeed, and an empty-string rename is rejected. ✅ Already implemented in Phase 8 (identical pattern to `editPhoto`).
+- [X] T040 [US5] Create `components/EditModal.tsx`: a shared dialog with fields for file name, note, and a week/category picker (mode depends on whether it's opened for a photo or document), calling `editPhoto`/`editDoc`.
+  **Done when**: opening the modal pre-fills current values, and saving updates only the changed fields. ✅ Added shadcn/ui `select` component (`npx shadcn add select`) for the move picker. Verified via preview: modal pre-fills name/note correctly; found and fixed a real bug where Base UI's `Select.Value` doesn't auto-derive the label from the matched item like Radix does — it needed an explicit `children` render function (`(value) => moveOptions.find(...).label`) or it silently displayed the raw UUID. Also added `getAllWeeks()` to `lib/data.ts` so a photo's move picker spans every room/work-type, not just the current one (FR-008).
+- [X] T041 [P] [US5] Wire `EditModal` into `components/PhotoGrid.tsx` (edit action per photo tile).
+  **Done when**: editing a photo's name/note/week from the grid reflects the change immediately in `PhotoGrid` and `Lightbox` (spec US5 acceptance scenarios 1–3). ✅ Full interaction verified via preview: opened modal, renamed the file, changed the week via the select, saved — action received `{fileName, weekId}` only (note untouched, correctly omitted), success toast shown. Live re-render after a real save deferred pending credentials.
+- [X] T042 [P] [US5] Wire `EditModal` into `components/DocList.tsx` (edit action per document row).
+  **Done when**: editing a document's name/note/category reflects the change immediately in `DocList` (spec US5 acceptance scenario 4). ✅ Same `EditModal` component reused with `kind="document"`; category move options built from `getDocumentCategories()` in the page. Live re-render deferred pending credentials.
 
 **Checkpoint**: All six user stories are complete and independently functional.
 

@@ -28,6 +28,10 @@ export default async function DocumentCategoryPage({
   }
 
   const documents = await getDocuments(currentCategory.id);
+  const categoryMoveOptions = categories.map((category) => ({
+    value: category.id,
+    label: `${category.emoji} ${category.name_th}`,
+  }));
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-4 p-4">
@@ -43,7 +47,7 @@ export default async function DocumentCategoryPage({
         ))}
       </nav>
       <DocUploader categoryId={currentCategory.id} />
-      <DocList documents={documents} />
+      <DocList documents={documents} categoryMoveOptions={categoryMoveOptions} />
     </div>
   );
 }
