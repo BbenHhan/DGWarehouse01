@@ -14,7 +14,10 @@ export const DOCUMENT_MIME_TYPES = [
 
 const uuid = z.string().uuid();
 
-const fileArray = (allowedMimeTypes: string[]) =>
+// Only checks batch size — per-file MIME/size checks happen in validateFile()
+// below, called per-item so one bad file doesn't fail the whole batch (US3
+// acceptance scenario 2: partial success/failure reporting).
+const fileArray = () =>
   z
     .array(z.instanceof(File))
     .min(1, "เลือกอย่างน้อย 1 ไฟล์")
@@ -32,7 +35,7 @@ export function validateFile(file: File, allowedMimeTypes: string[]): string | n
 
 export const uploadPhotoSchema = z.object({
   weekId: uuid,
-  files: fileArray(PHOTO_MIME_TYPES),
+  files: fileArray(),
 });
 
 export const deletePhotoSchema = z.object({
@@ -52,7 +55,7 @@ export const editPhotoSchema = z
 
 export const uploadDocSchema = z.object({
   categoryId: uuid,
-  files: fileArray(DOCUMENT_MIME_TYPES),
+  files: fileArray(),
 });
 
 export const deleteDocSchema = z.object({
