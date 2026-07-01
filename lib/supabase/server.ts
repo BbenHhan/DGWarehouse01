@@ -3,6 +3,7 @@ import "server-only";
 import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/lib/database.types";
 
 /**
  * Session-aware client (anon key + request cookies). Used to determine who is
@@ -12,7 +13,7 @@ import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 export async function createSessionClient() {
   const cookieStore = await cookies();
 
-  return createServerClient(
+  return createServerClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
@@ -39,7 +40,7 @@ export async function createSessionClient() {
  * not the database, to enforce the single-user access boundary.
  */
 export function createServiceClient() {
-  return createSupabaseClient(
+  return createSupabaseClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
     { auth: { autoRefreshToken: false, persistSession: false } }

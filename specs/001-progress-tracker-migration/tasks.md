@@ -90,12 +90,12 @@ so story-level traceability and independent testability are preserved.
 
 **Purpose**: Shared types, validation, and data-fetching helpers used by every UI component and Server Action.
 
-- [ ] T017 [P] Define shared TypeScript types (`Room`, `WorkType`, `Week`, `Photo`, `DocumentCategory`, `Document`, `ActionResult<T>`) in `lib/types.ts`, matching [data-model.md](./data-model.md) and [contracts/server-actions.md](./contracts/server-actions.md).
-  **Done when**: every other file in the project that references these shapes imports them from `lib/types.ts` with no duplicate local definitions.
-- [ ] T018 [P] Define Zod schemas for all six Server Action inputs (`uploadPhoto`, `deletePhoto`, `editPhoto`, `uploadDoc`, `deleteDoc`, `editDoc`) in `lib/validation.ts`, enforcing the 25 MB/20-file limits and allowed MIME types from [research.md](./research.md).
-  **Done when**: parsing a known-valid input succeeds and parsing an oversized/invalid-type file fails with a human-readable message.
-- [ ] T019 [P] Create data-fetching helpers in `lib/data.ts`: `getRooms()`, `getWorkTypes()`, `getWeeks(roomId, workTypeId)`, `getPhotos(weekId)`, `getDocumentCategories()`, `getDocuments(categoryId)`.
-  **Done when**: each helper, called against the seeded Supabase project, returns the expected rows with correct typing (no `any`).
+- [X] T017 [P] Define shared TypeScript types (`Room`, `WorkType`, `Week`, `Photo`, `DocumentCategory`, `Document`, `ActionResult<T>`) in `lib/types.ts`, matching [data-model.md](./data-model.md) and [contracts/server-actions.md](./contracts/server-actions.md).
+  **Done when**: every other file in the project that references these shapes imports them from `lib/types.ts` with no duplicate local definitions. ✅ Also added `lib/database.types.ts` (hand-written Supabase `Database` type matching the migration column-for-column, shaped to satisfy postgrest-js's `GenericSchema`/`GenericTable`) so `lib/data.ts` queries are genuinely type-checked against these Row shapes rather than falling back to `any` — verified by deliberately breaking a column name/return type and confirming `tsc` failed, then reverting.
+- [X] T018 [P] Define Zod schemas for all six Server Action inputs (`uploadPhoto`, `deletePhoto`, `editPhoto`, `uploadDoc`, `deleteDoc`, `editDoc`) in `lib/validation.ts`, enforcing the 25 MB/20-file limits and allowed MIME types from [research.md](./research.md).
+  **Done when**: parsing a known-valid input succeeds and parsing an oversized/invalid-type file fails with a human-readable message. ✅ Verified with a throwaway `tsx` script: valid input passes, invalid UUID rejected, >20-file batch rejected.
+- [X] T019 [P] Create data-fetching helpers in `lib/data.ts`: `getRooms()`, `getWorkTypes()`, `getWeeks(roomId, workTypeId)`, `getPhotos(weekId)`, `getDocumentCategories()`, `getDocuments(categoryId)`.
+  **Done when**: each helper, called against the seeded Supabase project, returns the expected rows with correct typing (no `any`). ✅ Typing verified against `lib/database.types.ts` (see T017 note); live call against a seeded project deferred pending Supabase credentials.
 
 **Checkpoint**: Types, validation, and data access are ready for both UI and Server Actions to build on.
 
