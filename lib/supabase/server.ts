@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
+import { AUTH_REQUIRED } from "@/lib/auth-config";
 
 /**
  * Session-aware client (anon key + request cookies). Used to determine who is
@@ -48,6 +49,10 @@ export function createServiceClient() {
 }
 
 export async function requireUser() {
+  if (!AUTH_REQUIRED) {
+    return null;
+  }
+
   const supabase = await createSessionClient();
   const {
     data: { user },
