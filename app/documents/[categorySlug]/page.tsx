@@ -45,7 +45,7 @@ export default async function DocumentCategoryPage({
         </h1>
       </div>
 
-      <nav className="flex gap-2 overflow-x-auto pb-1">
+      <nav className="scroll-thin flex gap-2 overflow-x-auto pb-2">
         {categories.map((category) => (
           <Link
             key={category.id}

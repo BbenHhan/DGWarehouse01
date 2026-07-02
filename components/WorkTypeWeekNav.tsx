@@ -33,7 +33,7 @@ export function WorkTypeWeekNav({
     <nav className="space-y-4">
       <div>
         <SectionLabel>ประเภทงาน</SectionLabel>
-        <div className="flex gap-2 overflow-x-auto pb-1">
+        <div className="scroll-thin flex gap-2 overflow-x-auto pb-2">
           {workTypes.map((workType) => {
             const active = workType.slug === currentWorkTypeSlug;
             return (
@@ -60,7 +60,7 @@ export function WorkTypeWeekNav({
         {weeks.length === 0 ? (
           <p className="text-sm text-muted-foreground">ยังไม่มีสัปดาห์</p>
         ) : (
-          <div className="relative flex gap-0 overflow-x-auto pt-1 pb-2">
+          <div className="scroll-thin relative flex gap-0 overflow-x-auto pt-1 pb-3">
             <div className="absolute top-[15px] right-4 left-4 h-0.5 bg-border" />
             {weeks.map(({ week, photoCount }) => {
               const active = week.id === selectedWeekId;
