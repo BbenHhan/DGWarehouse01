@@ -3,8 +3,12 @@ import type { Week, WorkType } from "@/lib/types";
 
 // Week labels look like "สัปดาห์ที่ 6 (8-15 มิ.ย. 2569)" — split so the date
 // range can render smaller/muted instead of competing with the week number.
+// The trailing year is dropped too: every week in this dataset is the same
+// year, so repeating "2569" on all 10 chips was just extra width with no
+// information — cutting it shortens the longest label enough to comfortably
+// fit on one line.
 function splitWeekLabel(label: string) {
-  const match = label.match(/^สัปดาห์ที่\s*(\d+)\s*(\(.*\))?/);
+  const match = label.match(/^สัปดาห์ที่\s*(\d+)\s*\((.*?)\s*\d{4}\)/);
   return { number: match?.[1] ?? label, subtitle: match?.[2] };
 }
 
@@ -47,7 +51,7 @@ export function WorkTypeWeekNav({
       {weeks.length === 0 ? (
         <p className="text-sm text-muted-foreground">ยังไม่มีสัปดาห์</p>
       ) : (
-        <div className="scroll-thin relative flex gap-0 overflow-x-auto pt-1 pb-3">
+        <div className="scroll-thin relative flex justify-between gap-1 overflow-x-auto pt-1 pb-3">
           <div className="absolute top-5 right-4 left-4 h-0.5 bg-border" />
           {weeks.map(({ week, photoCount }) => {
             const active = week.id === selectedWeekId;
@@ -57,7 +61,7 @@ export function WorkTypeWeekNav({
               <Link
                 key={week.id}
                 href={`/photos/${currentRoomSlug}/${currentWorkTypeSlug}?week=${week.id}`}
-                className="relative z-10 flex min-w-[104px] shrink-0 flex-col items-center gap-1 px-2"
+                className="relative z-10 flex min-w-[124px] shrink-0 flex-col items-center gap-1 px-2"
               >
                 <span
                   className={[
@@ -78,7 +82,7 @@ export function WorkTypeWeekNav({
                       active ? "text-primary" : hasPhotos ? "text-gold" : "text-muted-foreground",
                     ].join(" ")}
                   >
-                    {subtitle.replace(/[()]/g, "")}
+                    {subtitle}
                   </span>
                 )}
                 <span
