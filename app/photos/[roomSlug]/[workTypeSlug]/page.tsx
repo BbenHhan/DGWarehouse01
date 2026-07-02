@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { getAllWeeks, getPhotos, getRooms, getWeeks, getWorkTypes } from "@/lib/data";
 import { USE_MOCK_DATA } from "@/lib/data-config";
-import { RoomWorkTypeNav } from "@/components/RoomWorkTypeNav";
+import { WorkTypeWeekNav } from "@/components/WorkTypeWeekNav";
 import { PhotoGrid } from "@/components/PhotoGrid";
 import { PhotoUploader } from "@/components/PhotoUploader";
 import { AddWeekButton } from "@/components/AddWeekButton";
@@ -43,7 +43,7 @@ export default async function RoomWorkTypePage({
       });
 
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-col gap-5 p-4 sm:p-6">
+    <div className="flex flex-col gap-5">
       <div>
         <p className="text-xs font-medium text-muted-foreground">
           {currentRoom.emoji} {currentRoom.name_th}
@@ -53,8 +53,7 @@ export default async function RoomWorkTypePage({
         </h1>
       </div>
 
-      <RoomWorkTypeNav
-        rooms={rooms}
+      <WorkTypeWeekNav
         workTypes={workTypes}
         weeks={weeks}
         currentRoomSlug={roomSlug}

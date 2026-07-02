@@ -1,5 +1,5 @@
 import Link from "next/link";
-import type { Room, Week, WorkType } from "@/lib/types";
+import type { Week, WorkType } from "@/lib/types";
 
 function pillClass(active: boolean) {
   return [
@@ -25,15 +25,13 @@ function splitWeekLabel(label: string) {
   return { title: match?.[1] ?? label, subtitle: match?.[2] };
 }
 
-export function RoomWorkTypeNav({
-  rooms,
+export function WorkTypeWeekNav({
   workTypes,
   weeks,
   currentRoomSlug,
   currentWorkTypeSlug,
   selectedWeekId,
 }: {
-  rooms: Room[];
   workTypes: WorkType[];
   weeks: Week[];
   currentRoomSlug: string;
@@ -42,22 +40,6 @@ export function RoomWorkTypeNav({
 }) {
   return (
     <nav className="space-y-4">
-      <div>
-        <SectionLabel>ห้อง</SectionLabel>
-        <div className="flex gap-2 overflow-x-auto pb-1">
-          {rooms.map((room) => (
-            <Link
-              key={room.id}
-              href={`/photos/${room.slug}/${currentWorkTypeSlug}`}
-              className={pillClass(room.slug === currentRoomSlug)}
-            >
-              <span className="text-base leading-none">{room.emoji}</span>
-              {room.name_th}
-            </Link>
-          ))}
-        </div>
-      </div>
-
       <div>
         <SectionLabel>ประเภทงาน</SectionLabel>
         <div className="flex gap-2 overflow-x-auto pb-1">
