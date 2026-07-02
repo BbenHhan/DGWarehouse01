@@ -18,7 +18,7 @@ export function Header({
   return (
     <header className="sticky top-0 z-40 border-b border-border/70 bg-background/85 shadow-[0_1px_0_rgba(155,94,40,.1),0_2px_12px_rgba(0,0,0,.06)] backdrop-blur-xl supports-backdrop-filter:bg-background/70">
       <div className="h-[3px] bg-gradient-to-r from-primary to-gold" />
-      <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-3">
+      <div className="mx-auto flex w-full max-w-[1600px] flex-wrap items-center justify-between gap-3 px-4 py-3">
         <Link href="/photos" className="flex items-center gap-2.5">
           <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-primary-2 text-primary-foreground shadow-[0_4px_18px_rgba(155,94,40,.35)]">
             <Box className="h-5 w-5" />

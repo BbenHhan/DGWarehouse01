@@ -72,7 +72,7 @@ export function PhotoGrid({
 
   return (
     <>
-      <div className="columns-2 gap-3 sm:columns-3 md:columns-4">
+      <div className="columns-2 gap-3 sm:columns-3 md:columns-4 lg:columns-5 xl:columns-6">
         {optimisticPhotos.map((photo, index) => (
           <div
             key={photo.id}

@@ -14,7 +14,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     <div className="flex min-h-screen flex-col">
       <Header stats={siteStats} />
 
-      <div className="mx-auto flex w-full max-w-6xl flex-1 gap-6 p-4 sm:p-6">
+      <div className="mx-auto flex w-full max-w-[1600px] flex-1 gap-6 p-4 sm:p-6">
         <aside className="hidden w-56 shrink-0 md:block">
           <Sidebar
             rooms={rooms}
