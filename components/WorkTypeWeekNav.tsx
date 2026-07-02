@@ -48,22 +48,25 @@ export function WorkTypeWeekNav({
         <p className="text-sm text-muted-foreground">ยังไม่มีสัปดาห์</p>
       ) : (
         <div className="scroll-thin relative flex gap-0 overflow-x-auto pt-1 pb-3">
-          <div className="absolute top-[19px] right-4 left-4 h-0.5 bg-border" />
+          <div className="absolute top-5 right-4 left-4 h-0.5 bg-border" />
           {weeks.map(({ week, photoCount }) => {
             const active = week.id === selectedWeekId;
+            const hasPhotos = photoCount > 0;
             const { number, subtitle } = splitWeekLabel(week.label);
             return (
               <Link
                 key={week.id}
                 href={`/photos/${currentRoomSlug}/${currentWorkTypeSlug}?week=${week.id}`}
-                className="relative z-10 flex min-w-[72px] shrink-0 flex-col items-center gap-1 px-2"
+                className="relative z-10 flex min-w-[104px] shrink-0 flex-col items-center gap-1 px-2"
               >
                 <span
                   className={[
                     "flex h-8 w-8 items-center justify-center rounded-full border-2 text-[10px] font-bold transition-all",
                     active
                       ? "border-transparent bg-gradient-to-br from-primary to-primary-2 text-primary-foreground shadow-[0_0_0_4px_rgba(155,94,40,.18)]"
-                      : "border-border bg-card text-muted-foreground hover:border-primary/40",
+                      : hasPhotos
+                        ? "border-gold bg-gold/15 text-gold"
+                        : "border-border bg-card text-muted-foreground hover:border-primary/40",
                   ].join(" ")}
                 >
                   W{number}
@@ -71,8 +74,8 @@ export function WorkTypeWeekNav({
                 {subtitle && (
                   <span
                     className={[
-                      "text-center text-[10px] leading-tight whitespace-normal",
-                      active ? "text-primary" : "text-muted-foreground",
+                      "text-center text-[10px] leading-tight whitespace-nowrap",
+                      active ? "text-primary" : hasPhotos ? "text-gold" : "text-muted-foreground",
                     ].join(" ")}
                   >
                     {subtitle.replace(/[()]/g, "")}
@@ -81,14 +84,14 @@ export function WorkTypeWeekNav({
                 <span
                   className={[
                     "text-[10px] font-semibold",
-                    photoCount > 0
+                    hasPhotos
                       ? active
                         ? "text-primary"
                         : "text-gold"
                       : "text-muted-foreground/60",
                   ].join(" ")}
                 >
-                  {photoCount > 0 ? photoCount : "—"}
+                  {hasPhotos ? photoCount : "—"}
                 </span>
               </Link>
             );
