@@ -2,7 +2,7 @@
 
 import { useOptimistic, useState, useTransition } from "react";
 import Image from "next/image";
-import { ImageOff, Trash2 } from "lucide-react";
+import { ImageOff, Search, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import type { Photo } from "@/lib/types";
 import { publicFileUrl } from "@/lib/storage";
@@ -24,6 +24,17 @@ import { EditModal } from "@/components/EditModal";
 import { USE_MOCK_DATA } from "@/lib/data-config";
 
 type WeekMoveOption = { value: string; label: string };
+
+// Real photo dimensions aren't stored, so a true masonry needs a stand-in:
+// derive a stable pseudo-random aspect ratio per photo (from its id) rather
+// than forcing every tile into the same square, which is what made the grid
+// feel flat/repetitive.
+const ASPECT_RATIOS = ["aspect-[3/4]", "aspect-square", "aspect-[4/5]", "aspect-[4/3]"];
+function aspectRatioFor(id: string) {
+  let hash = 0;
+  for (let i = 0; i < id.length; i++) hash = (hash * 31 + id.charCodeAt(i)) >>> 0;
+  return ASPECT_RATIOS[hash % ASPECT_RATIOS.length];
+}
 
 export function PhotoGrid({
   photos,
@@ -61,14 +72,15 @@ export function PhotoGrid({
 
   return (
     <>
-      <p className="text-sm text-muted-foreground">
-        {optimisticPhotos.length} รูปภาพ
-      </p>
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+      <p className="text-sm text-muted-foreground">{optimisticPhotos.length} รูปภาพ</p>
+      <div className="columns-2 gap-3 sm:columns-3 md:columns-4">
         {optimisticPhotos.map((photo, index) => (
           <div
             key={photo.id}
-            className="group relative aspect-square overflow-hidden rounded-xl border border-border/60 bg-muted shadow-sm transition-shadow hover:shadow-md"
+            className={[
+              "group relative mb-3 break-inside-avoid overflow-hidden rounded-xl border border-border/60 bg-muted shadow-sm transition-shadow hover:shadow-md",
+              aspectRatioFor(photo.id),
+            ].join(" ")}
           >
             <button
               type="button"
@@ -81,10 +93,11 @@ export function PhotoGrid({
                 alt={photo.file_name}
                 fill
                 sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, 25vw"
-                className="object-cover transition-transform duration-200 group-hover:scale-105"
+                className="object-cover transition-transform duration-300 group-hover:scale-105"
               />
-              <span className="pointer-events-none absolute inset-x-0 bottom-0 truncate bg-gradient-to-t from-black/60 to-transparent px-2 pt-4 pb-1.5 text-left text-[11px] text-white opacity-0 transition-opacity group-hover:opacity-100">
-                {photo.file_name}
+              <span className="pointer-events-none absolute inset-0 flex items-end justify-between gap-2 bg-gradient-to-t from-black/70 via-black/10 to-transparent p-2.5 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
+                <span className="truncate text-[11px] text-white/90">{photo.file_name}</span>
+                <Search className="h-3.5 w-3.5 shrink-0 text-white/80" />
               </span>
             </button>
 

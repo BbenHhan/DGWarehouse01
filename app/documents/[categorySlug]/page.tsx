@@ -9,7 +9,7 @@ function tabClass(active: boolean) {
   return [
     "flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium whitespace-nowrap transition-all",
     active
-      ? "border-primary bg-primary text-primary-foreground shadow-sm"
+      ? "border-transparent bg-gradient-to-br from-primary to-primary-2 text-primary-foreground shadow-[0_3px_14px_rgba(155,94,40,.35)]"
       : "border-border bg-card text-foreground hover:border-primary/40 hover:bg-accent",
   ].join(" ");
 }
@@ -37,7 +37,7 @@ export default async function DocumentCategoryPage({
       }));
 
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-col gap-5 p-4 sm:p-6">
+    <div className="mx-auto flex w-full max-w-6xl flex-col gap-5 p-4 sm:p-6">
       <div>
         <p className="text-xs font-medium text-muted-foreground">รายการเอกสาร</p>
         <h1 className="text-xl font-semibold tracking-tight text-foreground sm:text-2xl">

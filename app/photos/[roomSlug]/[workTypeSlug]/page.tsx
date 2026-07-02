@@ -25,8 +25,17 @@ export default async function RoomWorkTypePage({
   }
 
   const weeks = await getWeeks(currentRoom.id, currentWorkType.id);
-  const selectedWeek = weeks.find((week) => week.id === weekIdParam) ?? weeks[weeks.length - 1];
-  const photos = selectedWeek ? await getPhotos(selectedWeek.id) : [];
+  // Fetch every week's photos once so the timeline can show which weeks
+  // actually have content (v7's "has-photos" gold dot) without a second
+  // round trip for the selected week.
+  const weeksWithPhotos = await Promise.all(
+    weeks.map(async (week) => ({ week, photos: await getPhotos(week.id) }))
+  );
+  const selectedEntry =
+    weeksWithPhotos.find((entry) => entry.week.id === weekIdParam) ??
+    weeksWithPhotos[weeksWithPhotos.length - 1];
+  const selectedWeek = selectedEntry?.week;
+  const photos = selectedEntry?.photos ?? [];
 
   // Photos can move to any room/work-type/week (FR-008), so the EditModal
   // "move to" list spans every week, not just this room/work-type's.
@@ -55,7 +64,10 @@ export default async function RoomWorkTypePage({
 
       <WorkTypeWeekNav
         workTypes={workTypes}
-        weeks={weeks}
+        weeks={weeksWithPhotos.map(({ week, photos: weekPhotos }) => ({
+          week,
+          photoCount: weekPhotos.length,
+        }))}
         currentRoomSlug={roomSlug}
         currentWorkTypeSlug={workTypeSlug}
         selectedWeekId={selectedWeek?.id}

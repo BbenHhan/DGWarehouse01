@@ -38,6 +38,8 @@
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
+  --color-primary-2: var(--primary-2);
+  --color-gold: var(--gold);
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -81,6 +83,11 @@
   --sidebar-accent-foreground: #5c3d1e;
   --sidebar-border: #c6b49a;
   --sidebar-ring: #a8760a;
+
+  /* Gradient/glow accents — not part of shadcn's token set, used for the
+     brand mark, active pills, and progress-style highlights. */
+  --primary-2: #7a4318;
+  --gold: #a8760a;
 }
 
 .dark {
@@ -115,6 +122,9 @@
   --sidebar-accent-foreground: #e8dcc8;
   --sidebar-border: #3d2f22;
   --sidebar-ring: #d1974f;
+
+  --primary-2: #a05e28;
+  --gold: #d4a843;
 }
 
 @layer base {
@@ -123,6 +133,8 @@
   }
   body {
     @apply bg-background text-foreground;
+    /* Subtle grain — flat warm color felt lifeless without it. */
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.05'/%3E%3C/svg%3E");
   }
   html {
     @apply font-sans;

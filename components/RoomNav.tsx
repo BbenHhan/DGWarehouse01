@@ -20,12 +20,15 @@ export function RoomNav({ rooms, onNavigate }: { rooms: Room[]; onNavigate?: () 
             href={`/photos/${room.slug}/${currentWorkTypeSlug}`}
             onClick={onNavigate}
             className={[
-              "flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+              "relative flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-all",
               active
-                ? "bg-primary text-primary-foreground shadow-sm"
-                : "text-foreground hover:bg-accent",
+                ? "bg-primary/12 text-primary"
+                : "text-foreground hover:bg-accent hover:text-accent-foreground",
             ].join(" ")}
           >
+            {active && (
+              <span className="absolute top-[18%] left-0 h-[64%] w-[3px] rounded-r-[3px] bg-primary shadow-[0_0_10px_rgba(155,94,40,.5)]" />
+            )}
             <span className="text-base leading-none">{room.emoji}</span>
             {room.name_th}
           </Link>

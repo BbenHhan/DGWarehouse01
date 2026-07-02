@@ -1,15 +1,6 @@
 import Link from "next/link";
 import type { Week, WorkType } from "@/lib/types";
 
-function pillClass(active: boolean) {
-  return [
-    "flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium whitespace-nowrap transition-all",
-    active
-      ? "border-primary bg-primary text-primary-foreground shadow-sm"
-      : "border-border bg-card text-foreground hover:border-primary/40 hover:bg-accent",
-  ].join(" ");
-}
-
 function SectionLabel({ children }: { children: string }) {
   return (
     <p className="mb-1.5 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
@@ -21,8 +12,8 @@ function SectionLabel({ children }: { children: string }) {
 // Week labels look like "สัปดาห์ที่ 6 (8-15 มิ.ย. 2569)" — split so the date
 // range can render smaller/muted instead of competing with the week number.
 function splitWeekLabel(label: string) {
-  const match = label.match(/^(.*?)\s*(\(.*\))?$/);
-  return { title: match?.[1] ?? label, subtitle: match?.[2] };
+  const match = label.match(/^สัปดาห์ที่\s*(\d+)\s*(\(.*\))?/);
+  return { short: match?.[1] ?? label, subtitle: match?.[2] };
 }
 
 export function WorkTypeWeekNav({
@@ -33,7 +24,7 @@ export function WorkTypeWeekNav({
   selectedWeekId,
 }: {
   workTypes: WorkType[];
-  weeks: Week[];
+  weeks: Array<{ week: Week; photoCount: number }>;
   currentRoomSlug: string;
   currentWorkTypeSlug: string;
   selectedWeekId: string | undefined;
@@ -43,16 +34,24 @@ export function WorkTypeWeekNav({
       <div>
         <SectionLabel>ประเภทงาน</SectionLabel>
         <div className="flex gap-2 overflow-x-auto pb-1">
-          {workTypes.map((workType) => (
-            <Link
-              key={workType.id}
-              href={`/photos/${currentRoomSlug}/${workType.slug}`}
-              className={pillClass(workType.slug === currentWorkTypeSlug)}
-            >
-              <span className="text-base leading-none">{workType.emoji}</span>
-              {workType.name_th}
-            </Link>
-          ))}
+          {workTypes.map((workType) => {
+            const active = workType.slug === currentWorkTypeSlug;
+            return (
+              <Link
+                key={workType.id}
+                href={`/photos/${currentRoomSlug}/${workType.slug}`}
+                className={[
+                  "flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium whitespace-nowrap transition-all",
+                  active
+                    ? "border-transparent bg-gradient-to-br from-primary to-primary-2 text-primary-foreground shadow-[0_3px_14px_rgba(155,94,40,.35)]"
+                    : "border-border bg-card text-foreground hover:border-primary/40 hover:bg-accent",
+                ].join(" ")}
+              >
+                <span className="text-base leading-none">{workType.emoji}</span>
+                {workType.name_th}
+              </Link>
+            );
+          })}
         </div>
       </div>
 
@@ -61,30 +60,40 @@ export function WorkTypeWeekNav({
         {weeks.length === 0 ? (
           <p className="text-sm text-muted-foreground">ยังไม่มีสัปดาห์</p>
         ) : (
-          <div className="flex gap-2 overflow-x-auto pb-1">
-            {weeks.map((week) => {
+          <div className="relative flex gap-0 overflow-x-auto pt-1 pb-2">
+            <div className="absolute top-[15px] right-4 left-4 h-0.5 bg-border" />
+            {weeks.map(({ week, photoCount }) => {
               const active = week.id === selectedWeekId;
-              const { title, subtitle } = splitWeekLabel(week.label);
+              const hasPhotos = photoCount > 0;
+              const { short, subtitle } = splitWeekLabel(week.label);
               return (
                 <Link
                   key={week.id}
                   href={`/photos/${currentRoomSlug}/${currentWorkTypeSlug}?week=${week.id}`}
-                  className={[
-                    "flex shrink-0 flex-col rounded-xl border px-3 py-1.5 whitespace-nowrap transition-all",
-                    active
-                      ? "border-primary bg-primary text-primary-foreground shadow-sm"
-                      : "border-border bg-card text-foreground hover:border-primary/40 hover:bg-accent",
-                  ].join(" ")}
+                  className="relative z-10 flex min-w-[76px] shrink-0 flex-col items-center gap-1.5 px-2.5"
                 >
-                  <span className="text-sm font-semibold">{title}</span>
+                  <span
+                    className={[
+                      "flex h-7 w-7 items-center justify-center rounded-full border-2 text-[11px] font-bold transition-all",
+                      active && hasPhotos
+                        ? "border-gold bg-gold text-[#1a1310] shadow-[0_0_0_4px_rgba(212,168,67,.2)]"
+                        : active
+                          ? "border-primary bg-secondary shadow-[0_0_0_4px_rgba(155,94,40,.18)]"
+                          : hasPhotos
+                            ? "border-gold bg-gold/10 text-gold"
+                            : "border-border bg-secondary text-muted-foreground",
+                    ].join(" ")}
+                  >
+                    {short}
+                  </span>
                   {subtitle && (
                     <span
                       className={[
-                        "text-[11px] leading-tight",
-                        active ? "text-primary-foreground/80" : "text-muted-foreground",
+                        "text-center text-[10px] leading-tight whitespace-normal",
+                        active ? "text-primary" : hasPhotos ? "text-gold" : "text-muted-foreground",
                       ].join(" ")}
                     >
-                      {subtitle}
+                      {subtitle.replace(/[()]/g, "")}
                     </span>
                   )}
                 </Link>
