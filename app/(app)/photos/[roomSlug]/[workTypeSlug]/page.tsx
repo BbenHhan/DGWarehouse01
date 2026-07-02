@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { getAllWeeks, getPhotos, getRooms, getWeeks, getWorkTypes } from "@/lib/data";
+import { getAllWeeks, getPhotos, getRoomPhotoCounts, getRooms, getWeeks, getWorkTypes } from "@/lib/data";
 import { USE_MOCK_DATA } from "@/lib/data-config";
 import { WorkTypeWeekNav } from "@/components/WorkTypeWeekNav";
 import { PhotoGrid } from "@/components/PhotoGrid";
@@ -16,13 +16,22 @@ export default async function RoomWorkTypePage({
   const { roomSlug, workTypeSlug } = await params;
   const { week: weekIdParam } = await searchParams;
 
-  const [rooms, workTypes] = await Promise.all([getRooms(), getWorkTypes()]);
+  const [rooms, workTypes, roomPhotoCounts] = await Promise.all([
+    getRooms(),
+    getWorkTypes(),
+    getRoomPhotoCounts(),
+  ]);
   const currentRoom = rooms.find((room) => room.slug === roomSlug);
   const currentWorkType = workTypes.find((workType) => workType.slug === workTypeSlug);
 
   if (!currentRoom || !currentWorkType) {
     notFound();
   }
+
+  // Mirrors Sidebar's grouping — ห้องย่อย 1-4 physically live under ❄️ ห้องเย็น.
+  const roomGroupLabel = currentRoom.slug.startsWith("hong-soi-")
+    ? "ห้องเย็น"
+    : currentRoom.name_th;
 
   const weeks = await getWeeks(currentRoom.id, currentWorkType.id);
   // Fetch every week's photos once so the timeline can show which weeks
@@ -53,13 +62,18 @@ export default async function RoomWorkTypePage({
 
   return (
     <div className="flex flex-col gap-5">
-      <div>
-        <p className="text-xs font-medium text-muted-foreground">
-          {currentRoom.emoji} {currentRoom.name_th}
-        </p>
-        <h1 className="text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
-          {currentWorkType.emoji} {currentWorkType.name_th}
-        </h1>
+      <div className="flex items-center gap-3">
+        <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-primary-2 text-xl shadow-[0_4px_18px_rgba(155,94,40,.3)]">
+          {currentRoom.emoji}
+        </span>
+        <div>
+          <h1 className="text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
+            {currentRoom.name_th}
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            {roomGroupLabel} · {roomPhotoCounts[currentRoom.id] ?? 0} รูป
+          </p>
+        </div>
       </div>
 
       <WorkTypeWeekNav
@@ -81,6 +95,14 @@ export default async function RoomWorkTypePage({
       )}
 
       <div className="border-t border-border/70 pt-4">
+        {selectedWeek && (
+          <div className="mb-3 flex flex-wrap items-center gap-2 text-sm">
+            <span className="rounded-full border border-primary/20 bg-primary/10 px-3 py-1 font-semibold text-primary">
+              {photos.length} รูป
+            </span>
+            <span className="text-muted-foreground">{selectedWeek.label}</span>
+          </div>
+        )}
         <PhotoGrid photos={photos} weekMoveOptions={weekMoveOptions} />
       </div>
     </div>

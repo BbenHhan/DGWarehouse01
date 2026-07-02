@@ -37,12 +37,17 @@ export default async function DocumentCategoryPage({
       }));
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-col gap-5 p-4 sm:p-6">
-      <div>
-        <p className="text-xs font-medium text-muted-foreground">รายการเอกสาร</p>
-        <h1 className="text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
-          {currentCategory.emoji} {currentCategory.name_th}
-        </h1>
+    <div className="flex flex-col gap-5">
+      <div className="flex items-center gap-3">
+        <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-primary-2 text-xl shadow-[0_4px_18px_rgba(155,94,40,.3)]">
+          {currentCategory.emoji}
+        </span>
+        <div>
+          <h1 className="text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
+            {currentCategory.name_th}
+          </h1>
+          <p className="text-sm text-muted-foreground">รายการเอกสาร · {documents.length} ไฟล์</p>
+        </div>
       </div>
 
       <nav className="scroll-thin flex gap-2 overflow-x-auto pb-2">

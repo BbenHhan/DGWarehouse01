@@ -72,7 +72,6 @@ export function PhotoGrid({
 
   return (
     <>
-      <p className="text-sm text-muted-foreground">{optimisticPhotos.length} รูปภาพ</p>
       <div className="columns-2 gap-3 sm:columns-3 md:columns-4">
         {optimisticPhotos.map((photo, index) => (
           <div

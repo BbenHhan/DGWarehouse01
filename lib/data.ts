@@ -7,7 +7,9 @@ import {
   mockGetDocumentCategories,
   mockGetDocuments,
   mockGetPhotos,
+  mockGetRoomPhotoCounts,
   mockGetRooms,
+  mockGetSiteStats,
   mockGetWeeks,
   mockGetWorkTypes,
 } from "@/lib/mock/source";
@@ -99,4 +101,40 @@ export async function getDocuments(categoryId: string): Promise<Document[]> {
     .order("created_at");
   if (error) throw error;
   return data;
+}
+
+// Header stats chips (total photos/documents/distinct weeks site-wide).
+export async function getSiteStats(): Promise<{
+  totalPhotos: number;
+  totalDocuments: number;
+  totalWeeks: number;
+}> {
+  if (USE_MOCK_DATA) return mockGetSiteStats();
+
+  await requireUser();
+  const supabase = createServiceClient();
+  const [{ count: totalPhotos }, { count: totalDocuments }, { data: weeks }] = await Promise.all([
+    supabase.from("photos").select("*", { count: "exact", head: true }),
+    supabase.from("documents").select("*", { count: "exact", head: true }),
+    supabase.from("weeks").select("week_number"),
+  ]);
+  const totalWeeks = new Set((weeks ?? []).map((week) => week.week_number)).size;
+  return { totalPhotos: totalPhotos ?? 0, totalDocuments: totalDocuments ?? 0, totalWeeks };
+}
+
+// Total photo count per room, across every work type/week — sidebar badges.
+export async function getRoomPhotoCounts(): Promise<Record<string, number>> {
+  if (USE_MOCK_DATA) return mockGetRoomPhotoCounts();
+
+  await requireUser();
+  const supabase = createServiceClient();
+  const { data, error } = await supabase.from("photos").select("week_id, weeks!inner(room_id)");
+  if (error) throw error;
+
+  const counts: Record<string, number> = {};
+  for (const row of data as unknown as Array<{ weeks: { room_id: string } }>) {
+    const roomId = row.weeks.room_id;
+    counts[roomId] = (counts[roomId] ?? 0) + 1;
+  }
+  return counts;
 }

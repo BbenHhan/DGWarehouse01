@@ -234,3 +234,37 @@ export async function mockGetDocumentCategories(): Promise<DocumentCategory[]> {
 export async function mockGetDocuments(categoryId: string): Promise<Document[]> {
   return getDocumentIndex().get(categoryId) ?? [];
 }
+
+// Site-wide header stats (total photos/documents/distinct weeks).
+export async function mockGetSiteStats(): Promise<{
+  totalPhotos: number;
+  totalDocuments: number;
+  totalWeeks: number;
+}> {
+  const photoIndex = getPhotoIndex();
+  const documentIndex = getDocumentIndex();
+
+  let totalPhotos = 0;
+  const weekNumbers = new Set<number>();
+  for (const entry of photoIndex.values()) {
+    totalPhotos += entry.photos.length;
+    weekNumbers.add(entry.week.week_number);
+  }
+
+  let totalDocuments = 0;
+  for (const documents of documentIndex.values()) {
+    totalDocuments += documents.length;
+  }
+
+  return { totalPhotos, totalDocuments, totalWeeks: weekNumbers.size };
+}
+
+// Total photo count per room, across every work type/week — used for the
+// sidebar's per-room count badges.
+export async function mockGetRoomPhotoCounts(): Promise<Record<string, number>> {
+  const counts: Record<string, number> = {};
+  for (const entry of getPhotoIndex().values()) {
+    counts[entry.week.room_id] = (counts[entry.week.room_id] ?? 0) + entry.photos.length;
+  }
+  return counts;
+}
