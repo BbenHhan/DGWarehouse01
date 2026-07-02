@@ -7,10 +7,10 @@ import { DocUploader } from "@/components/DocUploader";
 
 function tabClass(active: boolean) {
   return [
-    "rounded-full border px-3 py-1.5 text-sm whitespace-nowrap transition-colors",
+    "flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium whitespace-nowrap transition-all",
     active
-      ? "border-primary bg-primary text-primary-foreground"
-      : "border-border bg-background text-foreground hover:bg-accent",
+      ? "border-primary bg-primary text-primary-foreground shadow-sm"
+      : "border-border bg-card text-foreground hover:border-primary/40 hover:bg-accent",
   ].join(" ");
 }
 
@@ -37,20 +37,32 @@ export default async function DocumentCategoryPage({
       }));
 
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-col gap-4 p-4">
-      <nav className="flex flex-wrap gap-2 overflow-x-auto">
+    <div className="mx-auto flex w-full max-w-5xl flex-col gap-5 p-4 sm:p-6">
+      <div>
+        <p className="text-xs font-medium text-muted-foreground">รายการเอกสาร</p>
+        <h1 className="text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
+          {currentCategory.emoji} {currentCategory.name_th}
+        </h1>
+      </div>
+
+      <nav className="flex gap-2 overflow-x-auto pb-1">
         {categories.map((category) => (
           <Link
             key={category.id}
             href={`/documents/${category.slug}`}
             className={tabClass(category.slug === categorySlug)}
           >
-            {category.emoji} {category.name_th}
+            <span className="text-base leading-none">{category.emoji}</span>
+            {category.name_th}
           </Link>
         ))}
       </nav>
+
       {!USE_MOCK_DATA && <DocUploader categoryId={currentCategory.id} />}
-      <DocList documents={documents} categoryMoveOptions={categoryMoveOptions} />
+
+      <div className="border-t border-border/70 pt-4">
+        <DocList documents={documents} categoryMoveOptions={categoryMoveOptions} />
+      </div>
     </div>
   );
 }

@@ -2,7 +2,7 @@
 
 import { useOptimistic, useState, useTransition } from "react";
 import Image from "next/image";
-import { Trash2 } from "lucide-react";
+import { ImageOff, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import type { Photo } from "@/lib/types";
 import { publicFileUrl } from "@/lib/storage";
@@ -51,8 +51,9 @@ export function PhotoGrid({
 
   if (optimisticPhotos.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center gap-1 rounded-lg border border-dashed p-12 text-center text-muted-foreground">
-        <p>ยังไม่มีรูปภาพในสัปดาห์นี้</p>
+      <div className="flex flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-border bg-card/40 p-12 text-center text-muted-foreground">
+        <ImageOff className="h-8 w-8 opacity-50" />
+        <p className="font-medium">ยังไม่มีรูปภาพในสัปดาห์นี้</p>
         {!USE_MOCK_DATA && <p className="text-sm">อัปโหลดรูปภาพแรกของคุณด้านล่าง</p>}
       </div>
     );
@@ -60,9 +61,15 @@ export function PhotoGrid({
 
   return (
     <>
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
+      <p className="text-sm text-muted-foreground">
+        {optimisticPhotos.length} รูปภาพ
+      </p>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
         {optimisticPhotos.map((photo, index) => (
-          <div key={photo.id} className="relative aspect-square overflow-hidden rounded-md bg-muted">
+          <div
+            key={photo.id}
+            className="group relative aspect-square overflow-hidden rounded-xl border border-border/60 bg-muted shadow-sm transition-shadow hover:shadow-md"
+          >
             <button
               type="button"
               onClick={() => setOpenIndex(index)}
@@ -74,8 +81,11 @@ export function PhotoGrid({
                 alt={photo.file_name}
                 fill
                 sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, 25vw"
-                className="object-cover"
+                className="object-cover transition-transform duration-200 group-hover:scale-105"
               />
+              <span className="pointer-events-none absolute inset-x-0 bottom-0 truncate bg-gradient-to-t from-black/60 to-transparent px-2 pt-4 pb-1.5 text-left text-[11px] text-white opacity-0 transition-opacity group-hover:opacity-100">
+                {photo.file_name}
+              </span>
             </button>
 
             {!USE_MOCK_DATA && (

@@ -48,71 +48,81 @@ export function DocList({
 
   if (optimisticDocuments.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center gap-1 rounded-lg border border-dashed p-12 text-center text-muted-foreground">
-        <p>ยังไม่มีเอกสารในหมวดนี้</p>
+      <div className="flex flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-border bg-card/40 p-12 text-center text-muted-foreground">
+        <FileText className="h-8 w-8 opacity-50" />
+        <p className="font-medium">ยังไม่มีเอกสารในหมวดนี้</p>
         {!USE_MOCK_DATA && <p className="text-sm">อัปโหลดเอกสารแรกของคุณด้านล่าง</p>}
       </div>
     );
   }
 
   return (
-    <ul className="divide-y divide-border rounded-lg border">
-      {optimisticDocuments.map((doc) => (
-        <li key={doc.id} className="flex items-center gap-3 p-3">
-          <a
-            href={publicFileUrl("documents", doc.storage_path)}
-            target="_blank"
-            rel="noreferrer"
-            className="flex min-w-0 flex-1 items-center gap-3 hover:opacity-80"
+    <ul className="space-y-2">
+      {optimisticDocuments.map((doc) => {
+        const extension = doc.file_name.split(".").pop()?.toUpperCase() ?? "";
+        return (
+          <li
+            key={doc.id}
+            className="flex items-center gap-3 rounded-xl border border-border/60 bg-card p-3 shadow-sm transition-shadow hover:shadow-md"
           >
-            <FileText className="h-5 w-5 shrink-0 text-muted-foreground" />
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium">{doc.file_name}</p>
-              {doc.note && (
-                <p className="truncate text-xs text-muted-foreground">{doc.note}</p>
-              )}
-            </div>
-          </a>
+            <a
+              href={publicFileUrl("documents", doc.storage_path)}
+              target="_blank"
+              rel="noreferrer"
+              className="flex min-w-0 flex-1 items-center gap-3"
+            >
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-secondary text-secondary-foreground">
+                <FileText className="h-5 w-5" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium text-foreground">{doc.file_name}</p>
+                <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <span className="font-medium tracking-wide">{extension}</span>
+                  {doc.note && <span className="truncate">· {doc.note}</span>}
+                </p>
+              </div>
+            </a>
 
-          {!USE_MOCK_DATA && (
-            <div className="flex shrink-0 gap-1">
-              <EditModal
-                kind="document"
-                item={doc}
-                moveOptions={categoryMoveOptions}
-                moveLabel="ย้ายไปหมวด"
-              />
-
-              <AlertDialog>
-                <AlertDialogTrigger
-                  render={
-                    <Button
-                      type="button"
-                      size="icon-sm"
-                      variant="destructive"
-                      aria-label={`ลบเอกสาร ${doc.file_name}`}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  }
+            {!USE_MOCK_DATA && (
+              <div className="flex shrink-0 gap-1">
+                <EditModal
+                  kind="document"
+                  item={doc}
+                  moveOptions={categoryMoveOptions}
+                  moveLabel="ย้ายไปหมวด"
                 />
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>ลบเอกสารนี้?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      การลบนี้ไม่สามารถย้อนกลับได้ เอกสารจะถูกลบออกทันที
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>ยกเลิก</AlertDialogCancel>
-                    <AlertDialogAction onClick={() => handleDelete(doc.id)}>ลบ</AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-            </div>
-          )}
-        </li>
-      ))}
+
+                <AlertDialog>
+                  <AlertDialogTrigger
+                    render={
+                      <Button
+                        type="button"
+                        size="icon-sm"
+                        variant="destructive"
+                        aria-label={`ลบเอกสาร ${doc.file_name}`}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    }
+                  />
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>ลบเอกสารนี้?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        การลบนี้ไม่สามารถย้อนกลับได้ เอกสารจะถูกลบออกทันที
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>ยกเลิก</AlertDialogCancel>
+                      <AlertDialogAction onClick={() => handleDelete(doc.id)}>ลบ</AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </div>
+            )}
+          </li>
+        );
+      })}
     </ul>
   );
 }

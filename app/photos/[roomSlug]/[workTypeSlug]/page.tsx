@@ -43,7 +43,16 @@ export default async function RoomWorkTypePage({
       });
 
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-col gap-4 p-4">
+    <div className="mx-auto flex w-full max-w-5xl flex-col gap-5 p-4 sm:p-6">
+      <div>
+        <p className="text-xs font-medium text-muted-foreground">
+          {currentRoom.emoji} {currentRoom.name_th}
+        </p>
+        <h1 className="text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
+          {currentWorkType.emoji} {currentWorkType.name_th}
+        </h1>
+      </div>
+
       <RoomWorkTypeNav
         rooms={rooms}
         workTypes={workTypes}
@@ -52,13 +61,17 @@ export default async function RoomWorkTypePage({
         currentWorkTypeSlug={workTypeSlug}
         selectedWeekId={selectedWeek?.id}
       />
+
       {!USE_MOCK_DATA && (
         <div className="flex flex-wrap items-center gap-2">
           {selectedWeek && <PhotoUploader weekId={selectedWeek.id} />}
           <AddWeekButton roomId={currentRoom.id} workTypeId={currentWorkType.id} />
         </div>
       )}
-      <PhotoGrid photos={photos} weekMoveOptions={weekMoveOptions} />
+
+      <div className="border-t border-border/70 pt-4">
+        <PhotoGrid photos={photos} weekMoveOptions={weekMoveOptions} />
+      </div>
     </div>
   );
 }
