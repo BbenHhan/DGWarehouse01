@@ -1,15 +1,25 @@
 import Link from "next/link";
 import type { Week, WorkType } from "@/lib/types";
+import { formatWeekDateRangeOrNull } from "@/lib/week-format";
+import { DeleteWeekButton } from "@/components/DeleteWeekButton";
 
-// Week labels look like "สัปดาห์ที่ 6 (8-15 มิ.ย. 2569)" — split so the date
-// range can render smaller/muted instead of competing with the week number.
-// The trailing year is dropped too: every week in this dataset is the same
-// year, so repeating "2569" on all 10 chips was just extra width with no
-// information — cutting it shortens the longest label enough to comfortably
-// fit on one line.
+// Legacy fallback for "mock" backend weeks, which have no start_date/end_date
+// (see specs/002-week-date-range-ui/research.md Decision 3) — their label text
+// already embeds a date range like "สัปดาห์ที่ 6 (8-15 มิ.ย. 2569)".
 function splitWeekLabel(label: string) {
   const match = label.match(/^สัปดาห์ที่\s*(\d+)\s*\((.*?)\s*\d{4}\)/);
   return { number: match?.[1] ?? label, subtitle: match?.[2] };
+}
+
+// Primary card text is the week's date range when available (local/supabase
+// weeks); mock-backend weeks fall back to their legacy label parsing.
+function weekCardText(week: Week) {
+  const dateRange = formatWeekDateRangeOrNull(week);
+  if (dateRange) {
+    return { primary: dateRange, secondary: null as string | null };
+  }
+  const { number, subtitle } = splitWeekLabel(week.label);
+  return { primary: `สัปดาห์ที่ ${number}`, secondary: subtitle ?? null };
 }
 
 export function WorkTypeWeekNav({
@@ -18,12 +28,14 @@ export function WorkTypeWeekNav({
   currentRoomSlug,
   currentWorkTypeSlug,
   selectedWeekId,
+  showActions,
 }: {
   workTypes: WorkType[];
   weeks: Array<{ week: Week; photoCount: number }>;
   currentRoomSlug: string;
   currentWorkTypeSlug: string;
   selectedWeekId: string | undefined;
+  showActions: boolean;
 }) {
   return (
     <nav className="space-y-4">
@@ -51,53 +63,60 @@ export function WorkTypeWeekNav({
       {weeks.length === 0 ? (
         <p className="text-sm text-muted-foreground">ยังไม่มีสัปดาห์</p>
       ) : (
-        <div className="scroll-thin relative flex justify-between gap-1 overflow-x-auto pt-1 pb-3">
-          <div className="absolute top-5 right-4 left-4 h-0.5 bg-border" />
+        <div className="scroll-thin flex gap-2 overflow-x-auto pt-1 pb-3">
           {weeks.map(({ week, photoCount }) => {
             const active = week.id === selectedWeekId;
             const hasPhotos = photoCount > 0;
-            const { number, subtitle } = splitWeekLabel(week.label);
+            const { primary, secondary } = weekCardText(week);
             return (
-              <Link
+              <div
                 key={week.id}
-                href={`/photos/${currentRoomSlug}/${currentWorkTypeSlug}?week=${week.id}`}
-                className="relative z-10 flex min-w-[124px] shrink-0 flex-col items-center gap-1 px-2"
+                className={[
+                  "group relative min-w-[132px] shrink-0 rounded-xl border transition-all",
+                  active
+                    ? "border-transparent bg-gradient-to-br from-primary to-primary-2 text-primary-foreground shadow-[0_3px_14px_rgba(155,94,40,.35)]"
+                    : hasPhotos
+                      ? "border-gold bg-gold/10 text-foreground hover:border-gold/60"
+                      : "border-border bg-card text-foreground hover:border-primary/40 hover:bg-accent",
+                ].join(" ")}
               >
-                <span
-                  className={[
-                    "flex h-8 w-8 items-center justify-center rounded-full border-2 text-[10px] font-bold transition-all",
-                    active
-                      ? "border-transparent bg-gradient-to-br from-primary to-primary-2 text-primary-foreground shadow-[0_0_0_4px_rgba(155,94,40,.18)]"
-                      : hasPhotos
-                        ? "border-gold bg-gold/15 text-gold"
-                        : "border-border bg-card text-muted-foreground hover:border-primary/40",
-                  ].join(" ")}
+                <Link
+                  href={`/photos/${currentRoomSlug}/${currentWorkTypeSlug}?week=${week.id}`}
+                  className={["flex flex-col gap-0.5 px-3 py-2.5", showActions ? "pr-8" : ""].join(" ")}
                 >
-                  W{number}
-                </span>
-                {subtitle && (
+                  <span className="text-sm leading-tight font-semibold whitespace-nowrap">{primary}</span>
+                  {secondary && (
+                    <span
+                      className={[
+                        "text-xs leading-tight whitespace-nowrap",
+                        active ? "text-primary-foreground/80" : "text-muted-foreground",
+                      ].join(" ")}
+                    >
+                      {secondary}
+                    </span>
+                  )}
                   <span
                     className={[
-                      "text-center text-[10px] leading-tight whitespace-nowrap",
-                      active ? "text-primary" : hasPhotos ? "text-gold" : "text-muted-foreground",
+                      "text-xs font-medium",
+                      hasPhotos
+                        ? active
+                          ? "text-primary-foreground/90"
+                          : "text-gold"
+                        : active
+                          ? "text-primary-foreground/70"
+                          : "text-muted-foreground/60",
                     ].join(" ")}
                   >
-                    {subtitle}
+                    {hasPhotos ? `${photoCount} ไฟล์` : "ยังไม่มีไฟล์"}
                   </span>
+                </Link>
+
+                {showActions && (
+                  <div className="absolute top-1.5 right-1.5">
+                    <DeleteWeekButton weekId={week.id} photoCount={photoCount} />
+                  </div>
                 )}
-                <span
-                  className={[
-                    "text-[10px] font-semibold",
-                    hasPhotos
-                      ? active
-                        ? "text-primary"
-                        : "text-gold"
-                      : "text-muted-foreground/60",
-                  ].join(" ")}
-                >
-                  {hasPhotos ? photoCount : "—"}
-                </span>
-              </Link>
+              </div>
             );
           })}
         </div>

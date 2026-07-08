@@ -25,7 +25,7 @@ export function DocUploader({ categoryId }: { categoryId: string }) {
       const failed = result.data.results.filter((r) => !r.success);
 
       if (succeeded.length > 0) {
-        toast.success(`อัปโหลดสำเร็จ ${succeeded.length} เอกสาร`);
+        toast.success(`อัปโหลดสำเร็จ ${succeeded.length} ไฟล์`);
       }
       failed.forEach((f) => toast.error(`${f.fileName}: ${f.error}`));
 
@@ -38,7 +38,7 @@ export function DocUploader({ categoryId }: { categoryId: string }) {
       <input
         ref={inputRef}
         type="file"
-        accept="application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        accept="application/pdf,image/*,video/mp4,video/quicktime,video/webm,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         multiple
         className="hidden"
         onChange={(e) => handleFiles(e.target.files)}
@@ -50,7 +50,7 @@ export function DocUploader({ categoryId }: { categoryId: string }) {
         disabled={isPending}
         onClick={() => inputRef.current?.click()}
       >
-        {isPending ? "กำลังอัปโหลด..." : "+ เพิ่มเอกสาร"}
+        {isPending ? "กำลังอัปโหลด..." : "+ เพิ่มไฟล์"}
       </Button>
     </div>
   );

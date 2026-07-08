@@ -54,6 +54,8 @@ export type Database = {
           work_type_id: string;
           week_number: number;
           label: string;
+          start_date: string | null;
+          end_date: string | null;
           created_at: string;
         };
         Insert: {
@@ -62,6 +64,8 @@ export type Database = {
           work_type_id: string;
           week_number: number;
           label: string;
+          start_date?: string | null;
+          end_date?: string | null;
           created_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["weeks"]["Insert"]>;

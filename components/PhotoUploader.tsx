@@ -25,7 +25,7 @@ export function PhotoUploader({ weekId }: { weekId: string }) {
       const failed = result.data.results.filter((r) => !r.success);
 
       if (succeeded.length > 0) {
-        toast.success(`อัปโหลดสำเร็จ ${succeeded.length} รูป`);
+        toast.success(`อัปโหลดสำเร็จ ${succeeded.length} ไฟล์`);
       }
       failed.forEach((f) => toast.error(`${f.fileName}: ${f.error}`));
 
@@ -38,7 +38,7 @@ export function PhotoUploader({ weekId }: { weekId: string }) {
       <input
         ref={inputRef}
         type="file"
-        accept="image/jpeg,image/png,image/heic,image/heif"
+        accept="image/*,application/pdf,video/mp4,video/quicktime,video/webm"
         multiple
         className="hidden"
         onChange={(e) => handleFiles(e.target.files)}
@@ -50,7 +50,7 @@ export function PhotoUploader({ weekId }: { weekId: string }) {
         disabled={isPending}
         onClick={() => inputRef.current?.click()}
       >
-        {isPending ? "กำลังอัปโหลด..." : "+ เพิ่มรูปภาพ"}
+        {isPending ? "กำลังอัปโหลด..." : "+ เพิ่มรูป/PDF/วิดีโอ"}
       </Button>
     </div>
   );

@@ -4,6 +4,12 @@ import { randomUUID } from "crypto";
 import { revalidatePath } from "next/cache";
 import { createServiceClient, requireUser } from "@/lib/supabase/server";
 import { DOCUMENT_MIME_TYPES, editDocSchema, uploadDocSchema, validateFile } from "@/lib/validation";
+import { DATA_SOURCE } from "@/lib/data-config";
+import {
+  localDeleteDocument,
+  localSaveDocumentFile,
+  localUpdateDocument,
+} from "@/lib/local/store";
 import type { ActionResult, Document, UploadDocOutput } from "@/lib/types";
 
 async function assertAuthenticated(): Promise<string | null> {
@@ -27,8 +33,25 @@ export async function uploadDoc(
     return { ok: false, error: parsed.error.issues[0]?.message ?? "ข้อมูลไม่ถูกต้อง" };
   }
 
-  const supabase = createServiceClient();
   const results: UploadDocOutput["results"] = [];
+
+  if (DATA_SOURCE === "local") {
+    for (const file of parsed.data.files) {
+      const fileError = validateFile(file, DOCUMENT_MIME_TYPES);
+      if (fileError) {
+        results.push({ fileName: file.name, success: false, error: fileError });
+        continue;
+      }
+
+      const document = await localSaveDocumentFile(categoryId, file);
+      results.push({ fileName: file.name, success: true, item: document });
+    }
+
+    revalidatePath("/documents/[categorySlug]", "page");
+    return { ok: true, data: { results } };
+  }
+
+  const supabase = createServiceClient();
 
   for (const file of parsed.data.files) {
     const fileError = validateFile(file, DOCUMENT_MIME_TYPES);
@@ -74,6 +97,15 @@ export async function deleteDoc(documentId: string): Promise<ActionResult<{ docu
   const authError = await assertAuthenticated();
   if (authError) return { ok: false, error: authError };
 
+  if (DATA_SOURCE === "local") {
+    const removed = await localDeleteDocument(documentId);
+    if (!removed) {
+      return { ok: false, error: "ไม่พบเอกสารนี้" };
+    }
+    revalidatePath("/documents/[categorySlug]", "page");
+    return { ok: true, data: { documentId } };
+  }
+
   const supabase = createServiceClient();
 
   const { data: document, error: fetchError } = await supabase
@@ -118,6 +150,16 @@ export async function editDoc(input: {
   }
 
   const { documentId, fileName, note, categoryId } = parsed.data;
+
+  if (DATA_SOURCE === "local") {
+    const document = await localUpdateDocument(documentId, { fileName, note, categoryId });
+    if (!document) {
+      return { ok: false, error: "แก้ไขข้อมูลไม่สำเร็จ" };
+    }
+    revalidatePath("/documents/[categorySlug]", "page");
+    return { ok: true, data: document };
+  }
+
   const supabase = createServiceClient();
 
   const { data: document, error } = await supabase

@@ -1,7 +1,7 @@
 import "server-only";
 
 import { createServiceClient, requireUser } from "@/lib/supabase/server";
-import { USE_MOCK_DATA } from "@/lib/data-config";
+import { DATA_SOURCE } from "@/lib/data-config";
 import {
   mockGetAllWeeks,
   mockGetDocumentCategories,
@@ -13,10 +13,23 @@ import {
   mockGetWeeks,
   mockGetWorkTypes,
 } from "@/lib/mock/source";
+import {
+  localGetAllWeeks,
+  localGetDocuments,
+  localGetPhotos,
+  localGetRoomPhotoCounts,
+  localGetSiteStats,
+  localGetWeeks,
+} from "@/lib/local/store";
 import type { Document, DocumentCategory, Photo, Room, Week, WorkType } from "@/lib/types";
 
+// Rooms/work types/document categories are the same fixed lookup lists in
+// both non-Supabase modes ("local" and "mock") — neither depends on disk
+// state, so both share the mock module's static arrays instead of a
+// duplicate copy living in lib/local/store.ts (Constitution VIII: one
+// source of truth per list).
 export async function getRooms(): Promise<Room[]> {
-  if (USE_MOCK_DATA) return mockGetRooms();
+  if (DATA_SOURCE !== "supabase") return mockGetRooms();
 
   await requireUser();
   const supabase = createServiceClient();
@@ -26,7 +39,7 @@ export async function getRooms(): Promise<Room[]> {
 }
 
 export async function getWorkTypes(): Promise<WorkType[]> {
-  if (USE_MOCK_DATA) return mockGetWorkTypes();
+  if (DATA_SOURCE !== "supabase") return mockGetWorkTypes();
 
   await requireUser();
   const supabase = createServiceClient();
@@ -36,7 +49,8 @@ export async function getWorkTypes(): Promise<WorkType[]> {
 }
 
 export async function getWeeks(roomId: string, workTypeId: string): Promise<Week[]> {
-  if (USE_MOCK_DATA) return mockGetWeeks(roomId, workTypeId);
+  if (DATA_SOURCE === "mock") return mockGetWeeks(roomId, workTypeId);
+  if (DATA_SOURCE === "local") return localGetWeeks(roomId, workTypeId);
 
   await requireUser();
   const supabase = createServiceClient();
@@ -53,7 +67,8 @@ export async function getWeeks(roomId: string, workTypeId: string): Promise<Week
 // Unfiltered — used only to populate the "move to a different week" picker
 // in EditModal, since a photo can move to any room/work-type/week (FR-008).
 export async function getAllWeeks(): Promise<Week[]> {
-  if (USE_MOCK_DATA) return mockGetAllWeeks();
+  if (DATA_SOURCE === "mock") return mockGetAllWeeks();
+  if (DATA_SOURCE === "local") return localGetAllWeeks();
 
   await requireUser();
   const supabase = createServiceClient();
@@ -63,7 +78,8 @@ export async function getAllWeeks(): Promise<Week[]> {
 }
 
 export async function getPhotos(weekId: string): Promise<Photo[]> {
-  if (USE_MOCK_DATA) return mockGetPhotos(weekId);
+  if (DATA_SOURCE === "mock") return mockGetPhotos(weekId);
+  if (DATA_SOURCE === "local") return localGetPhotos(weekId);
 
   await requireUser();
   const supabase = createServiceClient();
@@ -77,7 +93,7 @@ export async function getPhotos(weekId: string): Promise<Photo[]> {
 }
 
 export async function getDocumentCategories(): Promise<DocumentCategory[]> {
-  if (USE_MOCK_DATA) return mockGetDocumentCategories();
+  if (DATA_SOURCE !== "supabase") return mockGetDocumentCategories();
 
   await requireUser();
   const supabase = createServiceClient();
@@ -90,7 +106,8 @@ export async function getDocumentCategories(): Promise<DocumentCategory[]> {
 }
 
 export async function getDocuments(categoryId: string): Promise<Document[]> {
-  if (USE_MOCK_DATA) return mockGetDocuments(categoryId);
+  if (DATA_SOURCE === "mock") return mockGetDocuments(categoryId);
+  if (DATA_SOURCE === "local") return localGetDocuments(categoryId);
 
   await requireUser();
   const supabase = createServiceClient();
@@ -109,7 +126,8 @@ export async function getSiteStats(): Promise<{
   totalDocuments: number;
   totalWeeks: number;
 }> {
-  if (USE_MOCK_DATA) return mockGetSiteStats();
+  if (DATA_SOURCE === "mock") return mockGetSiteStats();
+  if (DATA_SOURCE === "local") return localGetSiteStats();
 
   await requireUser();
   const supabase = createServiceClient();
@@ -124,7 +142,8 @@ export async function getSiteStats(): Promise<{
 
 // Total photo count per room, across every work type/week — sidebar badges.
 export async function getRoomPhotoCounts(): Promise<Record<string, number>> {
-  if (USE_MOCK_DATA) return mockGetRoomPhotoCounts();
+  if (DATA_SOURCE === "mock") return mockGetRoomPhotoCounts();
+  if (DATA_SOURCE === "local") return localGetRoomPhotoCounts();
 
   await requireUser();
   const supabase = createServiceClient();

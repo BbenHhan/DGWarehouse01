@@ -2,9 +2,10 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Image from "next/image";
-import { ChevronLeft, ChevronRight, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, FileText, X } from "lucide-react";
 import type { Photo } from "@/lib/types";
 import { publicFileUrl } from "@/lib/storage";
+import { fileKindFromName } from "@/lib/file-kind";
 
 export function Lightbox({
   photos,
@@ -36,6 +37,9 @@ export function Lightbox({
 
   if (!photo) return null;
 
+  const kind = fileKindFromName(photo.file_name);
+  const src = publicFileUrl("photos", photo.storage_path);
+
   return (
     <div
       className="fixed inset-0 z-50 flex flex-col bg-black/95 backdrop-blur-md"
@@ -54,14 +58,35 @@ export function Lightbox({
         </button>
       </div>
       <div className="relative flex-1">
-        <Image
-          src={publicFileUrl("photos", photo.storage_path)}
-          alt={photo.file_name}
-          fill
-          sizes="100vw"
-          className="object-contain drop-shadow-[0_24px_80px_rgba(0,0,0,.7)]"
-          priority
-        />
+        {kind === "video" ? (
+          <video
+            src={src}
+            controls
+            autoPlay
+            className="absolute inset-0 h-full w-full object-contain drop-shadow-[0_24px_80px_rgba(0,0,0,.7)]"
+          />
+        ) : kind === "pdf" || kind === "other" ? (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 text-white">
+            <FileText className="h-16 w-16 opacity-70" />
+            <a
+              href={src}
+              target="_blank"
+              rel="noreferrer"
+              className="rounded-full border border-primary/20 bg-primary/15 px-4 py-2 text-sm hover:bg-primary/25"
+            >
+              เปิดไฟล์ {photo.file_name}
+            </a>
+          </div>
+        ) : (
+          <Image
+            src={src}
+            alt={photo.file_name}
+            fill
+            sizes="100vw"
+            className="object-contain drop-shadow-[0_24px_80px_rgba(0,0,0,.7)]"
+            priority
+          />
+        )}
         {photos.length > 1 && (
           <>
             <button

@@ -2,10 +2,11 @@
 
 import { useOptimistic, useState, useTransition } from "react";
 import Image from "next/image";
-import { ImageOff, Search, Trash2 } from "lucide-react";
+import { FileText, ImageOff, Play, Search, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import type { Photo } from "@/lib/types";
 import { publicFileUrl } from "@/lib/storage";
+import { fileKindFromName } from "@/lib/file-kind";
 import { Lightbox } from "@/components/Lightbox";
 import { Button } from "@/components/ui/button";
 import {
@@ -36,6 +37,54 @@ function aspectRatioFor(id: string) {
   return ASPECT_RATIOS[hash % ASPECT_RATIOS.length];
 }
 
+// Photos module now accepts image/PDF/video (Constitution VIII), so a tile
+// can't assume next/image works — video gets a muted preview clip, PDF gets
+// an icon card, since neither has a thumbnail to point <Image> at.
+function PhotoTileMedia({ photo }: { photo: Photo }) {
+  const kind = fileKindFromName(photo.file_name);
+  const src = publicFileUrl("photos", photo.storage_path);
+
+  if (kind === "video") {
+    return (
+      <>
+        <video
+          src={src}
+          muted
+          playsInline
+          preload="metadata"
+          className="absolute inset-0 h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+        />
+        <span className="pointer-events-none absolute inset-0 flex items-center justify-center">
+          <span className="flex h-9 w-9 items-center justify-center rounded-full bg-black/50 text-white">
+            <Play className="h-4 w-4 fill-current" />
+          </span>
+        </span>
+      </>
+    );
+  }
+
+  if (kind === "pdf" || kind === "other") {
+    return (
+      <span className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-secondary p-3 text-secondary-foreground">
+        <FileText className="h-8 w-8 opacity-70" />
+        <span className="line-clamp-2 text-center text-[11px] break-all opacity-80">
+          {photo.file_name}
+        </span>
+      </span>
+    );
+  }
+
+  return (
+    <Image
+      src={src}
+      alt={photo.file_name}
+      fill
+      sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, 25vw"
+      className="object-cover transition-transform duration-300 group-hover:scale-105"
+    />
+  );
+}
+
 export function PhotoGrid({
   photos,
   weekMoveOptions,
@@ -64,8 +113,8 @@ export function PhotoGrid({
     return (
       <div className="flex flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-border bg-card/40 p-12 text-center text-muted-foreground">
         <ImageOff className="h-8 w-8 opacity-50" />
-        <p className="font-medium">ยังไม่มีรูปภาพในสัปดาห์นี้</p>
-        {!USE_MOCK_DATA && <p className="text-sm">อัปโหลดรูปภาพแรกของคุณด้านล่าง</p>}
+        <p className="font-medium">ยังไม่มีไฟล์ในสัปดาห์นี้</p>
+        {!USE_MOCK_DATA && <p className="text-sm">อัปโหลดรูป/PDF/วิดีโอแรกของคุณด้านล่าง</p>}
       </div>
     );
   }
@@ -85,15 +134,9 @@ export function PhotoGrid({
               type="button"
               onClick={() => setOpenIndex(index)}
               className="absolute inset-0"
-              aria-label={`เปิดรูป ${photo.file_name}`}
+              aria-label={`เปิดไฟล์ ${photo.file_name}`}
             >
-              <Image
-                src={publicFileUrl("photos", photo.storage_path)}
-                alt={photo.file_name}
-                fill
-                sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, 25vw"
-                className="object-cover transition-transform duration-300 group-hover:scale-105"
-              />
+              <PhotoTileMedia photo={photo} />
               <span className="pointer-events-none absolute inset-0 flex items-end justify-between gap-2 bg-gradient-to-t from-black/70 via-black/10 to-transparent p-2.5 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
                 <span className="truncate text-[11px] text-white/90">{photo.file_name}</span>
                 <Search className="h-3.5 w-3.5 shrink-0 text-white/80" />

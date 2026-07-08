@@ -64,3 +64,33 @@ export async function requireUser() {
 
   return user;
 }
+
+// Display-only read for the header's account menu — unlike requireUser(),
+// this never throws. requireUser() guards privileged Server Actions (throwing
+// means "reject this mutation"); this just answers "who's signed in, if
+// anyone," so callers (a Server Component render) never need a try/catch for
+// what is, for them, a perfectly normal case (specs/004-user-account-menu).
+export async function getCurrentUser(): Promise<{
+  email: string;
+  name: string | null;
+  avatarUrl: string | null;
+} | null> {
+  if (!AUTH_REQUIRED) {
+    return null;
+  }
+
+  const supabase = await createSessionClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user || !user.email) {
+    return null;
+  }
+
+  return {
+    email: user.email,
+    name: user.user_metadata?.full_name ?? null,
+    avatarUrl: user.user_metadata?.avatar_url ?? null,
+  };
+}

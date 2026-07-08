@@ -28,8 +28,19 @@ create table if not exists weeks (
   work_type_id uuid not null references work_types (id) on delete restrict,
   week_number int not null,
   label text not null,
+  -- Date range the week covers. Nullable so historical/mock-derived rows (which
+  -- have no structured date data) remain representable in the same schema;
+  -- every week created through the app's "local"/"supabase" backends always
+  -- populates both (specs/002-week-date-range-ui). Two weeks in the same
+  -- room/work-type must not have overlapping ranges (confirmed via
+  -- /speckit-clarify 2026-07-07) — enforced in application code (createWeek
+  -- Server Action), not as a DB exclusion constraint, to match the "local"
+  -- backend's identical (application-level) enforcement.
+  start_date date,
+  end_date date,
   created_at timestamptz not null default now(),
-  unique (room_id, work_type_id, week_number)
+  unique (room_id, work_type_id, week_number),
+  check (end_date is null or start_date is null or end_date >= start_date)
 );
 
 create index if not exists weeks_room_work_type_idx on weeks (room_id, work_type_id);

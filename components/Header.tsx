@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Box, CalendarDays, FileText, Images } from "lucide-react";
+import { AccountMenu } from "@/components/AccountMenu";
 
 function StatChip({ icon, label }: { icon: React.ReactNode; label: string }) {
   return (
@@ -12,8 +13,10 @@ function StatChip({ icon, label }: { icon: React.ReactNode; label: string }) {
 
 export function Header({
   stats,
+  user,
 }: {
   stats: { totalPhotos: number; totalDocuments: number; totalWeeks: number };
+  user: { email: string; name: string | null; avatarUrl: string | null } | null;
 }) {
   return (
     <header className="sticky top-0 z-40 border-b border-border/70 bg-background/85 shadow-[0_1px_0_rgba(155,94,40,.1),0_2px_12px_rgba(0,0,0,.06)] backdrop-blur-xl supports-backdrop-filter:bg-background/70">
@@ -42,6 +45,8 @@ export function Header({
             label={`${stats.totalWeeks} สัปดาห์`}
           />
         </div>
+
+        {user && <AccountMenu {...user} />}
       </div>
     </header>
   );

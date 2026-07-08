@@ -43,3 +43,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local writable data store (interim storage backend, DATA_SOURCE=local) —
+# uploaded photos/documents/videos + db.json live here, never committed
+/.local-data/

@@ -37,13 +37,21 @@ Seeded once via migration; not user-editable.
 ### Week
 Open-ended time bucket within a room + work-type. Created on demand (research.md §6).
 
+> **Amended by** `specs/002-week-date-range-ui/data-model.md`: weeks are now created
+> with a required `start_date`/`end_date` instead of a user-facing order number, and
+> sort chronologically by `start_date` rather than by `week_number`. `week_number`
+> is retained only as an internal bookkeeping/tie-break value. See that document for
+> the full amended field table and rationale.
+
 | Column | Type | Notes |
 |---|---|---|
 | id | uuid, PK | |
 | room_id | uuid, FK → Room | |
 | work_type_id | uuid, FK → WorkType | |
-| week_number | int | sequential within (room_id, work_type_id) |
-| label | text | derived display label, e.g. "สัปดาห์ที่ 4" |
+| week_number | int | internal only as of 002 — no longer user-facing |
+| label | text | derived display label, e.g. "สัปดาห์ที่ 4" (mock) or the date range (local/supabase, as of 002) |
+| start_date | date, nullable | added in 002 — required for local/supabase-created weeks |
+| end_date | date, nullable | added in 002 — required for local/supabase-created weeks |
 | created_at | timestamptz | |
 
 Unique constraint: `(room_id, work_type_id, week_number)`.

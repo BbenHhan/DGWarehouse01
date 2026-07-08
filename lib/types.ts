@@ -25,6 +25,12 @@ export type Week = {
   week_number: number;
   label: string;
   created_at: string;
+  // Date range the week covers (ISO "YYYY-MM-DD"). Required for weeks created via
+  // the "local"/"supabase" backends; absent/null only for "mock" backend weeks
+  // read from the legacy v7 folder snapshot, which has no structured date data —
+  // see specs/002-week-date-range-ui/research.md Decision 3.
+  start_date?: string | null;
+  end_date?: string | null;
 };
 
 export type Photo = {

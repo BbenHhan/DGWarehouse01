@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { getAllWeeks, getPhotos, getRoomPhotoCounts, getRooms, getWeeks, getWorkTypes } from "@/lib/data";
 import { USE_MOCK_DATA } from "@/lib/data-config";
+import { formatWeekDateRangeOrNull } from "@/lib/week-format";
 import { WorkTypeWeekNav } from "@/components/WorkTypeWeekNav";
 import { PhotoGrid } from "@/components/PhotoGrid";
 import { PhotoUploader } from "@/components/PhotoUploader";
@@ -54,9 +55,10 @@ export default async function RoomWorkTypePage({
     : (await getAllWeeks()).map((week) => {
         const room = rooms.find((r) => r.id === week.room_id);
         const workType = workTypes.find((w) => w.id === week.work_type_id);
+        const weekLabel = formatWeekDateRangeOrNull(week) ?? week.label;
         return {
           value: week.id,
-          label: `${room?.emoji ?? ""} ${room?.name_th ?? ""} · ${workType?.emoji ?? ""} ${workType?.name_th ?? ""} · ${week.label}`,
+          label: `${room?.emoji ?? ""} ${room?.name_th ?? ""} · ${workType?.emoji ?? ""} ${workType?.name_th ?? ""} · ${weekLabel}`,
         };
       });
 
@@ -85,6 +87,7 @@ export default async function RoomWorkTypePage({
         currentRoomSlug={roomSlug}
         currentWorkTypeSlug={workTypeSlug}
         selectedWeekId={selectedWeek?.id}
+        showActions={!USE_MOCK_DATA}
       />
 
       {!USE_MOCK_DATA && (

@@ -5,4 +5,4 @@
 // Flip this back to `true` once a real Supabase project + credentials exist
 // (see DEPLOYMENT.md) — every other auth code path (login page, callback
 // route, requireUser()) is already written and just needs this flag.
-export const AUTH_REQUIRED = false;
+export const AUTH_REQUIRED = true;

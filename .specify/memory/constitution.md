@@ -1,50 +1,30 @@
 <!--
 Sync Impact Report
 ==================
-Version change: 1.0.0 → 2.0.0 (MAJOR — architecture pivot)
-Rationale for MAJOR bump: The project moves from a single-file, zero-build,
-local-filesystem HTML viewer to a hosted Next.js 15 + Supabase web
-application. This directly redefines/removes the prior Principle I
-("Single-File, Zero-Build Architecture") and Principle VI ("Local-Only File
-Operations"), which is backward-incompatible with v1.0.0 — a MAJOR bump per
-this document's own versioning policy.
+Version change: 2.0.0 → 3.0.0 (MAJOR — storage rule redefinition)
+Rationale for MAJOR bump: Principle III previously mandated "no local
+filesystem persistence anywhere in the app." This change carves out an
+explicit, flagged interim exception (local disk-backed storage until a live
+Supabase project exists) — the versioning policy itself names "dropping
+Supabase Storage for local files" as a MAJOR-bump example, so this is MAJOR
+even though the exception is scoped and temporary by design.
 Modified principles (old → new):
-  - I. Single-File, Zero-Build Architecture → I. App Router Only (Next.js 15)
-  - II. Folder Structure Is the Source of Truth → removed (no local folder
-    hierarchy; Supabase Storage + DB are now source of truth)
-  - III. Defensive State Restoration → removed (was localStorage/DOM-specific
-    to the old viewer; superseded by Server Actions + Supabase state model)
-  - IV. No Nested-Quote Inline Handlers → removed (was a vanilla-JS inline
-    handler bug class; not applicable to React/JSX)
-  - V. Design Token Consistency → VI. Tailwind-Only Styling (Tailwind utility
-    classes + shadcn/ui replace the CSS custom-property token system)
-  - VI. Local-Only File Operations → III. Cloud-Only Storage & Optimized
-    Images (Supabase Storage + Next.js <Image>, direct contradiction of the
-    old "no network dependency" rule — intentional, per user direction)
+  - III. Cloud-Only Storage & Optimized Images → III. Storage-Agnostic File
+    Persistence with a Cloud Migration Path (permits a flagged interim local
+    disk backend; still requires eventual migration to Supabase Storage;
+    expands media handling from images-only to image/PDF/video)
 Added principles:
-  - II. Server Actions & Supabase Client Boundary
-  - IV. Thai-First, Mobile-First UI
-  - V. Resilient Async UX (loading/error states, optimistic delete)
-  - VII. Single-User Auth via Supabase
-Added sections:
-  - Technical Reference (stack, environment variables)
-Removed sections:
-  - Old Technical Reference (folder structure, panel/WT/week IDs, old
-    localStorage keys, old CSS token values) — no longer applicable to the
-    new stack
-  - Regression Guardrails (old vanilla-JS/localStorage bug list) — bug class
-    does not exist in the new architecture
+  - VIII. Universal File Attachments (every module/data-record type must
+    expose a working add-file control for image/PDF/video; validation of
+    type/extension and size is mandatory and centralized, not per-page)
+Added sections: none (Technical Reference expanded in place)
+Removed sections: none
 Templates requiring updates:
-  - .specify/templates/plan-template.md — ✅ no change needed (Technical
-    Context / Constitution Check gate are generic and now apply to the new
-    stack via this file)
+  - .specify/templates/plan-template.md — ✅ no change needed (generic gate)
   - .specify/templates/spec-template.md — ✅ no change needed
-  - .specify/templates/tasks-template.md — ✅ no change needed (path
-    conventions are advisory; Next.js App Router paths fit "Single project"
-    convention already documented)
+  - .specify/templates/tasks-template.md — ✅ no change needed
   - .specify/templates/checklist-template.md — ✅ no change needed
-Follow-up TODOs: none — all placeholders resolved from user-supplied stack
-and principle list.
+Follow-up TODOs: none.
 -->
 
 # DG Warehouse 01 — Progress Tracker Constitution
@@ -71,14 +51,30 @@ read-only display.
 and validation in one trusted place and prevents the service role key
 from ever reaching the browser.
 
-### III. Cloud-Only Storage & Optimized Images
-All file uploads (photos, documents) MUST go through Supabase Storage —
-no local filesystem persistence anywhere in the app. Images MUST be
-rendered with Next.js `<Image>` pointed at Supabase public URLs, never
-plain `<img>` tags or unoptimized paths.
-**Rationale**: The app is a hosted, multi-device Vercel deployment; local
-disk state would not survive redeploys or be visible across devices, and
-`<Image>` is required for responsive/optimized delivery.
+### III. Storage-Agnostic File Persistence with a Cloud Migration Path
+All file uploads (images, PDFs, videos) MUST be written through a single
+storage abstraction (`lib/storage.ts` + the upload Server Actions), never
+directly from a component or route handler. Two backends are permitted,
+selected by one flag (`DATA_SOURCE`):
+- **Cloud (target)**: Supabase Storage. Required before any real
+  multi-device or production use.
+- **Local (interim only)**: a git-ignored writable directory on the
+  server's disk, used only while no live Supabase project is configured.
+  It MUST implement the same read/write contract as the cloud backend so
+  switching `DATA_SOURCE` back to Supabase requires no changes to
+  components, Server Action call sites, or the public data shape.
+
+Images MUST be rendered with Next.js `<Image>` pointed at the active
+backend's public URL, never plain `<img>` tags or unoptimized paths.
+Videos MUST be rendered with a native `<video controls>` element (Next.js
+`<Image>` does not apply to video). PDFs MUST be linked/embedded via a
+direct file URL, not inlined as an image.
+**Rationale**: The app is a hosted, multi-device Vercel deployment; the
+long-term source of truth must be Supabase Storage so files survive
+redeploys and are visible across devices. But requiring a live Supabase
+project before any upload code can be written or tested blocks real
+progress, so a same-contract local backend is allowed as a scaffold — as
+long as it is a drop-in swap, not a fork.
 
 ### IV. Thai-First, Mobile-First UI
 All user-facing UI text MUST be in Thai. Every screen MUST be designed
@@ -117,6 +113,24 @@ unauthenticated write access.
 a one-person tool is unneeded complexity; Supabase Auth's built-in flows
 cover the real requirement.
 
+### VIII. Universal File Attachments
+Every module that has a data record (rooms/work-types/weeks for photos,
+categories for documents, and any module added later) MUST expose a
+working "add file" control accepting images, PDFs, and videos — this is
+not optional per-page polish, and a new module MUST NOT ship without it.
+The upload control and its validation MUST be built as a shared,
+reusable component/action pair, not duplicated per module, so adding a
+ninth module later means wiring the existing primitive, not writing a new
+uploader. Every upload MUST validate MIME type/extension against an
+explicit allowlist and enforce a file-size ceiling before the file is
+persisted — both checks run the same way regardless of which storage
+backend (Principle III) is active. The size ceiling MUST be set high
+enough to admit real video files, not tuned only for photos.
+**Rationale**: File attachment was added as a cross-cutting capability,
+not a feature of one screen — building it per-module invites drift (one
+page validates size, another forgets) and duplicate code that has to be
+fixed in N places instead of one.
+
 ## Technical Reference
 
 This section captures the current concrete stack and configuration that
@@ -133,6 +147,19 @@ shadcn/ui + Supabase (Auth, Database, Storage, Realtime) + Vercel
 `SUPABASE_SERVICE_ROLE_KEY` (server-side only — Server Actions/Server
 Components; MUST NEVER be referenced in client components or exposed to
 the browser bundle).
+
+**Storage backend flag**: `DATA_SOURCE` (`lib/data-config.ts`) selects
+`"local"` | `"mock"` | `"supabase"`. `"local"` persists uploads to a
+git-ignored directory on the server disk (interim backend, Principle
+III); `"mock"` reads the read-only v7 folder snapshot with no writes;
+`"supabase"` is the target production backend. Exactly one is active at
+a time; component code MUST NOT branch on this flag directly — only
+`lib/data.ts` and `lib/storage.ts` may.
+
+**Accepted upload MIME types**: images (`image/*`), PDFs
+(`application/pdf`), videos (`video/mp4`, `video/quicktime`, `video/webm`).
+The allowlist and size ceiling live in `lib/validation.ts` as the single
+source of truth (Principle VIII) — no module may define its own list.
 
 ## Governance
 
@@ -153,7 +180,7 @@ below, and update `LAST_AMENDED_DATE`.
 - PATCH: Wording clarifications, typo fixes, or non-semantic refinements.
 
 **Compliance review**: Before merging any change, verify it does not
-violate Principles I–VII and that any stack/config change is reflected in
+violate Principles I–VIII and that any stack/config change is reflected in
 the Technical Reference section.
 
-**Version**: 2.0.0 | **Ratified**: 2026-07-01 | **Last Amended**: 2026-07-01
+**Version**: 3.0.0 | **Ratified**: 2026-07-01 | **Last Amended**: 2026-07-06
