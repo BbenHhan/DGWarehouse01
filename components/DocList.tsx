@@ -26,9 +26,11 @@ type CategoryMoveOption = { value: string; label: string };
 export function DocList({
   documents,
   categoryMoveOptions,
+  canEdit,
 }: {
   documents: Document[];
   categoryMoveOptions: CategoryMoveOption[];
+  canEdit: boolean;
 }) {
   const [, startTransition] = useTransition();
   const [optimisticDocuments, removeOptimisticDocument] = useOptimistic(
@@ -51,7 +53,7 @@ export function DocList({
       <div className="flex flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-border bg-card/40 p-12 text-center text-muted-foreground">
         <FileText className="h-8 w-8 opacity-50" />
         <p className="font-medium">ยังไม่มีเอกสารในหมวดนี้</p>
-        {!USE_MOCK_DATA && <p className="text-sm">อัปโหลดเอกสารแรกของคุณด้านล่าง</p>}
+        {!USE_MOCK_DATA && canEdit && <p className="text-sm">อัปโหลดเอกสารแรกของคุณด้านล่าง</p>}
       </div>
     );
   }
@@ -83,7 +85,7 @@ export function DocList({
               </div>
             </a>
 
-            {!USE_MOCK_DATA && (
+            {!USE_MOCK_DATA && canEdit && (
               <div className="flex shrink-0 gap-1">
                 <EditModal
                   kind="document"

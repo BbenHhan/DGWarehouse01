@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Box, CalendarDays, FileText, Images } from "lucide-react";
+import type { Role } from "@/lib/roles";
 import { AccountMenu } from "@/components/AccountMenu";
 
 function StatChip({ icon, label }: { icon: React.ReactNode; label: string }) {
@@ -16,7 +17,13 @@ export function Header({
   user,
 }: {
   stats: { totalPhotos: number; totalDocuments: number; totalWeeks: number };
-  user: { email: string; name: string | null; avatarUrl: string | null } | null;
+  user: {
+    email: string;
+    name: string | null;
+    avatarUrl: string | null;
+    role: Role;
+    hasPendingRequest: boolean;
+  } | null;
 }) {
   return (
     <header className="sticky top-0 z-40 border-b border-border/70 bg-background/85 shadow-[0_1px_0_rgba(155,94,40,.1),0_2px_12px_rgba(0,0,0,.06)] backdrop-blur-xl supports-backdrop-filter:bg-background/70">

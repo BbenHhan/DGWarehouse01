@@ -164,6 +164,52 @@ export type Database = {
           }
         ];
       };
+      profiles: {
+        Row: {
+          id: string;
+          email: string;
+          full_name: string | null;
+          role: string;
+          created_at: string;
+        };
+        Insert: {
+          id: string;
+          email: string;
+          full_name?: string | null;
+          role?: string;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["profiles"]["Insert"]>;
+        Relationships: [];
+      };
+      role_requests: {
+        Row: {
+          id: string;
+          requester_id: string;
+          status: string;
+          requested_at: string;
+          resolved_at: string | null;
+          resolved_by: string | null;
+        };
+        Insert: {
+          id?: string;
+          requester_id: string;
+          status?: string;
+          requested_at?: string;
+          resolved_at?: string | null;
+          resolved_by?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["role_requests"]["Insert"]>;
+        Relationships: [
+          {
+            foreignKeyName: "role_requests_requester_id_fkey";
+            columns: ["requester_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
     };
     Views: Empty;
     Functions: Empty;

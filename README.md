@@ -72,6 +72,24 @@ version with auth and upload/edit/delete back.
 
    Open [http://localhost:3000](http://localhost:3000).
 
+## Running tests
+
+```bash
+npm test
+```
+
+Runs the full Vitest suite once (`npm run test:watch` re-runs on file
+changes). No live Supabase project or network access is required — tests
+cover pure logic (date-range overlap, file validation, the local storage
+backend's cascading delete/sort) using a disposable temp directory, never the
+real `.local-data/` folder used by `npm run dev`. See
+[specs/005-automated-testing/](specs/005-automated-testing/) for the full
+spec/plan behind this setup.
+
+Test files are colocated next to what they test (e.g. `lib/date-range.test.ts`
+next to `lib/date-range.ts`) — `lib/date-range.test.ts` is the simplest one to
+copy as a starting point for a new test.
+
 ## Project structure
 
 ```text

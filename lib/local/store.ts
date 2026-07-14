@@ -13,7 +13,13 @@ import { formatWeekDateRange } from "@/lib/week-format";
 // lib/storage.ts know this backend exists; lib/data.ts and Server Actions call
 // these functions the same way they'd call the Supabase equivalents, so
 // switching DATA_SOURCE back to "supabase" needs no other code changes.
-export const LOCAL_BASE_DIR = path.join(process.cwd(), ".local-data");
+// Overridable via LOCAL_DATA_DIR so the automated test suite can point this
+// backend at a disposable temp directory instead of the developer's real
+// .local-data/ folder (specs/005-automated-testing) — set by vitest.setup.ts
+// before any test imports this module.
+export const LOCAL_BASE_DIR = process.env.LOCAL_DATA_DIR
+  ? path.resolve(process.env.LOCAL_DATA_DIR)
+  : path.join(process.cwd(), ".local-data");
 export const LOCAL_FILES_DIR = path.join(LOCAL_BASE_DIR, "files");
 const DB_PATH = path.join(LOCAL_BASE_DIR, "db.json");
 

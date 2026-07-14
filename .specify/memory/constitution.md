@@ -1,24 +1,28 @@
 <!--
 Sync Impact Report
 ==================
-Version change: 2.0.0 → 3.0.0 (MAJOR — storage rule redefinition)
-Rationale for MAJOR bump: Principle III previously mandated "no local
-filesystem persistence anywhere in the app." This change carves out an
-explicit, flagged interim exception (local disk-backed storage until a live
-Supabase project exists) — the versioning policy itself names "dropping
-Supabase Storage for local files" as a MAJOR-bump example, so this is MAJOR
-even though the exception is scoped and temporary by design.
+Version change: 5.0.0 → 5.1.0 (MINOR — expanded guidance under an existing principle)
+Rationale for MINOR bump: Principle VII's core invariants (Supabase Auth only,
+three stored roles, only an admin can change a role) are unchanged — this adds
+a self-service role-request mechanism as explicit, additive guidance under the
+same principle, not a redefinition of it.
 Modified principles (old → new):
-  - III. Cloud-Only Storage & Optimized Images → III. Storage-Agnostic File
-    Persistence with a Cloud Migration Path (permits a flagged interim local
-    disk backend; still requires eventual migration to Supabase Storage;
-    expands media handling from images-only to image/PDF/video)
-Added principles:
-  - VIII. Universal File Attachments (every module/data-record type must
-    expose a working add-file control for image/PDF/video; validation of
-    type/extension and size is mandatory and centralized, not per-page)
-Added sections: none (Technical Reference expanded in place)
+  - VII. Multi-User Auth with Role-Based Access Control — added: a viewer MAY
+    submit a request to be upgraded to editor; this only creates a pending
+    record visible to admins, never changes a role by itself; only an admin
+    acting on the request (approve/deny) can change it, keeping "only an
+    admin can change a role" intact; the admin's view of requests is in-app
+    (part of the existing account-management screen), not an external
+    email/notification service.
+Added principles: none
+Added sections: none
 Removed sections: none
+Also updated (housekeeping, not part of this amendment's substance): the
+Technical Reference "User roles" bullet was still marked "not yet
+implemented" from the v5.0.0 amendment even though Feature 007 has since
+shipped it — corrected to reflect the real `profiles` table/trigger/
+`requireRole()` helper now in the codebase, per Governance's requirement to
+keep Technical Reference in sync.
 Templates requiring updates:
   - .specify/templates/plan-template.md — ✅ no change needed (generic gate)
   - .specify/templates/spec-template.md — ✅ no change needed
@@ -78,9 +82,9 @@ long as it is a drop-in swap, not a fork.
 
 ### IV. Thai-First, Mobile-First UI
 All user-facing UI text MUST be in Thai. Every screen MUST be designed
-mobile-first, since the primary and sole user (Bell) uses the app on
-mobile; desktop/tablet layouts are progressive enhancements of the mobile
-layout, never the other way around.
+mobile-first, since the app's users primarily access it on mobile;
+desktop/tablet layouts are progressive enhancements of the mobile layout,
+never the other way around.
 **Rationale**: Matches the actual usage context and avoids a
 desktop-first design that degrades on the primary device.
 
@@ -90,9 +94,9 @@ loading state and an explicit error state — silent failures or
 indefinite spinners are not acceptable. Delete operations specifically
 MUST use optimistic UI: the item is removed from the view immediately,
 with rollback and an error message if the Server Action fails.
-**Rationale**: A single-user tool still needs to communicate system state
-clearly, and optimistic deletes keep the app feeling responsive despite
-network latency to Supabase.
+**Rationale**: The app still needs to communicate system state clearly
+regardless of how many people are signed in, and optimistic deletes keep
+it feeling responsive despite network latency to Supabase.
 
 ### VI. Tailwind-Only Styling
 Styling MUST be done exclusively with Tailwind CSS v4 utility classes and
@@ -104,14 +108,47 @@ site.
 **Rationale**: Keeps styling consistent, themeable, and reviewable through
 one system instead of two competing ones.
 
-### VII. Single-User Auth via Supabase
-The application is single-tenant, single-user (Bell). Authentication
-MUST be handled by Supabase Auth using either magic link or Google OAuth
-— no custom auth system, no multi-user account model, and no
-unauthenticated write access.
-**Rationale**: Building multi-user auth (roles, permissions, invites) for
-a one-person tool is unneeded complexity; Supabase Auth's built-in flows
-cover the real requirement.
+### VII. Multi-User Auth with Role-Based Access Control
+Authentication MUST be handled by Supabase Auth using either email/password
+or Google OAuth — no custom auth system, no hand-rolled credentials table
+or hashing implementation. Sign-up MUST be open: anyone MUST be able to
+create an account via either method; there is no invite-only or
+allowlisted registration gate.
+
+Every account MUST have exactly one stored role — `viewer`, `editor`, or
+`admin` — persisted server-side, never inferred from session claims alone.
+Every new sign-up MUST default to `viewer`; nothing in the sign-up flow
+itself may grant a higher role. The roles are cumulative:
+- **viewer**: MAY sign in and view all photos/documents. MUST NOT add,
+  edit, or delete anything.
+- **editor**: Everything `viewer` can do, and MUST additionally be able to
+  add, edit, and delete photos and documents. MUST NOT change any
+  account's role.
+- **admin**: Everything `editor` can do, and MUST additionally be able to
+  view and change any account's role via an admin-only user-management
+  screen.
+
+Every mutating Server Action MUST check the caller's role before
+proceeding — under Principle II, "authenticated" alone is no longer
+sufficient authorization for a write; the caller must also hold at least
+`editor` for content mutations, or `admin` for role changes.
+
+A viewer MAY submit a self-service request to be upgraded to `editor`.
+Submitting a request MUST only create a pending record visible to admins —
+it MUST NOT change the requester's role by itself. Only an admin acting on
+a request (approving or denying it) MAY change the requester's role; this
+does not weaken the "only an admin can change a role" invariant above, it
+is the same invariant's self-service entry point. The admin-facing view of
+pending requests MUST be in-app (part of the existing admin-only
+account-management screen), not an external email or notification
+service — no third-party integration is required for this capability.
+**Rationale**: The application moved from a single trusted operator to an
+open sign-up model, so authentication alone (proving *who* someone is) no
+longer proves *what* they should be allowed to do. A three-role model is
+the minimum needed to let new sign-ups view progress safely by default
+while still letting trusted people contribute (`editor`) or administer
+access (`admin`), without building a generic permissions/invites system
+this project doesn't otherwise need.
 
 ### VIII. Universal File Attachments
 Every module that has a data record (rooms/work-types/weeks for photos,
@@ -161,6 +198,14 @@ a time; component code MUST NOT branch on this flag directly — only
 The allowlist and size ceiling live in `lib/validation.ts` as the single
 source of truth (Principle VIII) — no module may define its own list.
 
+**User roles**: `viewer` | `editor` | `admin` (Principle VII), stored in a
+`profiles` table (`id` = `auth.users.id`, `role`, RLS: self-select only).
+A trigger on `auth.users` insert creates each account's `profiles` row with
+`role = 'viewer'` by default, covering both email/password sign-up and
+first-time Google OAuth. Server-side enforcement is `requireRole(minRole)`
+in `lib/supabase/server.ts`, used by every mutating Server Action; the pure
+rank-comparison logic lives in `lib/roles.ts`.
+
 ## Governance
 
 This constitution supersedes ad hoc conventions for the DG Warehouse 01
@@ -183,4 +228,4 @@ below, and update `LAST_AMENDED_DATE`.
 violate Principles I–VIII and that any stack/config change is reflected in
 the Technical Reference section.
 
-**Version**: 3.0.0 | **Ratified**: 2026-07-01 | **Last Amended**: 2026-07-06
+**Version**: 5.1.0 | **Ratified**: 2026-07-01 | **Last Amended**: 2026-07-09

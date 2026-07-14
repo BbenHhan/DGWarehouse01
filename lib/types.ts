@@ -2,6 +2,25 @@
 // and contracts/server-actions.md. Import these everywhere rather than
 // redefining local shapes.
 
+import type { Role } from "@/lib/roles";
+
+export type Account = {
+  id: string;
+  email: string;
+  full_name: string | null;
+  role: Role;
+  created_at: string;
+};
+
+export type RoleRequest = {
+  id: string;
+  requesterId: string;
+  requesterEmail: string;
+  requesterFullName: string | null;
+  status: "pending" | "approved" | "denied";
+  requestedAt: string;
+};
+
 export type Room = {
   id: string;
   slug: string;

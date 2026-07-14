@@ -2,7 +2,7 @@
 
 import { randomUUID } from "crypto";
 import { revalidatePath } from "next/cache";
-import { createServiceClient, requireUser } from "@/lib/supabase/server";
+import { createServiceClient, requireRole } from "@/lib/supabase/server";
 import { DOCUMENT_MIME_TYPES, editDocSchema, uploadDocSchema, validateFile } from "@/lib/validation";
 import { DATA_SOURCE } from "@/lib/data-config";
 import {
@@ -12,12 +12,15 @@ import {
 } from "@/lib/local/store";
 import type { ActionResult, Document, UploadDocOutput } from "@/lib/types";
 
-async function assertAuthenticated(): Promise<string | null> {
+async function assertCanEdit(): Promise<string | null> {
   try {
-    await requireUser();
+    await requireRole("editor");
     return null;
-  } catch {
-    return "กรุณาเข้าสู่ระบบก่อนทำรายการนี้";
+  } catch (error) {
+    if (error instanceof Error && error.message === "UNAUTHENTICATED") {
+      return "กรุณาเข้าสู่ระบบก่อนทำรายการนี้";
+    }
+    return "คุณไม่มีสิทธิ์ทำรายการนี้";
   }
 }
 
@@ -25,7 +28,7 @@ export async function uploadDoc(
   categoryId: string,
   files: File[]
 ): Promise<ActionResult<UploadDocOutput>> {
-  const authError = await assertAuthenticated();
+  const authError = await assertCanEdit();
   if (authError) return { ok: false, error: authError };
 
   const parsed = uploadDocSchema.safeParse({ categoryId, files });
@@ -94,7 +97,7 @@ export async function uploadDoc(
 }
 
 export async function deleteDoc(documentId: string): Promise<ActionResult<{ documentId: string }>> {
-  const authError = await assertAuthenticated();
+  const authError = await assertCanEdit();
   if (authError) return { ok: false, error: authError };
 
   if (DATA_SOURCE === "local") {
@@ -141,7 +144,7 @@ export async function editDoc(input: {
   note?: string;
   categoryId?: string;
 }): Promise<ActionResult<Document>> {
-  const authError = await assertAuthenticated();
+  const authError = await assertCanEdit();
   if (authError) return { ok: false, error: authError };
 
   const parsed = editDocSchema.safeParse(input);

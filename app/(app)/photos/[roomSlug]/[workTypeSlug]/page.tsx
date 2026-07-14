@@ -2,6 +2,8 @@ import { notFound } from "next/navigation";
 import { getAllWeeks, getPhotos, getRoomPhotoCounts, getRooms, getWeeks, getWorkTypes } from "@/lib/data";
 import { USE_MOCK_DATA } from "@/lib/data-config";
 import { formatWeekDateRangeOrNull } from "@/lib/week-format";
+import { canEdit as roleCanEdit } from "@/lib/roles";
+import { getCurrentUser } from "@/lib/supabase/server";
 import { WorkTypeWeekNav } from "@/components/WorkTypeWeekNav";
 import { PhotoGrid } from "@/components/PhotoGrid";
 import { PhotoUploader } from "@/components/PhotoUploader";
@@ -17,11 +19,13 @@ export default async function RoomWorkTypePage({
   const { roomSlug, workTypeSlug } = await params;
   const { week: weekIdParam } = await searchParams;
 
-  const [rooms, workTypes, roomPhotoCounts] = await Promise.all([
+  const [rooms, workTypes, roomPhotoCounts, currentUser] = await Promise.all([
     getRooms(),
     getWorkTypes(),
     getRoomPhotoCounts(),
+    getCurrentUser(),
   ]);
+  const userCanEdit = currentUser ? roleCanEdit(currentUser.role) : false;
   const currentRoom = rooms.find((room) => room.slug === roomSlug);
   const currentWorkType = workTypes.find((workType) => workType.slug === workTypeSlug);
 
@@ -87,10 +91,10 @@ export default async function RoomWorkTypePage({
         currentRoomSlug={roomSlug}
         currentWorkTypeSlug={workTypeSlug}
         selectedWeekId={selectedWeek?.id}
-        showActions={!USE_MOCK_DATA}
+        showActions={!USE_MOCK_DATA && userCanEdit}
       />
 
-      {!USE_MOCK_DATA && (
+      {!USE_MOCK_DATA && userCanEdit && (
         <div className="flex flex-wrap items-center gap-2">
           {selectedWeek && <PhotoUploader weekId={selectedWeek.id} />}
           <AddWeekButton roomId={currentRoom.id} workTypeId={currentWorkType.id} />
@@ -106,7 +110,7 @@ export default async function RoomWorkTypePage({
             <span className="text-muted-foreground">{selectedWeek.label}</span>
           </div>
         )}
-        <PhotoGrid photos={photos} weekMoveOptions={weekMoveOptions} />
+        <PhotoGrid photos={photos} weekMoveOptions={weekMoveOptions} canEdit={userCanEdit} />
       </div>
     </div>
   );

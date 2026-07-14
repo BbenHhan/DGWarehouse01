@@ -88,9 +88,11 @@ function PhotoTileMedia({ photo }: { photo: Photo }) {
 export function PhotoGrid({
   photos,
   weekMoveOptions,
+  canEdit,
 }: {
   photos: Photo[];
   weekMoveOptions: WeekMoveOption[];
+  canEdit: boolean;
 }) {
   const [openIndex, setOpenIndex] = useState<number | null>(null);
   const [, startTransition] = useTransition();
@@ -114,7 +116,7 @@ export function PhotoGrid({
       <div className="flex flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-border bg-card/40 p-12 text-center text-muted-foreground">
         <ImageOff className="h-8 w-8 opacity-50" />
         <p className="font-medium">ยังไม่มีไฟล์ในสัปดาห์นี้</p>
-        {!USE_MOCK_DATA && <p className="text-sm">อัปโหลดรูป/PDF/วิดีโอแรกของคุณด้านล่าง</p>}
+        {!USE_MOCK_DATA && canEdit && <p className="text-sm">อัปโหลดรูป/PDF/วิดีโอแรกของคุณด้านล่าง</p>}
       </div>
     );
   }
@@ -143,7 +145,7 @@ export function PhotoGrid({
               </span>
             </button>
 
-            {!USE_MOCK_DATA && (
+            {!USE_MOCK_DATA && canEdit && (
               <div className="absolute top-1 right-1 flex gap-1" onClick={(e) => e.stopPropagation()}>
                 <EditModal
                   kind="photo"

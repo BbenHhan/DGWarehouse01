@@ -2,7 +2,7 @@
 
 import { randomUUID } from "crypto";
 import { revalidatePath } from "next/cache";
-import { createServiceClient, requireUser } from "@/lib/supabase/server";
+import { createServiceClient, requireRole } from "@/lib/supabase/server";
 import {
   PHOTO_MIME_TYPES,
   createWeekSchema,
@@ -19,22 +19,18 @@ import {
   localUpdatePhoto,
 } from "@/lib/local/store";
 import { getWeeks } from "@/lib/data";
+import { rangesOverlap } from "@/lib/date-range";
 import type { ActionResult, Photo, UploadPhotoOutput } from "@/lib/types";
 
-// Two weeks in the same room/work-type must not cover overlapping dates
-// (specs/002-week-date-range-ui, confirmed via /speckit-clarify). Half-open
-// interval overlap check: ranges [aStart, aEnd] and [bStart, bEnd] overlap
-// (inclusive) whenever aStart <= bEnd && bStart <= aEnd.
-function rangesOverlap(aStart: string, aEnd: string, bStart: string, bEnd: string): boolean {
-  return aStart <= bEnd && bStart <= aEnd;
-}
-
-async function assertAuthenticated(): Promise<string | null> {
+async function assertCanEdit(): Promise<string | null> {
   try {
-    await requireUser();
+    await requireRole("editor");
     return null;
-  } catch {
-    return "กรุณาเข้าสู่ระบบก่อนทำรายการนี้";
+  } catch (error) {
+    if (error instanceof Error && error.message === "UNAUTHENTICATED") {
+      return "กรุณาเข้าสู่ระบบก่อนทำรายการนี้";
+    }
+    return "คุณไม่มีสิทธิ์ทำรายการนี้";
   }
 }
 
@@ -42,7 +38,7 @@ export async function uploadPhoto(
   weekId: string,
   files: File[]
 ): Promise<ActionResult<UploadPhotoOutput>> {
-  const authError = await assertAuthenticated();
+  const authError = await assertCanEdit();
   if (authError) return { ok: false, error: authError };
 
   const parsed = uploadPhotoSchema.safeParse({ weekId, files });
@@ -111,7 +107,7 @@ export async function uploadPhoto(
 }
 
 export async function deletePhoto(photoId: string): Promise<ActionResult<{ photoId: string }>> {
-  const authError = await assertAuthenticated();
+  const authError = await assertCanEdit();
   if (authError) return { ok: false, error: authError };
 
   if (DATA_SOURCE === "local") {
@@ -156,7 +152,7 @@ export async function editPhoto(input: {
   note?: string;
   weekId?: string;
 }): Promise<ActionResult<Photo>> {
-  const authError = await assertAuthenticated();
+  const authError = await assertCanEdit();
   if (authError) return { ok: false, error: authError };
 
   const parsed = editPhotoSchema.safeParse(input);
@@ -203,7 +199,7 @@ export async function createWeek(
   startDate: string,
   endDate: string
 ): Promise<ActionResult<{ weekId: string }>> {
-  const authError = await assertAuthenticated();
+  const authError = await assertCanEdit();
   if (authError) return { ok: false, error: authError };
 
   const parsed = createWeekSchema.safeParse({ roomId, workTypeId, startDate, endDate });
@@ -272,7 +268,7 @@ export async function createWeek(
 }
 
 export async function deleteWeek(weekId: string): Promise<ActionResult<{ weekId: string }>> {
-  const authError = await assertAuthenticated();
+  const authError = await assertCanEdit();
   if (authError) return { ok: false, error: authError };
 
   if (DATA_SOURCE === "local") {

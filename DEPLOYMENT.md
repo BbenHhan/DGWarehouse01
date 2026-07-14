@@ -7,19 +7,30 @@ account access — they can't be done from this environment.
 ## 1. Create the Supabase project **(you)**
 
 1. Create a new project at [supabase.com](https://supabase.com).
-2. In the SQL editor, run the four migrations in order:
+2. In the SQL editor, run the six migrations in order:
    - `supabase/migrations/0001_schema.sql`
    - `supabase/migrations/0002_rls.sql`
    - `supabase/migrations/0003_storage.sql`
    - `supabase/migrations/0004_seed_lookups.sql`
+   - `supabase/migrations/0005_roles.sql` — creates the `profiles`/role
+     system (specs/007-role-based-access) and makes the account under the
+     email hardcoded in that migration file the initial admin; edit that
+     email in the migration before running it if it's not yours
+   - `supabase/migrations/0006_role_requests.sql` — adds the self-service
+     role-request flow and `profiles.full_name` for admin search
+     (specs/008-role-requests-search)
 3. Confirm the seed worked: `select * from rooms` should return 6 rows,
    `work_types` 6 rows, `document_categories` 4 rows.
-4. Under **Authentication → Providers**, enable **Email** (for magic link) and
-   **Google** (add your OAuth client ID/secret from the Google Cloud Console).
+4. Under **Authentication → Providers**, enable **Email** (powers email/password
+   sign-in and the "forgot password" reset-link flow) and **Google** (add your
+   OAuth client ID/secret from the Google Cloud Console).
 5. Under **Authentication → URL Configuration**, you'll add the production
    redirect URL once you know your Vercel domain (step 3 below).
-6. Provision your one real user: **Authentication → Users → Add user**, using
-   your own email.
+6. Sign-up is open to anyone (specs/007-role-based-access) — new accounts
+   default to view-only automatically, so there's no "provision your user"
+   step; the admin account is whichever email you targeted in step 2's
+   `0005_roles.sql` run, and that admin can promote other accounts to
+   editor/admin later from **จัดการผู้ใช้** in the app itself.
 7. Copy from **Settings → API**:
    - Project URL → `NEXT_PUBLIC_SUPABASE_URL`
    - `anon` `public` key → `NEXT_PUBLIC_SUPABASE_ANON_KEY`
