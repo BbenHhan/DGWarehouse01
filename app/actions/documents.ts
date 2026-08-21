@@ -26,12 +26,13 @@ async function assertCanEdit(): Promise<string | null> {
 
 export async function uploadDoc(
   categoryId: string,
+  note: string | null,
   files: File[]
 ): Promise<ActionResult<UploadDocOutput>> {
   const authError = await assertCanEdit();
   if (authError) return { ok: false, error: authError };
 
-  const parsed = uploadDocSchema.safeParse({ categoryId, files });
+  const parsed = uploadDocSchema.safeParse({ categoryId, note, files });
   if (!parsed.success) {
     return { ok: false, error: parsed.error.issues[0]?.message ?? "ข้อมูลไม่ถูกต้อง" };
   }
@@ -46,7 +47,7 @@ export async function uploadDoc(
         continue;
       }
 
-      const document = await localSaveDocumentFile(categoryId, file);
+      const document = await localSaveDocumentFile(categoryId, parsed.data.note ?? null, file);
       results.push({ fileName: file.name, success: true, item: document });
     }
 
@@ -75,7 +76,12 @@ export async function uploadDoc(
 
     const { data: document, error: insertError } = await supabase
       .from("documents")
-      .insert({ category_id: categoryId, storage_path: storagePath, file_name: file.name })
+      .insert({
+        category_id: categoryId,
+        storage_path: storagePath,
+        file_name: file.name,
+        note: parsed.data.note ?? null,
+      })
       .select("*")
       .single();
 

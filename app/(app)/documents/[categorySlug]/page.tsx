@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getDocumentCategories, getDocuments } from "@/lib/data";
+import { getDocumentCategories, getDocumentNotes, getDocuments } from "@/lib/data";
 import { USE_MOCK_DATA } from "@/lib/data-config";
 import { canEdit as roleCanEdit } from "@/lib/roles";
 import { getCurrentUser } from "@/lib/supabase/server";
@@ -30,9 +30,10 @@ export default async function DocumentCategoryPage({
     notFound();
   }
 
-  const [documents, currentUser] = await Promise.all([
+  const [documents, currentUser, documentNotes] = await Promise.all([
     getDocuments(currentCategory.id),
     getCurrentUser(),
+    USE_MOCK_DATA ? Promise.resolve([]) : getDocumentNotes(),
   ]);
   const userCanEdit = currentUser ? roleCanEdit(currentUser.role) : false;
   const categoryMoveOptions = USE_MOCK_DATA
@@ -69,7 +70,13 @@ export default async function DocumentCategoryPage({
         ))}
       </nav>
 
-      {!USE_MOCK_DATA && userCanEdit && <DocUploader categoryId={currentCategory.id} />}
+      {!USE_MOCK_DATA && userCanEdit && (
+        <DocUploader
+          categoryId={currentCategory.id}
+          categoryOptions={categoryMoveOptions}
+          existingNotes={documentNotes}
+        />
+      )}
 
       <div className="border-t border-border/70 pt-4">
         <DocList documents={documents} categoryMoveOptions={categoryMoveOptions} canEdit={userCanEdit} />

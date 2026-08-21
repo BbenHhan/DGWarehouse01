@@ -91,6 +91,7 @@ export const editPhotoSchema = z
 
 export const uploadDocSchema = z.object({
   categoryId: foreignKeyId,
+  note: z.string().nullable().optional(),
   files: fileArray(),
 });
 

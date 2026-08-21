@@ -4,6 +4,7 @@ import { createServiceClient, requireUser } from "@/lib/supabase/server";
 import { DATA_SOURCE } from "@/lib/data-config";
 import {
   mockGetDocumentCategories,
+  mockGetDocumentNotes,
   mockGetDocuments,
   mockGetPhotos,
   mockGetRoomPhotoCounts,
@@ -12,6 +13,7 @@ import {
   mockGetWorkTypes,
 } from "@/lib/mock/source";
 import {
+  localGetDocumentNotes,
   localGetDocuments,
   localGetPhotos,
   localGetRoomPhotoCounts,
@@ -102,6 +104,25 @@ export async function getDocuments(categoryId: string): Promise<Document[]> {
     .order("created_at");
   if (error) throw error;
   return data;
+}
+
+// Distinct previously-used note (sub-folder/group) values across every
+// document, sitewide — powers the upload control's "reuse an existing group
+// name" suggestion (specs/025-document-upload-categorization) rather than
+// scoping to one category, since the uploader can pick any category anyway.
+export async function getDocumentNotes(): Promise<string[]> {
+  if (DATA_SOURCE === "mock") return mockGetDocumentNotes();
+  if (DATA_SOURCE === "local") return localGetDocumentNotes();
+
+  await requireUser();
+  const supabase = createServiceClient();
+  const { data, error } = await supabase.from("documents").select("note");
+  if (error) throw error;
+  const notes = new Set<string>();
+  for (const row of data) {
+    if (row.note) notes.add(row.note);
+  }
+  return [...notes];
 }
 
 // Header stats chips (total photos/documents/distinct photographed days

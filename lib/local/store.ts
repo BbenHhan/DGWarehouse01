@@ -156,7 +156,11 @@ export async function localGetDocuments(categoryId: string): Promise<Document[]>
     .sort((a, b) => a.created_at.localeCompare(b.created_at));
 }
 
-export async function localSaveDocumentFile(categoryId: string, file: File): Promise<Document> {
+export async function localSaveDocumentFile(
+  categoryId: string,
+  note: string | null,
+  file: File
+): Promise<Document> {
   const db = await loadDb();
   const id = randomUUID();
   const storagePath = `documents/${categoryId}/${id}-${file.name}`;
@@ -167,13 +171,26 @@ export async function localSaveDocumentFile(categoryId: string, file: File): Pro
     category_id: categoryId,
     storage_path: storagePath,
     file_name: file.name,
-    note: null,
+    note,
     created_at: nowIso(),
     updated_at: nowIso(),
   };
   db.documents.push(document);
   await persist(db);
   return document;
+}
+
+// Distinct previously-used note values across every document, sitewide —
+// suggests a naming convention to reuse at upload time
+// (specs/025-document-upload-categorization) rather than every manual
+// upload retyping (or forgetting) the same grouping label.
+export async function localGetDocumentNotes(): Promise<string[]> {
+  const db = await loadDb();
+  const notes = new Set<string>();
+  for (const document of db.documents) {
+    if (document.note) notes.add(document.note);
+  }
+  return [...notes];
 }
 
 export async function localDeleteDocument(documentId: string): Promise<Document | null> {

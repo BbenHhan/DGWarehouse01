@@ -263,6 +263,13 @@ export async function mockGetDocuments(categoryId: string): Promise<Document[]> 
   return getDocumentIndex().get(categoryId) ?? [];
 }
 
+// Mock-backend documents never have a note (specs/017-bulk-document-import's
+// import script — the only writer of real note values — never ran against
+// this frozen, read-only snapshot), so there's nothing to suggest.
+export async function mockGetDocumentNotes(): Promise<string[]> {
+  return [];
+}
+
 // Site-wide header stats (total photos/documents/distinct photographed days).
 export async function mockGetSiteStats(): Promise<{
   totalPhotos: number;
