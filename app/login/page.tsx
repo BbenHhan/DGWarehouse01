@@ -138,7 +138,14 @@ function LoginPageContent() {
     setErrorMessage("");
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
-      options: { redirectTo: `${window.location.origin}/auth/callback` },
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`,
+        // Without this, Google silently reuses whatever Google account is
+        // already signed into the browser and skips the account picker
+        // entirely — forcing prompt=select_account makes it always show the
+        // chooser, even with an existing Google session.
+        queryParams: { prompt: "select_account" },
+      },
     });
 
     if (error) {
