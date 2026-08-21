@@ -1,8 +1,9 @@
-// Formats a week's ISO start_date/end_date into the same Thai, Buddhist-year
-// style the app already uses elsewhere (e.g. "8-15 มิ.ย. 2569"). Returns null
-// when either date is missing, so callers (WorkTypeWeekNav) know to fall back
-// to the legacy label-parsing path used by the "mock" backend — see
-// specs/002-week-date-range-ui/research.md Decision 3.
+// Formats ISO dates into the Thai, Buddhist-year style used across the app
+// (e.g. "8 มิ.ย. 2569"). Renamed from lib/week-format.ts as part of
+// specs/018-per-photo-dates — formatThaiDate is now the primary export
+// (a photo has one date, not a range); formatThaiDateRange is kept only for
+// the browse page's date-range filter bar, which still needs to describe a
+// range when both ends are set.
 
 const THAI_MONTHS_ABBR = [
   "ม.ค.",
@@ -26,7 +27,13 @@ function parseIsoDate(value: string): { day: number; month: number; buddhistYear
   return { day: Number(day), month: Number(month) - 1, buddhistYear: Number(year) + 543 };
 }
 
-export function formatWeekDateRange(startDate: string, endDate: string): string | null {
+export function formatThaiDate(date: string): string | null {
+  const parsed = parseIsoDate(date);
+  if (!parsed) return null;
+  return `${parsed.day} ${THAI_MONTHS_ABBR[parsed.month]} ${parsed.buddhistYear}`;
+}
+
+export function formatThaiDateRange(startDate: string, endDate: string): string | null {
   const start = parseIsoDate(startDate);
   const end = parseIsoDate(endDate);
   if (!start || !end) return null;
@@ -46,13 +53,4 @@ export function formatWeekDateRange(startDate: string, endDate: string): string 
   }
 
   return `${start.day} ${startMonthName} ${start.buddhistYear} - ${end.day} ${endMonthName} ${end.buddhistYear}`;
-}
-
-// Convenience wrapper for callers holding a Week-shaped object with nullable dates.
-export function formatWeekDateRangeOrNull(week: {
-  start_date?: string | null;
-  end_date?: string | null;
-}): string | null {
-  if (!week.start_date || !week.end_date) return null;
-  return formatWeekDateRange(week.start_date, week.end_date);
 }

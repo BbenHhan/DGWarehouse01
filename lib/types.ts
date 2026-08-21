@@ -37,24 +37,16 @@ export type WorkType = {
   sort_order: number;
 };
 
-export type Week = {
+export type Photo = {
   id: string;
   room_id: string;
   work_type_id: string;
-  week_number: number;
-  label: string;
-  created_at: string;
-  // Date range the week covers (ISO "YYYY-MM-DD"). Required for weeks created via
-  // the "local"/"supabase" backends; absent/null only for "mock" backend weeks
-  // read from the legacy v7 folder snapshot, which has no structured date data —
-  // see specs/002-week-date-range-ui/research.md Decision 3.
-  start_date?: string | null;
-  end_date?: string | null;
-};
-
-export type Photo = {
-  id: string;
-  week_id: string;
+  // The photo's single exact date (ISO "YYYY-MM-DD"), chosen at upload time —
+  // replaces the old week date-RANGE container (specs/018-per-photo-dates).
+  // For "mock" backend photos (a frozen, date-less v7 folder snapshot) this
+  // is a best-effort value parsed from legacy week-label text, never a gap —
+  // see specs/018-per-photo-dates/research.md Decision 5.
+  date: string;
   storage_path: string;
   file_name: string;
   note: string | null;

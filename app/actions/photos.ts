@@ -3,23 +3,9 @@
 import { randomUUID } from "crypto";
 import { revalidatePath } from "next/cache";
 import { createServiceClient, requireRole } from "@/lib/supabase/server";
-import {
-  PHOTO_MIME_TYPES,
-  createWeekSchema,
-  editPhotoSchema,
-  uploadPhotoSchema,
-  validateFile,
-} from "@/lib/validation";
+import { PHOTO_MIME_TYPES, editPhotoSchema, uploadPhotoSchema, validateFile } from "@/lib/validation";
 import { DATA_SOURCE } from "@/lib/data-config";
-import {
-  localCreateWeek,
-  localDeletePhoto,
-  localDeleteWeek,
-  localSavePhotoFile,
-  localUpdatePhoto,
-} from "@/lib/local/store";
-import { getWeeks } from "@/lib/data";
-import { rangesOverlap } from "@/lib/date-range";
+import { localDeletePhoto, localSavePhotoFile, localUpdatePhoto } from "@/lib/local/store";
 import type { ActionResult, Photo, UploadPhotoOutput } from "@/lib/types";
 
 async function assertCanEdit(): Promise<string | null> {
@@ -34,14 +20,20 @@ async function assertCanEdit(): Promise<string | null> {
   }
 }
 
+// A photo carries its own single date, chosen at upload time (default
+// today) — no pre-created week date-range container to resolve first
+// (specs/018-per-photo-dates). No overlap/conflict check exists here; that
+// concept belonged entirely to the removed week model.
 export async function uploadPhoto(
-  weekId: string,
+  roomId: string,
+  workTypeId: string,
+  date: string,
   files: File[]
 ): Promise<ActionResult<UploadPhotoOutput>> {
   const authError = await assertCanEdit();
   if (authError) return { ok: false, error: authError };
 
-  const parsed = uploadPhotoSchema.safeParse({ weekId, files });
+  const parsed = uploadPhotoSchema.safeParse({ roomId, workTypeId, date, files });
   if (!parsed.success) {
     return { ok: false, error: parsed.error.issues[0]?.message ?? "ข้อมูลไม่ถูกต้อง" };
   }
@@ -56,7 +48,7 @@ export async function uploadPhoto(
         continue;
       }
 
-      const photo = await localSavePhotoFile(weekId, file);
+      const photo = await localSavePhotoFile(parsed.data.roomId, parsed.data.workTypeId, parsed.data.date, file);
       results.push({ fileName: file.name, success: true, item: photo });
     }
 
@@ -73,7 +65,7 @@ export async function uploadPhoto(
       continue;
     }
 
-    const storagePath = `${weekId}/${randomUUID()}-${file.name}`;
+    const storagePath = `${parsed.data.roomId}-${parsed.data.workTypeId}/${randomUUID()}-${file.name}`;
     const { error: uploadError } = await supabase.storage
       .from("photos")
       .upload(storagePath, file, { contentType: file.type });
@@ -85,7 +77,13 @@ export async function uploadPhoto(
 
     const { data: photo, error: insertError } = await supabase
       .from("photos")
-      .insert({ week_id: weekId, storage_path: storagePath, file_name: file.name })
+      .insert({
+        room_id: parsed.data.roomId,
+        work_type_id: parsed.data.workTypeId,
+        date: parsed.data.date,
+        storage_path: storagePath,
+        file_name: file.name,
+      })
       .select("*")
       .single();
 
@@ -150,7 +148,9 @@ export async function editPhoto(input: {
   photoId: string;
   fileName?: string;
   note?: string;
-  weekId?: string;
+  date?: string;
+  roomId?: string;
+  workTypeId?: string;
 }): Promise<ActionResult<Photo>> {
   const authError = await assertCanEdit();
   if (authError) return { ok: false, error: authError };
@@ -160,10 +160,10 @@ export async function editPhoto(input: {
     return { ok: false, error: parsed.error.issues[0]?.message ?? "ข้อมูลไม่ถูกต้อง" };
   }
 
-  const { photoId, fileName, note, weekId } = parsed.data;
+  const { photoId, fileName, note, date, roomId, workTypeId } = parsed.data;
 
   if (DATA_SOURCE === "local") {
-    const photo = await localUpdatePhoto(photoId, { fileName, note, weekId });
+    const photo = await localUpdatePhoto(photoId, { fileName, note, date, roomId, workTypeId });
     if (!photo) {
       return { ok: false, error: "แก้ไขข้อมูลไม่สำเร็จ" };
     }
@@ -178,7 +178,9 @@ export async function editPhoto(input: {
     .update({
       ...(fileName !== undefined ? { file_name: fileName } : {}),
       ...(note !== undefined ? { note } : {}),
-      ...(weekId !== undefined ? { week_id: weekId } : {}),
+      ...(date !== undefined ? { date } : {}),
+      ...(roomId !== undefined ? { room_id: roomId } : {}),
+      ...(workTypeId !== undefined ? { work_type_id: workTypeId } : {}),
     })
     .eq("id", photoId)
     .select("*")
@@ -191,130 +193,4 @@ export async function editPhoto(input: {
   revalidatePath("/photos/[roomSlug]/[workTypeSlug]", "page");
 
   return { ok: true, data: photo };
-}
-
-export async function createWeek(
-  roomId: string,
-  workTypeId: string,
-  startDate: string,
-  endDate: string
-): Promise<ActionResult<{ weekId: string }>> {
-  const authError = await assertCanEdit();
-  if (authError) return { ok: false, error: authError };
-
-  const parsed = createWeekSchema.safeParse({ roomId, workTypeId, startDate, endDate });
-  if (!parsed.success) {
-    return { ok: false, error: parsed.error.issues[0]?.message ?? "ข้อมูลไม่ถูกต้อง" };
-  }
-
-  const weeksInSameWorkType = await getWeeks(parsed.data.roomId, parsed.data.workTypeId);
-  const hasOverlap = weeksInSameWorkType.some(
-    (week) =>
-      week.start_date &&
-      week.end_date &&
-      rangesOverlap(parsed.data.startDate, parsed.data.endDate, week.start_date, week.end_date)
-  );
-  if (hasOverlap) {
-    return { ok: false, error: "ช่วงวันที่นี้ทับซ้อนกับสัปดาห์ที่มีอยู่แล้วในประเภทงานนี้" };
-  }
-
-  if (DATA_SOURCE === "local") {
-    const week = await localCreateWeek(
-      parsed.data.roomId,
-      parsed.data.workTypeId,
-      parsed.data.startDate,
-      parsed.data.endDate
-    );
-    revalidatePath("/photos/[roomSlug]/[workTypeSlug]", "page");
-    return { ok: true, data: { weekId: week.id } };
-  }
-
-  const supabase = createServiceClient();
-
-  const { data: existingWeeks, error: fetchError } = await supabase
-    .from("weeks")
-    .select("week_number")
-    .eq("room_id", parsed.data.roomId)
-    .eq("work_type_id", parsed.data.workTypeId)
-    .order("week_number", { ascending: false })
-    .limit(1);
-
-  if (fetchError) {
-    return { ok: false, error: fetchError.message };
-  }
-
-  const nextWeekNumber = (existingWeeks[0]?.week_number ?? 0) + 1;
-
-  const { data: week, error: insertError } = await supabase
-    .from("weeks")
-    .insert({
-      room_id: parsed.data.roomId,
-      work_type_id: parsed.data.workTypeId,
-      week_number: nextWeekNumber,
-      label: `สัปดาห์ที่ ${nextWeekNumber}`,
-      start_date: parsed.data.startDate,
-      end_date: parsed.data.endDate,
-    })
-    .select("*")
-    .single();
-
-  if (insertError || !week) {
-    return { ok: false, error: insertError?.message ?? "สร้างสัปดาห์ไม่สำเร็จ" };
-  }
-
-  revalidatePath("/photos/[roomSlug]/[workTypeSlug]", "page");
-
-  return { ok: true, data: { weekId: week.id } };
-}
-
-export async function deleteWeek(weekId: string): Promise<ActionResult<{ weekId: string }>> {
-  const authError = await assertCanEdit();
-  if (authError) return { ok: false, error: authError };
-
-  if (DATA_SOURCE === "local") {
-    const removed = await localDeleteWeek(weekId);
-    if (!removed) {
-      return { ok: false, error: "ไม่พบสัปดาห์นี้" };
-    }
-    revalidatePath("/photos/[roomSlug]/[workTypeSlug]", "page");
-    return { ok: true, data: { weekId } };
-  }
-
-  const supabase = createServiceClient();
-
-  const { data: photosInWeek, error: fetchPhotosError } = await supabase
-    .from("photos")
-    .select("storage_path")
-    .eq("week_id", weekId);
-
-  if (fetchPhotosError) {
-    return { ok: false, error: fetchPhotosError.message };
-  }
-
-  if (photosInWeek.length > 0) {
-    const { error: storageError } = await supabase.storage
-      .from("photos")
-      .remove(photosInWeek.map((photo) => photo.storage_path));
-    if (storageError) {
-      return { ok: false, error: storageError.message };
-    }
-  }
-
-  // photos rows are removed automatically via the weeks_id FK's
-  // "on delete cascade" once the week row itself is deleted below.
-  const { error: deleteError, count } = await supabase
-    .from("weeks")
-    .delete({ count: "exact" })
-    .eq("id", weekId);
-
-  if (deleteError) {
-    return { ok: false, error: deleteError.message };
-  }
-  if (!count) {
-    return { ok: false, error: "ไม่พบสัปดาห์นี้" };
-  }
-
-  revalidatePath("/photos/[roomSlug]/[workTypeSlug]", "page");
-
-  return { ok: true, data: { weekId } };
 }

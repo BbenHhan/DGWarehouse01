@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   MAX_FILE_SIZE_BYTES,
   PHOTO_MIME_TYPES,
-  createWeekSchema,
+  uploadPhotoSchema,
   validateFile,
 } from "@/lib/validation";
 
@@ -45,26 +45,22 @@ describe("validateFile", () => {
   });
 });
 
-describe("createWeekSchema", () => {
+describe("uploadPhotoSchema", () => {
   const base = { roomId: "hong-raek", workTypeId: "firewalls" };
+  const files = [new File(["x"], "a.jpg", { type: "image/jpeg" })];
 
-  it("accepts a valid date range where end is after start", () => {
-    const result = createWeekSchema.safeParse({ ...base, startDate: "2026-06-08", endDate: "2026-06-15" });
+  it("accepts a valid date with room/work-type/files", () => {
+    const result = uploadPhotoSchema.safeParse({ ...base, date: "2026-06-08", files });
     expect(result.success).toBe(true);
-  });
-
-  it("accepts a single-day range where end equals start", () => {
-    const result = createWeekSchema.safeParse({ ...base, startDate: "2026-06-08", endDate: "2026-06-08" });
-    expect(result.success).toBe(true);
-  });
-
-  it("rejects an end date before the start date", () => {
-    const result = createWeekSchema.safeParse({ ...base, startDate: "2026-06-15", endDate: "2026-06-08" });
-    expect(result.success).toBe(false);
   });
 
   it("rejects a missing date", () => {
-    const result = createWeekSchema.safeParse({ ...base, startDate: "", endDate: "2026-06-15" });
+    const result = uploadPhotoSchema.safeParse({ ...base, date: "", files });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects an unparseable date", () => {
+    const result = uploadPhotoSchema.safeParse({ ...base, date: "not-a-date", files });
     expect(result.success).toBe(false);
   });
 });

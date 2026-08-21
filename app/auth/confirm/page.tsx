@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { Suspense, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,18 @@ import { Button } from "@/components/ui/button";
 // can't consume the one-time code before the real person clicks (research.md
 // Decision 1). Google OAuth is unaffected — it still goes through
 // app/auth/callback/route.ts directly, untouched by this feature.
+// Same Suspense requirement as app/login/page.tsx — useSearchParams() needs
+// it for `next build`'s static prerendering, even though dev mode never
+// complains about its absence.
 export default function AuthConfirmPage() {
+  return (
+    <Suspense>
+      <AuthConfirmPageContent />
+    </Suspense>
+  );
+}
+
+function AuthConfirmPageContent() {
   const searchParams = useSearchParams();
   const code = searchParams.get("code");
   const next = searchParams.get("next") ?? "/photos";

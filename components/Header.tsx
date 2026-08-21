@@ -16,7 +16,7 @@ export function Header({
   stats,
   user,
 }: {
-  stats: { totalPhotos: number; totalDocuments: number; totalWeeks: number };
+  stats: { totalPhotos: number; totalDocuments: number; totalDays: number };
   user: {
     email: string;
     name: string | null;
@@ -49,7 +49,7 @@ export function Header({
           />
           <StatChip
             icon={<CalendarDays className="h-3.5 w-3.5" />}
-            label={`${stats.totalWeeks} สัปดาห์`}
+            label={`${stats.totalDays} วัน`}
           />
         </div>
 

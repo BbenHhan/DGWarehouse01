@@ -3,25 +3,22 @@ import "server-only";
 import { createServiceClient, requireUser } from "@/lib/supabase/server";
 import { DATA_SOURCE } from "@/lib/data-config";
 import {
-  mockGetAllWeeks,
   mockGetDocumentCategories,
   mockGetDocuments,
   mockGetPhotos,
   mockGetRoomPhotoCounts,
   mockGetRooms,
   mockGetSiteStats,
-  mockGetWeeks,
   mockGetWorkTypes,
 } from "@/lib/mock/source";
 import {
-  localGetAllWeeks,
   localGetDocuments,
   localGetPhotos,
   localGetRoomPhotoCounts,
   localGetSiteStats,
-  localGetWeeks,
 } from "@/lib/local/store";
-import type { Document, DocumentCategory, Photo, Room, Week, WorkType } from "@/lib/types";
+import type { DateFilter } from "@/lib/date-filter";
+import type { Document, DocumentCategory, Photo, Room, WorkType } from "@/lib/types";
 
 // Rooms/work types/document categories are the same fixed lookup lists in
 // both non-Supabase modes ("local" and "mock") — neither depends on disk
@@ -48,46 +45,33 @@ export async function getWorkTypes(): Promise<WorkType[]> {
   return data;
 }
 
-export async function getWeeks(roomId: string, workTypeId: string): Promise<Week[]> {
-  if (DATA_SOURCE === "mock") return mockGetWeeks(roomId, workTypeId);
-  if (DATA_SOURCE === "local") return localGetWeeks(roomId, workTypeId);
+// Every photo for a room+work-type, most recent date first, optionally
+// narrowed to a [from, to] range — replaces the old per-week fetch entirely
+// (specs/018-per-photo-dates). `filter` mirrors lib/date-filter.ts's
+// semantics: an unset from/to is unfiltered on that end; a reversed range
+// (from > to) is treated as unfiltered here too, applied before the query is
+// built so the two never disagree.
+export async function getPhotos(
+  roomId: string,
+  workTypeId: string,
+  filter?: DateFilter
+): Promise<Photo[]> {
+  const from = filter?.from && filter?.to && filter.from > filter.to ? undefined : filter?.from;
+  const to = filter?.from && filter?.to && filter.from > filter.to ? undefined : filter?.to;
+
+  if (DATA_SOURCE === "mock") return mockGetPhotos(roomId, workTypeId, { from, to });
+  if (DATA_SOURCE === "local") return localGetPhotos(roomId, workTypeId, { from, to });
 
   await requireUser();
   const supabase = createServiceClient();
-  const { data, error } = await supabase
-    .from("weeks")
-    .select("*")
-    .eq("room_id", roomId)
-    .eq("work_type_id", workTypeId)
-    .order("week_number");
-  if (error) throw error;
-  return data;
-}
-
-// Unfiltered — used only to populate the "move to a different week" picker
-// in EditModal, since a photo can move to any room/work-type/week (FR-008).
-export async function getAllWeeks(): Promise<Week[]> {
-  if (DATA_SOURCE === "mock") return mockGetAllWeeks();
-  if (DATA_SOURCE === "local") return localGetAllWeeks();
-
-  await requireUser();
-  const supabase = createServiceClient();
-  const { data, error } = await supabase.from("weeks").select("*").order("created_at");
-  if (error) throw error;
-  return data;
-}
-
-export async function getPhotos(weekId: string): Promise<Photo[]> {
-  if (DATA_SOURCE === "mock") return mockGetPhotos(weekId);
-  if (DATA_SOURCE === "local") return localGetPhotos(weekId);
-
-  await requireUser();
-  const supabase = createServiceClient();
-  const { data, error } = await supabase
+  let query = supabase
     .from("photos")
     .select("*")
-    .eq("week_id", weekId)
-    .order("created_at");
+    .eq("room_id", roomId)
+    .eq("work_type_id", workTypeId);
+  if (from) query = query.gte("date", from);
+  if (to) query = query.lte("date", to);
+  const { data, error } = await query.order("date", { ascending: false });
   if (error) throw error;
   return data;
 }
@@ -120,40 +104,42 @@ export async function getDocuments(categoryId: string): Promise<Document[]> {
   return data;
 }
 
-// Header stats chips (total photos/documents/distinct weeks site-wide).
+// Header stats chips (total photos/documents/distinct photographed days
+// site-wide). `totalDays` replaces the old `totalWeeks` stat — the closest
+// still-meaningful analog now that there's no week container to count
+// (specs/018-per-photo-dates/research.md Decision 6).
 export async function getSiteStats(): Promise<{
   totalPhotos: number;
   totalDocuments: number;
-  totalWeeks: number;
+  totalDays: number;
 }> {
   if (DATA_SOURCE === "mock") return mockGetSiteStats();
   if (DATA_SOURCE === "local") return localGetSiteStats();
 
   await requireUser();
   const supabase = createServiceClient();
-  const [{ count: totalPhotos }, { count: totalDocuments }, { data: weeks }] = await Promise.all([
+  const [{ count: totalPhotos }, { count: totalDocuments }, { data: photos }] = await Promise.all([
     supabase.from("photos").select("*", { count: "exact", head: true }),
     supabase.from("documents").select("*", { count: "exact", head: true }),
-    supabase.from("weeks").select("week_number"),
+    supabase.from("photos").select("date"),
   ]);
-  const totalWeeks = new Set((weeks ?? []).map((week) => week.week_number)).size;
-  return { totalPhotos: totalPhotos ?? 0, totalDocuments: totalDocuments ?? 0, totalWeeks };
+  const totalDays = new Set((photos ?? []).map((photo) => photo.date)).size;
+  return { totalPhotos: totalPhotos ?? 0, totalDocuments: totalDocuments ?? 0, totalDays };
 }
 
-// Total photo count per room, across every work type/week — sidebar badges.
+// Total photo count per room, across every work type/date — sidebar badges.
 export async function getRoomPhotoCounts(): Promise<Record<string, number>> {
   if (DATA_SOURCE === "mock") return mockGetRoomPhotoCounts();
   if (DATA_SOURCE === "local") return localGetRoomPhotoCounts();
 
   await requireUser();
   const supabase = createServiceClient();
-  const { data, error } = await supabase.from("photos").select("week_id, weeks!inner(room_id)");
+  const { data, error } = await supabase.from("photos").select("room_id");
   if (error) throw error;
 
   const counts: Record<string, number> = {};
-  for (const row of data as unknown as Array<{ weeks: { room_id: string } }>) {
-    const roomId = row.weeks.room_id;
-    counts[roomId] = (counts[roomId] ?? 0) + 1;
+  for (const row of data) {
+    counts[row.room_id] = (counts[row.room_id] ?? 0) + 1;
   }
   return counts;
 }

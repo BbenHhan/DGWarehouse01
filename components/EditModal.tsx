@@ -29,7 +29,10 @@ export function EditModal({ kind, item, moveOptions, moveLabel }: EditModalProps
   const [open, setOpen] = useState(false);
   const [fileName, setFileName] = useState(item.file_name);
   const [note, setNote] = useState(item.note ?? "");
-  const initialMoveTo = kind === "photo" ? item.week_id : item.category_id;
+  const [date, setDate] = useState(kind === "photo" ? item.date : "");
+  // Photos move between room/work-type pairs (composite "roomId::workTypeId"
+  // value, specs/018-per-photo-dates); documents move between categories.
+  const initialMoveTo = kind === "photo" ? `${item.room_id}::${item.work_type_id}` : item.category_id;
   const [moveTo, setMoveTo] = useState(initialMoveTo);
   const [isPending, startTransition] = useTransition();
 
@@ -41,20 +44,25 @@ export function EditModal({ kind, item, moveOptions, moveLabel }: EditModalProps
     }
 
     startTransition(async () => {
-      const result =
-        kind === "photo"
-          ? await editPhoto({
-              photoId: item.id,
-              fileName: trimmedName !== item.file_name ? trimmedName : undefined,
-              note: note !== (item.note ?? "") ? note : undefined,
-              weekId: moveTo !== initialMoveTo ? moveTo : undefined,
-            })
-          : await editDoc({
-              documentId: item.id,
-              fileName: trimmedName !== item.file_name ? trimmedName : undefined,
-              note: note !== (item.note ?? "") ? note : undefined,
-              categoryId: moveTo !== initialMoveTo ? moveTo : undefined,
-            });
+      let result;
+      if (kind === "photo") {
+        const [roomId, workTypeId] = moveTo !== initialMoveTo ? moveTo.split("::") : [undefined, undefined];
+        result = await editPhoto({
+          photoId: item.id,
+          fileName: trimmedName !== item.file_name ? trimmedName : undefined,
+          note: note !== (item.note ?? "") ? note : undefined,
+          date: date !== item.date ? date : undefined,
+          roomId,
+          workTypeId,
+        });
+      } else {
+        result = await editDoc({
+          documentId: item.id,
+          fileName: trimmedName !== item.file_name ? trimmedName : undefined,
+          note: note !== (item.note ?? "") ? note : undefined,
+          categoryId: moveTo !== initialMoveTo ? moveTo : undefined,
+        });
+      }
 
       if (!result.ok) {
         toast.error(result.error);
@@ -92,6 +100,15 @@ export function EditModal({ kind, item, moveOptions, moveLabel }: EditModalProps
             </label>
             <Input id="edit-file-name" value={fileName} onChange={(e) => setFileName(e.target.value)} />
           </div>
+
+          {kind === "photo" && (
+            <div className="space-y-1">
+              <label className="text-sm font-medium" htmlFor="edit-date">
+                วันที่
+              </label>
+              <Input id="edit-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+            </div>
+          )}
 
           <div className="space-y-1">
             <label className="text-sm font-medium" htmlFor="edit-note">

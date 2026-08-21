@@ -1,23 +1,21 @@
 import { notFound } from "next/navigation";
-import { getAllWeeks, getPhotos, getRoomPhotoCounts, getRooms, getWeeks, getWorkTypes } from "@/lib/data";
+import { getPhotos, getRoomPhotoCounts, getRooms, getWorkTypes } from "@/lib/data";
 import { USE_MOCK_DATA } from "@/lib/data-config";
-import { formatWeekDateRangeOrNull } from "@/lib/week-format";
 import { canEdit as roleCanEdit } from "@/lib/roles";
 import { getCurrentUser } from "@/lib/supabase/server";
-import { WorkTypeWeekNav } from "@/components/WorkTypeWeekNav";
+import { WorkTypePhotoNav } from "@/components/WorkTypePhotoNav";
+import { PhotoDateFilter } from "@/components/PhotoDateFilter";
 import { PhotoGrid } from "@/components/PhotoGrid";
-import { PhotoUploader } from "@/components/PhotoUploader";
-import { AddWeekButton } from "@/components/AddWeekButton";
 
 export default async function RoomWorkTypePage({
   params,
   searchParams,
 }: {
   params: Promise<{ roomSlug: string; workTypeSlug: string }>;
-  searchParams: Promise<{ week?: string }>;
+  searchParams: Promise<{ from?: string; to?: string }>;
 }) {
   const { roomSlug, workTypeSlug } = await params;
-  const { week: weekIdParam } = await searchParams;
+  const { from, to } = await searchParams;
 
   const [rooms, workTypes, roomPhotoCounts, currentUser] = await Promise.all([
     getRooms(),
@@ -38,33 +36,20 @@ export default async function RoomWorkTypePage({
     ? "ห้องเย็น"
     : currentRoom.name_th;
 
-  const weeks = await getWeeks(currentRoom.id, currentWorkType.id);
-  // Fetch every week's photos once so the timeline can show which weeks
-  // actually have content (v7's "has-photos" gold dot) without a second
-  // round trip for the selected week.
-  const weeksWithPhotos = await Promise.all(
-    weeks.map(async (week) => ({ week, photos: await getPhotos(week.id) }))
-  );
-  const selectedEntry =
-    weeksWithPhotos.find((entry) => entry.week.id === weekIdParam) ??
-    weeksWithPhotos[weeksWithPhotos.length - 1];
-  const selectedWeek = selectedEntry?.week;
-  const photos = selectedEntry?.photos ?? [];
+  const photos = await getPhotos(currentRoom.id, currentWorkType.id, { from, to });
 
-  // Photos can move to any room/work-type/week (FR-008), so the EditModal
-  // "move to" list spans every week, not just this room/work-type's.
+  // A photo can move to any room/work-type pair (FR-007) — every combination
+  // is a move option, not just this page's own (specs/018-per-photo-dates,
+  // replaces the old "move to a different week" list spanning every week).
   // Skipped entirely in mock mode (v1) since edit/upload UI is hidden there.
-  const weekMoveOptions = USE_MOCK_DATA
+  const roomWorkTypeMoveOptions = USE_MOCK_DATA
     ? []
-    : (await getAllWeeks()).map((week) => {
-        const room = rooms.find((r) => r.id === week.room_id);
-        const workType = workTypes.find((w) => w.id === week.work_type_id);
-        const weekLabel = formatWeekDateRangeOrNull(week) ?? week.label;
-        return {
-          value: week.id,
-          label: `${room?.emoji ?? ""} ${room?.name_th ?? ""} · ${workType?.emoji ?? ""} ${workType?.name_th ?? ""} · ${weekLabel}`,
-        };
-      });
+    : rooms.flatMap((room) =>
+        workTypes.map((workType) => ({
+          value: `${room.id}::${workType.id}`,
+          label: `${room.emoji} ${room.name_th} · ${workType.emoji} ${workType.name_th}`,
+        }))
+      );
 
   return (
     <div className="flex flex-col gap-5">
@@ -82,35 +67,21 @@ export default async function RoomWorkTypePage({
         </div>
       </div>
 
-      <WorkTypeWeekNav
+      <WorkTypePhotoNav
         workTypes={workTypes}
-        weeks={weeksWithPhotos.map(({ week, photos: weekPhotos }) => ({
-          week,
-          photoCount: weekPhotos.length,
-        }))}
         currentRoomSlug={roomSlug}
         currentWorkTypeSlug={workTypeSlug}
-        selectedWeekId={selectedWeek?.id}
-        showActions={!USE_MOCK_DATA && userCanEdit}
       />
 
-      {!USE_MOCK_DATA && userCanEdit && (
-        <div className="flex flex-wrap items-center gap-2">
-          {selectedWeek && <PhotoUploader weekId={selectedWeek.id} />}
-          <AddWeekButton roomId={currentRoom.id} workTypeId={currentWorkType.id} />
-        </div>
-      )}
+      <PhotoDateFilter />
 
       <div className="border-t border-border/70 pt-4">
-        {selectedWeek && (
-          <div className="mb-3 flex flex-wrap items-center gap-2 text-sm">
-            <span className="rounded-full border border-primary/20 bg-primary/10 px-3 py-1 font-semibold text-primary">
-              {photos.length} รูป
-            </span>
-            <span className="text-muted-foreground">{selectedWeek.label}</span>
-          </div>
-        )}
-        <PhotoGrid photos={photos} weekMoveOptions={weekMoveOptions} canEdit={userCanEdit} />
+        <div className="mb-3 flex flex-wrap items-center gap-2 text-sm">
+          <span className="rounded-full border border-primary/20 bg-primary/10 px-3 py-1 font-semibold text-primary">
+            {photos.length} รูป
+          </span>
+        </div>
+        <PhotoGrid photos={photos} moveOptions={roomWorkTypeMoveOptions} canEdit={userCanEdit} />
       </div>
     </div>
   );

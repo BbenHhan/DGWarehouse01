@@ -2,10 +2,10 @@
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
-import { Clock, LogOut, UserPlus, Users } from "lucide-react";
+import { Clock, LogOut, Upload, UserPlus, Users } from "lucide-react";
 import { toast } from "sonner";
 import type { Role } from "@/lib/roles";
-import { isAdmin } from "@/lib/roles";
+import { canEdit, isAdmin } from "@/lib/roles";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -86,6 +86,21 @@ export function AccountMenu({
           </DropdownMenuLabel>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
+        {canEdit(role) && (
+          <>
+            <DropdownMenuGroup>
+              <DropdownMenuItem
+                render={
+                  <Link href="/upload">
+                    <Upload className="h-4 w-4" />
+                    อัปโหลดรูปหลายไฟล์
+                  </Link>
+                }
+              />
+            </DropdownMenuGroup>
+            <DropdownMenuSeparator />
+          </>
+        )}
         {isAdmin(role) && (
           <>
             <DropdownMenuGroup>

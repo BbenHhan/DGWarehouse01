@@ -4,8 +4,9 @@ import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
-import type { Document, Photo, Week } from "@/lib/types";
-import { formatWeekDateRange } from "@/lib/week-format";
+import type { Document, Photo } from "@/lib/types";
+import type { DateFilter } from "@/lib/date-filter";
+import { photoMatchesDateFilter } from "@/lib/date-filter";
 
 // Interim storage backend for Constitution III ("local" DATA_SOURCE) — persists
 // uploads to a git-ignored disk folder instead of Supabase Storage, so upload/
@@ -24,7 +25,6 @@ export const LOCAL_FILES_DIR = path.join(LOCAL_BASE_DIR, "files");
 const DB_PATH = path.join(LOCAL_BASE_DIR, "db.json");
 
 type LocalDb = {
-  weeks: Week[];
   photos: Photo[];
   documents: Document[];
 };
@@ -42,13 +42,13 @@ let writeQueue: Promise<void> = Promise.resolve();
 
 async function loadDb(): Promise<LocalDb> {
   if (!existsSync(DB_PATH)) {
-    return { weeks: [], photos: [], documents: [] };
+    return { photos: [], documents: [] };
   }
   try {
     const raw = await readFile(DB_PATH, "utf-8");
     return JSON.parse(raw) as LocalDb;
   } catch {
-    return { weeks: [], photos: [], documents: [] };
+    return { photos: [], documents: [] };
   }
 }
 
@@ -76,90 +76,41 @@ async function deleteUploadedFile(storagePath: string): Promise<void> {
   await rm(absolutePath, { force: true });
 }
 
-// Weeks are ordered by their date range, earliest first — not by creation order
-// or a manually-assigned number (specs/002-week-date-range-ui FR-004). ISO date
-// strings ("YYYY-MM-DD") sort correctly with plain string comparison.
-function sortWeeksByDate(weeks: Week[]): Week[] {
-  return [...weeks].sort((a, b) => {
-    if (a.start_date && b.start_date) return a.start_date.localeCompare(b.start_date);
-    return a.week_number - b.week_number;
-  });
-}
-
-export async function localGetWeeks(roomId: string, workTypeId: string): Promise<Week[]> {
-  const db = await loadDb();
-  return sortWeeksByDate(
-    db.weeks.filter((week) => week.room_id === roomId && week.work_type_id === workTypeId)
-  );
-}
-
-export async function localGetAllWeeks(): Promise<Week[]> {
-  const db = await loadDb();
-  return sortWeeksByDate(db.weeks);
-}
-
-export async function localCreateWeek(
+// Every photo for a room+work-type, most recent date first, optionally
+// narrowed by lib/date-filter.ts's semantics (specs/018-per-photo-dates —
+// replaces the old per-week fetch entirely).
+export async function localGetPhotos(
   roomId: string,
   workTypeId: string,
-  startDate: string,
-  endDate: string
-): Promise<Week> {
-  const db = await loadDb();
-  // week_number is kept only as an internal, never-shown bookkeeping/tie-break
-  // value now — the user never sees or assigns it (specs/002-week-date-range-ui).
-  const existing = db.weeks.filter((week) => week.room_id === roomId && week.work_type_id === workTypeId);
-  const nextNumber = existing.reduce((max, week) => Math.max(max, week.week_number), 0) + 1;
-
-  const week: Week = {
-    id: randomUUID(),
-    room_id: roomId,
-    work_type_id: workTypeId,
-    week_number: nextNumber,
-    label: formatWeekDateRange(startDate, endDate) ?? `สัปดาห์ที่ ${nextNumber}`,
-    start_date: startDate,
-    end_date: endDate,
-    created_at: nowIso(),
-  };
-  db.weeks.push(week);
-  await persist(db);
-  return week;
-}
-
-export async function localDeleteWeek(weekId: string): Promise<Week | null> {
-  const db = await loadDb();
-  const index = db.weeks.findIndex((week) => week.id === weekId);
-  if (index === -1) return null;
-
-  // Cascade: every photo that belonged to this week is deleted too — same
-  // per-file deletion localDeletePhoto already does (specs/003-delete-week).
-  const photosInWeek = db.photos.filter((photo) => photo.week_id === weekId);
-  db.photos = db.photos.filter((photo) => photo.week_id !== weekId);
-  const [removed] = db.weeks.splice(index, 1);
-  await persist(db);
-
-  for (const photo of photosInWeek) {
-    await deleteUploadedFile(photo.storage_path);
-  }
-
-  return removed;
-}
-
-export async function localGetPhotos(weekId: string): Promise<Photo[]> {
+  filter?: DateFilter
+): Promise<Photo[]> {
   const db = await loadDb();
   return db.photos
-    .filter((photo) => photo.week_id === weekId)
-    .sort((a, b) => a.created_at.localeCompare(b.created_at));
+    .filter(
+      (photo) =>
+        photo.room_id === roomId &&
+        photo.work_type_id === workTypeId &&
+        photoMatchesDateFilter(photo.date, filter ?? {})
+    )
+    .sort((a, b) => b.date.localeCompare(a.date));
 }
 
-export async function localSavePhotoFile(weekId: string, file: File): Promise<Photo> {
+export async function localSavePhotoFile(
+  roomId: string,
+  workTypeId: string,
+  date: string,
+  file: File
+): Promise<Photo> {
   const db = await loadDb();
   const id = randomUUID();
-  const storagePath = `photos/${weekId}/${id}-${file.name}`;
+  const storagePath = `photos/${roomId}-${workTypeId}/${id}-${file.name}`;
   await writeUploadedFile(storagePath, file);
 
   const photo: Photo = {
     id,
-    week_id: weekId,
+    room_id: roomId,
+    work_type_id: workTypeId,
+    date,
     storage_path: storagePath,
     file_name: file.name,
     note: null,
@@ -183,14 +134,16 @@ export async function localDeletePhoto(photoId: string): Promise<Photo | null> {
 
 export async function localUpdatePhoto(
   photoId: string,
-  updates: { fileName?: string; note?: string; weekId?: string }
+  updates: { fileName?: string; note?: string; date?: string; roomId?: string; workTypeId?: string }
 ): Promise<Photo | null> {
   const db = await loadDb();
   const photo = db.photos.find((p) => p.id === photoId);
   if (!photo) return null;
   if (updates.fileName !== undefined) photo.file_name = updates.fileName;
   if (updates.note !== undefined) photo.note = updates.note;
-  if (updates.weekId !== undefined) photo.week_id = updates.weekId;
+  if (updates.date !== undefined) photo.date = updates.date;
+  if (updates.roomId !== undefined) photo.room_id = updates.roomId;
+  if (updates.workTypeId !== undefined) photo.work_type_id = updates.workTypeId;
   photo.updated_at = nowIso();
   await persist(db);
   return photo;
@@ -251,24 +204,21 @@ export async function localUpdateDocument(
 export async function localGetSiteStats(): Promise<{
   totalPhotos: number;
   totalDocuments: number;
-  totalWeeks: number;
+  totalDays: number;
 }> {
   const db = await loadDb();
   return {
     totalPhotos: db.photos.length,
     totalDocuments: db.documents.length,
-    totalWeeks: new Set(db.weeks.map((week) => week.week_number)).size,
+    totalDays: new Set(db.photos.map((photo) => photo.date)).size,
   };
 }
 
 export async function localGetRoomPhotoCounts(): Promise<Record<string, number>> {
   const db = await loadDb();
-  const weekRoomMap = new Map(db.weeks.map((week) => [week.id, week.room_id]));
   const counts: Record<string, number> = {};
   for (const photo of db.photos) {
-    const roomId = weekRoomMap.get(photo.week_id);
-    if (!roomId) continue;
-    counts[roomId] = (counts[roomId] ?? 0) + 1;
+    counts[photo.room_id] = (counts[photo.room_id] ?? 0) + 1;
   }
   return counts;
 }

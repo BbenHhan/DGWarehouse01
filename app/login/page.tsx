@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { validatePassword } from "@/lib/password";
@@ -15,7 +15,19 @@ const EXPIRED_LINK_ERROR = "ลิงก์หมดอายุหรือถ�
 
 type Mode = "signin" | "signup" | "forgot";
 
+// useSearchParams() forces this page out of static prerendering unless it's
+// wrapped in a Suspense boundary — dev mode never enforces this, only
+// `next build`, which is what Vercel actually runs (confirmed live during
+// this session's pre-deploy build check).
 export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginPageContent />
+    </Suspense>
+  );
+}
+
+function LoginPageContent() {
   const searchParams = useSearchParams();
   const [mode, setMode] = useState<Mode>("signin");
 

@@ -1,5 +1,6 @@
 import { getRoomPhotoCounts, getRooms, getSiteStats } from "@/lib/data";
 import { getCurrentUser } from "@/lib/supabase/server";
+import { canEdit } from "@/lib/roles";
 import { Header } from "@/components/Header";
 import { Sidebar } from "@/components/Sidebar";
 import { SidebarSwitcher } from "@/components/SidebarSwitcher";
@@ -12,6 +13,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     getCurrentUser(),
   ]);
 
+  const showUploadLink = !!user && canEdit(user.role);
+
   return (
     <div className="flex min-h-screen flex-col">
       <Header stats={siteStats} user={user} />
@@ -22,6 +25,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             rooms={rooms}
             roomPhotoCounts={roomPhotoCounts}
             documentCount={siteStats.totalDocuments}
+            showUploadLink={showUploadLink}
           />
         </aside>
 
@@ -31,6 +35,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
               rooms={rooms}
               roomPhotoCounts={roomPhotoCounts}
               documentCount={siteStats.totalDocuments}
+              showUploadLink={showUploadLink}
             />
           </div>
           {children}

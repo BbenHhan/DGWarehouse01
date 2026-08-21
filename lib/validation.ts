@@ -24,7 +24,7 @@ export const DOCUMENT_MIME_TYPES = [
 ];
 
 const uuid = z.string().uuid();
-// weekId/categoryId are foreign-key references to a fixed lookup list, not
+// roomId/workTypeId/categoryId are foreign-key references to a fixed lookup list, not
 // user-typed text. In Supabase mode they're real UUIDs, but the "local" and
 // "mock" backends (lib/mock/source.ts) use human-readable slug ids like
 // "structure" for document categories — a strict .uuid() check rejected
@@ -53,8 +53,16 @@ export function validateFile(file: File, allowedMimeTypes: string[]): string | n
   return null;
 }
 
+// A photo's single exact date (specs/018-per-photo-dates) — replaces the old
+// week date-RANGE container entirely; no range, no overlap check.
+const isoDate = z.string().min(1, "กรุณาระบุวันที่").refine((value) => !Number.isNaN(Date.parse(value)), {
+  message: "รูปแบบวันที่ไม่ถูกต้อง",
+});
+
 export const uploadPhotoSchema = z.object({
-  weekId: foreignKeyId,
+  roomId: foreignKeyId,
+  workTypeId: foreignKeyId,
+  date: isoDate,
   files: fileArray(),
 });
 
@@ -67,30 +75,19 @@ export const editPhotoSchema = z
     photoId: uuid,
     fileName: z.string().trim().min(1, "ชื่อไฟล์ห้ามว่าง").optional(),
     note: z.string().optional(),
-    weekId: foreignKeyId.optional(),
+    date: isoDate.optional(),
+    roomId: foreignKeyId.optional(),
+    workTypeId: foreignKeyId.optional(),
   })
-  .refine((input) => input.fileName !== undefined || input.note !== undefined || input.weekId !== undefined, {
-    message: "ต้องระบุอย่างน้อยหนึ่งฟิลด์ที่จะแก้ไข",
-  });
-
-// Week's user-facing identity is its date range, not a manually-assigned order
-// number (Constitution-adjacent product decision — see
-// specs/002-week-date-range-ui/spec.md FR-001/FR-002/FR-003).
-const isoDate = z.string().min(1, "กรุณาระบุวันที่").refine((value) => !Number.isNaN(Date.parse(value)), {
-  message: "รูปแบบวันที่ไม่ถูกต้อง",
-});
-
-export const createWeekSchema = z
-  .object({
-    roomId: foreignKeyId,
-    workTypeId: foreignKeyId,
-    startDate: isoDate,
-    endDate: isoDate,
-  })
-  .refine((input) => input.endDate >= input.startDate, {
-    message: "วันที่สิ้นสุดต้องไม่ก่อนวันที่เริ่มต้น",
-    path: ["endDate"],
-  });
+  .refine(
+    (input) =>
+      input.fileName !== undefined ||
+      input.note !== undefined ||
+      input.date !== undefined ||
+      input.roomId !== undefined ||
+      input.workTypeId !== undefined,
+    { message: "ต้องระบุอย่างน้อยหนึ่งฟิลด์ที่จะแก้ไข" }
+  );
 
 export const uploadDocSchema = z.object({
   categoryId: foreignKeyId,

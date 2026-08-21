@@ -2,7 +2,9 @@ import "server-only";
 
 import { readdirSync } from "node:fs";
 import path from "node:path";
-import type { Document, DocumentCategory, Photo, Room, Week, WorkType } from "@/lib/types";
+import type { DateFilter } from "@/lib/date-filter";
+import { photoMatchesDateFilter } from "@/lib/date-filter";
+import type { Document, DocumentCategory, Photo, Room, WorkType } from "@/lib/types";
 
 // Root of the real v7 local folder this mock data layer reads from.
 // Override with MOCK_DATA_ROOT if the folder lives somewhere else.
@@ -64,16 +66,60 @@ function listFiles(dir: string): string[] {
   }
 }
 
-type PhotoIndex = Map<string, { week: Week; photos: Photo[] }>; // key: `${roomId}::${workTypeId}::${weekNumber}`
+// Best-effort date extraction for this already-legacy, read-only mock
+// backend only (specs/018-per-photo-dates/research.md Decision 5) — real
+// per-photo dates for live data come from the "supabase"/"local" backends'
+// actual `date` column. The v7 folder snapshot embeds a Thai date range as
+// plain text in each week folder's name, e.g. "สัปดาห์ที่ 6 (8-15 มิ.ย. 2569)"
+// — every photo under that folder is assigned that range's start date.
+const THAI_MONTHS_ABBR = [
+  "ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.",
+  "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค.",
+];
+const MOCK_FALLBACK_DATE = "1970-01-01"; // used only if a folder's label doesn't parse
+
+function pad(n: number): string {
+  return String(n).padStart(2, "0");
+}
+
+function monthIndex(abbr: string): number | null {
+  const i = THAI_MONTHS_ABBR.indexOf(abbr.trim());
+  return i === -1 ? null : i;
+}
+
+function parseWeekFolderStartDate(folderName: string): string | null {
+  const match = folderName.match(/^สัปดาห์ที่\s*\d+\s*\(([^)]+)\)$/);
+  if (!match) return null;
+  const rangeText = match[1].trim();
+
+  const sameMonth = rangeText.match(/^(\d{1,2})-(\d{1,2})\s+([ก-๙.]+)\s+(\d{4})$/);
+  if (sameMonth) {
+    const [, d1, , monthAbbr, beYear] = sameMonth;
+    const month = monthIndex(monthAbbr);
+    if (month === null) return null;
+    return `${Number(beYear) - 543}-${pad(month + 1)}-${pad(Number(d1))}`;
+  }
+
+  const crossMonth = rangeText.match(/^(\d{1,2})\s+([ก-๙.]+)\s*-\s*\d{1,2}\s+[ก-๙.]+\s+(\d{4})$/);
+  if (crossMonth) {
+    const [, d1, monthAbbr1, beYear] = crossMonth;
+    const month1 = monthIndex(monthAbbr1);
+    if (month1 === null) return null;
+    return `${Number(beYear) - 543}-${pad(month1 + 1)}-${pad(Number(d1))}`;
+  }
+
+  return null;
+}
+
+type PhotoIndex = Map<string, Photo[]>; // key: `${roomId}::${workTypeId}`
 
 function buildPhotoIndex(): PhotoIndex {
   const index: PhotoIndex = new Map();
   const photosRoot = path.join(MOCK_BASE_DIR, PHOTOS_ROOT_NAME);
 
   for (const weekFolder of listDirs(photosRoot)) {
-    const weekMatch = weekFolder.match(/สัปดาห์ที่\s*(\d+)/);
-    if (!weekMatch) continue; // skips "📅 ยังไม่ระบุวันที่"
-    const weekNumber = Number(weekMatch[1]);
+    if (!weekFolder.match(/สัปดาห์ที่\s*\d+/)) continue; // skips "📅 ยังไม่ระบุวันที่"
+    const date = parseWeekFolderStartDate(weekFolder) ?? MOCK_FALLBACK_DATE;
     const weekPath = path.join(photosRoot, weekFolder);
 
     for (const roomFolder of listDirs(weekPath)) {
@@ -82,46 +128,30 @@ function buildPhotoIndex(): PhotoIndex {
         for (const subroomFolder of listDirs(coldRoomPath)) {
           const room = ROOMS.find((r) => r.subroomFolderName === subroomFolder);
           if (!room) continue;
-          indexRoomWeek(index, room, weekNumber, weekFolder, path.join(coldRoomPath, subroomFolder));
+          indexRoomFolder(index, room, date, path.join(coldRoomPath, subroomFolder));
         }
         continue;
       }
 
       const room = ROOMS.find((r) => r.folderName === roomFolder);
       if (!room) continue; // skips "📦 ยังไม่ระบุห้อง"
-      indexRoomWeek(index, room, weekNumber, weekFolder, path.join(weekPath, roomFolder));
+      indexRoomFolder(index, room, date, path.join(weekPath, roomFolder));
     }
   }
 
   return index;
 }
 
-function indexRoomWeek(
-  index: PhotoIndex,
-  room: Room,
-  weekNumber: number,
-  weekFolderLabel: string,
-  roomWeekPath: string
-) {
+function indexRoomFolder(index: PhotoIndex, room: Room, date: string, roomWeekPath: string) {
   for (const workType of WORK_TYPES) {
-    const key = `${room.id}::${workType.id}::${weekNumber}`;
+    const key = `${room.id}::${workType.id}`;
     const matchingFolders = listDirs(roomWeekPath).filter((f) => workType.folderNames.includes(f));
     if (matchingFolders.length === 0) continue;
 
-    let entry = index.get(key);
-    if (!entry) {
-      entry = {
-        week: {
-          id: key,
-          room_id: room.id,
-          work_type_id: workType.id,
-          week_number: weekNumber,
-          label: weekFolderLabel,
-          created_at: "",
-        },
-        photos: [],
-      };
-      index.set(key, entry);
+    let photos = index.get(key);
+    if (!photos) {
+      photos = [];
+      index.set(key, photos);
     }
 
     for (const folderName of matchingFolders) {
@@ -130,9 +160,11 @@ function indexRoomWeek(
         if (!PHOTO_EXTENSIONS.has(path.extname(fileName).toLowerCase())) continue;
         const absolutePath = path.join(folderPath, fileName);
         const relativePath = path.relative(MOCK_BASE_DIR, absolutePath).split(path.sep).join("/");
-        entry.photos.push({
+        photos.push({
           id: relativePath,
-          week_id: key,
+          room_id: room.id,
+          work_type_id: workType.id,
+          date,
           storage_path: relativePath,
           file_name: fileName,
           note: null,
@@ -211,20 +243,16 @@ export async function mockGetWorkTypes(): Promise<WorkType[]> {
   return WORK_TYPES.map(({ id, slug, name_th, emoji, sort_order }) => ({ id, slug, name_th, emoji, sort_order }));
 }
 
-export async function mockGetWeeks(roomId: string, workTypeId: string): Promise<Week[]> {
-  const weeks: Week[] = [];
-  for (const [key, entry] of getPhotoIndex()) {
-    if (key.startsWith(`${roomId}::${workTypeId}::`)) weeks.push(entry.week);
-  }
-  return weeks.sort((a, b) => a.week_number - b.week_number);
-}
-
-export async function mockGetAllWeeks(): Promise<Week[]> {
-  return [...getPhotoIndex().values()].map((entry) => entry.week);
-}
-
-export async function mockGetPhotos(weekId: string): Promise<Photo[]> {
-  return getPhotoIndex().get(weekId)?.photos ?? [];
+export async function mockGetPhotos(
+  roomId: string,
+  workTypeId: string,
+  filter?: DateFilter
+): Promise<Photo[]> {
+  const photos = getPhotoIndex().get(`${roomId}::${workTypeId}`) ?? [];
+  return photos
+    .filter((photo) => photoMatchesDateFilter(photo.date, filter ?? {}))
+    .slice()
+    .sort((a, b) => b.date.localeCompare(a.date));
 }
 
 export async function mockGetDocumentCategories(): Promise<DocumentCategory[]> {
@@ -235,20 +263,20 @@ export async function mockGetDocuments(categoryId: string): Promise<Document[]> 
   return getDocumentIndex().get(categoryId) ?? [];
 }
 
-// Site-wide header stats (total photos/documents/distinct weeks).
+// Site-wide header stats (total photos/documents/distinct photographed days).
 export async function mockGetSiteStats(): Promise<{
   totalPhotos: number;
   totalDocuments: number;
-  totalWeeks: number;
+  totalDays: number;
 }> {
   const photoIndex = getPhotoIndex();
   const documentIndex = getDocumentIndex();
 
   let totalPhotos = 0;
-  const weekNumbers = new Set<number>();
-  for (const entry of photoIndex.values()) {
-    totalPhotos += entry.photos.length;
-    weekNumbers.add(entry.week.week_number);
+  const dates = new Set<string>();
+  for (const photos of photoIndex.values()) {
+    totalPhotos += photos.length;
+    for (const photo of photos) dates.add(photo.date);
   }
 
   let totalDocuments = 0;
@@ -256,15 +284,17 @@ export async function mockGetSiteStats(): Promise<{
     totalDocuments += documents.length;
   }
 
-  return { totalPhotos, totalDocuments, totalWeeks: weekNumbers.size };
+  return { totalPhotos, totalDocuments, totalDays: dates.size };
 }
 
-// Total photo count per room, across every work type/week — used for the
+// Total photo count per room, across every work type/date — used for the
 // sidebar's per-room count badges.
 export async function mockGetRoomPhotoCounts(): Promise<Record<string, number>> {
   const counts: Record<string, number> = {};
-  for (const entry of getPhotoIndex().values()) {
-    counts[entry.week.room_id] = (counts[entry.week.room_id] ?? 0) + entry.photos.length;
+  for (const photos of getPhotoIndex().values()) {
+    for (const photo of photos) {
+      counts[photo.room_id] = (counts[photo.room_id] ?? 0) + 1;
+    }
   }
   return counts;
 }

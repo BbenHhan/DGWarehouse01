@@ -11,10 +11,12 @@ export function SidebarSwitcher({
   rooms,
   roomPhotoCounts,
   documentCount,
+  showUploadLink,
 }: {
   rooms: Room[];
   roomPhotoCounts: Record<string, number>;
   documentCount: number;
+  showUploadLink?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
@@ -30,6 +32,9 @@ export function SidebarSwitcher({
       currentLabel = room.name_th;
       currentEmoji = room.emoji;
     }
+  } else if (pathname === "/upload") {
+    currentLabel = "อัปโหลดรูปหลายไฟล์";
+    currentEmoji = "📤";
   }
 
   return (
@@ -54,6 +59,7 @@ export function SidebarSwitcher({
             rooms={rooms}
             roomPhotoCounts={roomPhotoCounts}
             documentCount={documentCount}
+            showUploadLink={showUploadLink}
             onNavigate={() => setOpen(false)}
           />
         </div>

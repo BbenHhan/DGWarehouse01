@@ -47,49 +47,12 @@ export type Database = {
         Update: Partial<Database["public"]["Tables"]["work_types"]["Insert"]>;
         Relationships: [];
       };
-      weeks: {
-        Row: {
-          id: string;
-          room_id: string;
-          work_type_id: string;
-          week_number: number;
-          label: string;
-          start_date: string | null;
-          end_date: string | null;
-          created_at: string;
-        };
-        Insert: {
-          id?: string;
-          room_id: string;
-          work_type_id: string;
-          week_number: number;
-          label: string;
-          start_date?: string | null;
-          end_date?: string | null;
-          created_at?: string;
-        };
-        Update: Partial<Database["public"]["Tables"]["weeks"]["Insert"]>;
-        Relationships: [
-          {
-            foreignKeyName: "weeks_room_id_fkey";
-            columns: ["room_id"];
-            isOneToOne: false;
-            referencedRelation: "rooms";
-            referencedColumns: ["id"];
-          },
-          {
-            foreignKeyName: "weeks_work_type_id_fkey";
-            columns: ["work_type_id"];
-            isOneToOne: false;
-            referencedRelation: "work_types";
-            referencedColumns: ["id"];
-          }
-        ];
-      };
       photos: {
         Row: {
           id: string;
-          week_id: string;
+          room_id: string;
+          work_type_id: string;
+          date: string;
           storage_path: string;
           file_name: string;
           note: string | null;
@@ -98,7 +61,9 @@ export type Database = {
         };
         Insert: {
           id?: string;
-          week_id: string;
+          room_id: string;
+          work_type_id: string;
+          date: string;
           storage_path: string;
           file_name: string;
           note?: string | null;
@@ -108,10 +73,17 @@ export type Database = {
         Update: Partial<Database["public"]["Tables"]["photos"]["Insert"]>;
         Relationships: [
           {
-            foreignKeyName: "photos_week_id_fkey";
-            columns: ["week_id"];
+            foreignKeyName: "photos_room_id_fkey";
+            columns: ["room_id"];
             isOneToOne: false;
-            referencedRelation: "weeks";
+            referencedRelation: "rooms";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "photos_work_type_id_fkey";
+            columns: ["work_type_id"];
+            isOneToOne: false;
+            referencedRelation: "work_types";
             referencedColumns: ["id"];
           }
         ];

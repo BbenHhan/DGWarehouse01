@@ -2,26 +2,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { FileText } from "lucide-react";
+import { FileText, Upload } from "lucide-react";
 import type { Room } from "@/lib/types";
-
-// Presentational grouping only (no schema change) — mirrors the real v7
-// folder layout, where ❄️ ห้องเย็น physically wraps ห้องย่อย 1-4.
-type RoomGroup = { key: string; label: string; emoji: string; rooms: Room[] };
-function groupRooms(rooms: Room[]): RoomGroup[] {
-  const coldRooms = rooms.filter((room) => room.slug.startsWith("hong-soi-"));
-  const singleRooms = rooms.filter((room) => !room.slug.startsWith("hong-soi-"));
-  const groups: RoomGroup[] = singleRooms.map((room) => ({
-    key: room.id,
-    label: room.name_th,
-    emoji: room.emoji,
-    rooms: [room],
-  }));
-  if (coldRooms.length > 0) {
-    groups.push({ key: "cold", label: "ห้องเย็น", emoji: "❄️", rooms: coldRooms });
-  }
-  return groups;
-}
+import { groupRooms } from "@/lib/room-groups";
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
@@ -43,7 +26,7 @@ function SidebarLink({
   active: boolean;
   icon: React.ReactNode;
   label: string;
-  badge: number;
+  badge?: number;
   onNavigate?: () => void;
 }) {
   return (
@@ -62,14 +45,16 @@ function SidebarLink({
       )}
       {icon}
       <span className="min-w-0 flex-1 truncate">{label}</span>
-      <span
-        className={[
-          "shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold",
-          active ? "bg-primary/15 text-primary" : "bg-secondary text-muted-foreground",
-        ].join(" ")}
-      >
-        {badge}
-      </span>
+      {badge !== undefined && (
+        <span
+          className={[
+            "shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold",
+            active ? "bg-primary/15 text-primary" : "bg-secondary text-muted-foreground",
+          ].join(" ")}
+        >
+          {badge}
+        </span>
+      )}
     </Link>
   );
 }
@@ -78,11 +63,13 @@ export function Sidebar({
   rooms,
   roomPhotoCounts,
   documentCount,
+  showUploadLink,
   onNavigate,
 }: {
   rooms: Room[];
   roomPhotoCounts: Record<string, number>;
   documentCount: number;
+  showUploadLink?: boolean;
   onNavigate?: () => void;
 }) {
   const pathname = usePathname();
@@ -128,6 +115,18 @@ export function Sidebar({
           </div>
         </div>
       ))}
+
+      {showUploadLink && (
+        <div>
+          <SidebarLink
+            href="/upload"
+            active={pathname === "/upload"}
+            icon={<Upload className="h-4 w-4 shrink-0" />}
+            label="อัปโหลดรูปหลายไฟล์"
+            onNavigate={onNavigate}
+          />
+        </div>
+      )}
     </nav>
   );
 }
