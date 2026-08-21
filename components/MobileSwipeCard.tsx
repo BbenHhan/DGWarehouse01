@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight, RefreshCw, Video } from "lucide-react";
+import { ChevronLeft, ChevronRight, Copy, RefreshCw, Trash2, Video } from "lucide-react";
 import type { Room, WorkType } from "@/lib/types";
 import type { UnsortedFile } from "@/components/BulkUploadWorkspace";
 import { groupRooms } from "@/lib/room-groups";
@@ -26,11 +26,15 @@ export function MobileSwipeCard({
   rooms,
   workTypes,
   onAssignFile,
+  onRemove,
+  onDuplicate,
 }: {
   files: UnsortedFile[];
   rooms: Room[];
   workTypes: WorkType[];
   onAssignFile: (file: UnsortedFile, roomId: string, workTypeId: string) => void;
+  onRemove: (fileId: string) => void;
+  onDuplicate: (fileId: string) => void;
 }) {
   const [index, setIndex] = useState(0);
   const [selectedRoomId, setSelectedRoomId] = useState(rooms[0]?.id ?? "");
@@ -146,6 +150,25 @@ export function MobileSwipeCard({
           aria-label="รูปถัดไป"
         >
           <ChevronRight className="h-4 w-4" />
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          size="icon"
+          onClick={() => onDuplicate(current.id)}
+          aria-label="ทำสำเนารูปนี้"
+          className="ml-2"
+        >
+          <Copy className="h-4 w-4" />
+        </Button>
+        <Button
+          type="button"
+          variant="destructive"
+          size="icon"
+          onClick={() => onRemove(current.id)}
+          aria-label="เอารูปนี้ออก"
+        >
+          <Trash2 className="h-4 w-4" />
         </Button>
       </div>
 

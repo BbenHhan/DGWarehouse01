@@ -309,6 +309,8 @@ export function BulkUploadWorkspace({ rooms, workTypes }: { rooms: Room[]; workT
           rooms={rooms}
           workTypes={workTypes}
           onAssignFile={assignFileKeepInTray}
+          onRemove={removeFile}
+          onDuplicate={duplicateFile}
         />
       </div>
 
