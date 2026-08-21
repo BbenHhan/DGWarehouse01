@@ -47,3 +47,6 @@ next-env.d.ts
 # local writable data store (interim storage backend, DATA_SOURCE=local) —
 # uploaded photos/documents/videos + db.json live here, never committed
 /.local-data/
+
+# database backups — may contain user emails/PII, never committed
+/supabase/backups/
