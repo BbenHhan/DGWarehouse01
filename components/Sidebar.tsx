@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { FileText, Upload } from "lucide-react";
+import { CheckSquare, FileText, Upload } from "lucide-react";
 import type { Room } from "@/lib/types";
 import { groupRooms } from "@/lib/room-groups";
 
@@ -75,7 +75,8 @@ export function Sidebar({
   const pathname = usePathname();
   const segments = pathname.split("/");
   const isDocuments = pathname.startsWith("/documents");
-  const currentRoomSlug = !isDocuments ? segments[2] : undefined;
+  const isChecklist = pathname.startsWith("/checklist");
+  const currentRoomSlug = !isDocuments && !isChecklist ? segments[2] : undefined;
   const currentWorkTypeSlug = segments[3] || "firewalls";
 
   const groups = groupRooms(rooms);
@@ -90,6 +91,13 @@ export function Sidebar({
           icon={<FileText className="h-4 w-4 shrink-0" />}
           label="รายการเอกสาร"
           badge={documentCount}
+          onNavigate={onNavigate}
+        />
+        <SidebarLink
+          href="/checklist"
+          active={isChecklist}
+          icon={<CheckSquare className="h-4 w-4 shrink-0" />}
+          label="เช็คลิสต์"
           onNavigate={onNavigate}
         />
       </div>

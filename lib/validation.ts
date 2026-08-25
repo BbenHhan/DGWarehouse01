@@ -110,3 +110,57 @@ export const editDocSchema = z
     (input) => input.fileName !== undefined || input.note !== undefined || input.categoryId !== undefined,
     { message: "ต้องระบุอย่างน้อยหนึ่งฟิลด์ที่จะแก้ไข" }
   );
+
+// Room checklist (specs/028-room-checklist) — free text + optional
+// multi-room tagging, no work-type scope (research.md Decision 4).
+// parentId (specs/029-checklist-subitems) is a real DB-generated id in both
+// the "local" and "supabase" backends (unlike roomId/categoryId, which use
+// human-readable slugs in mock/local data) — safe to validate as a uuid.
+// detail/startDate/dueDate (specs/032-checklist-detail-status-colors) are
+// all optional, plain-text/date fields — no per-item requirement beyond text.
+const checklistStatusSchema = z.enum(["todo", "in_progress", "done"]);
+
+export const addChecklistItemSchema = z.object({
+  text: z.string().trim().min(1, "กรุณาระบุข้อความ"),
+  roomIds: z.array(foreignKeyId).default([]),
+  parentId: uuid.optional(),
+  detail: z.string().trim().min(1).optional(),
+  startDate: isoDate.optional(),
+  dueDate: isoDate.optional(),
+});
+
+export const editChecklistItemSchema = z
+  .object({
+    id: uuid,
+    text: z.string().trim().min(1, "ข้อความห้ามว่าง").optional(),
+    roomIds: z.array(foreignKeyId).optional(),
+    detail: z.string().trim().nullable().optional(),
+    startDate: isoDate.nullable().optional(),
+    dueDate: isoDate.nullable().optional(),
+  })
+  .refine(
+    (input) =>
+      input.text !== undefined ||
+      input.roomIds !== undefined ||
+      input.detail !== undefined ||
+      input.startDate !== undefined ||
+      input.dueDate !== undefined,
+    { message: "ต้องระบุอย่างน้อยหนึ่งฟิลด์ที่จะแก้ไข" }
+  );
+
+// Replaces the old boolean toggle (specs/032-checklist-detail-status-colors)
+// — status is one of three states everywhere, item-level or per-room.
+export const setChecklistItemStatusSchema = z.object({
+  id: uuid,
+  status: checklistStatusSchema,
+});
+
+export const setChecklistItemRoomStatusSchema = z.object({
+  itemId: uuid,
+  roomId: foreignKeyId,
+  status: checklistStatusSchema,
+});
+
+export const deleteChecklistItemSchema = z.object({
+  id: uuid,
+});

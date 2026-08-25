@@ -182,6 +182,69 @@ export type Database = {
           }
         ];
       };
+      checklist_items: {
+        Row: {
+          id: string;
+          text: string;
+          status: string;
+          detail: string | null;
+          start_date: string | null;
+          due_date: string | null;
+          parent_id: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          text: string;
+          status?: string;
+          detail?: string | null;
+          start_date?: string | null;
+          due_date?: string | null;
+          parent_id?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["checklist_items"]["Insert"]>;
+        Relationships: [
+          {
+            foreignKeyName: "checklist_items_parent_id_fkey";
+            columns: ["parent_id"];
+            isOneToOne: false;
+            referencedRelation: "checklist_items";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+      checklist_item_rooms: {
+        Row: {
+          checklist_item_id: string;
+          room_id: string;
+          status: string;
+        };
+        Insert: {
+          checklist_item_id: string;
+          room_id: string;
+          status?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["checklist_item_rooms"]["Insert"]>;
+        Relationships: [
+          {
+            foreignKeyName: "checklist_item_rooms_checklist_item_id_fkey";
+            columns: ["checklist_item_id"];
+            isOneToOne: false;
+            referencedRelation: "checklist_items";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "checklist_item_rooms_room_id_fkey";
+            columns: ["room_id"];
+            isOneToOne: false;
+            referencedRelation: "rooms";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
     };
     Views: Empty;
     Functions: Empty;

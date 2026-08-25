@@ -3,6 +3,7 @@
 // redefining local shapes.
 
 import type { Role } from "@/lib/roles";
+import type { ChecklistStatus } from "@/lib/checklist-status";
 
 export type Account = {
   id: string;
@@ -68,6 +69,32 @@ export type Document = {
   storage_path: string;
   file_name: string;
   note: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+// Free-text, checkable task, optionally tagged to one or more rooms
+// (specs/028-room-checklist). room_ids is derived from a join
+// (checklist_item_rooms), not a raw column. parent_id/sub_items add a single
+// level of breakdown (specs/029-checklist-subitems): a top-level item
+// (parent_id null) returned by lib/data.ts carries its full sub-item list;
+// a sub-item's own sub_items is always [] (one level only). status is the
+// direct source of truth for an item with no room tags and no sub-items;
+// otherwise it's a derived, kept-in-sync rollup (lib/checklist-status.ts)
+// of either room_statuses (1+ room tags) or every sub-item's own status
+// (specs/032-checklist-detail-status-colors, replacing the old boolean
+// is_done/room_completions from specs/031 everywhere).
+export type ChecklistItem = {
+  id: string;
+  text: string;
+  detail: string | null;
+  status: ChecklistStatus;
+  start_date: string | null;
+  due_date: string | null;
+  room_ids: string[];
+  room_statuses: { room_id: string; status: ChecklistStatus }[];
+  parent_id: string | null;
+  sub_items: ChecklistItem[];
   created_at: string;
   updated_at: string;
 };

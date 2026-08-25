@@ -4,7 +4,9 @@ import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
-import type { Document, Photo } from "@/lib/types";
+import type { ChecklistItem, Document, Photo } from "@/lib/types";
+import type { ChecklistStatus } from "@/lib/checklist-status";
+import { rollupChecklistStatus } from "@/lib/checklist-status";
 import type { DateFilter } from "@/lib/date-filter";
 import { photoMatchesDateFilter } from "@/lib/date-filter";
 
@@ -27,6 +29,7 @@ const DB_PATH = path.join(LOCAL_BASE_DIR, "db.json");
 type LocalDb = {
   photos: Photo[];
   documents: Document[];
+  checklistItems: ChecklistItem[];
 };
 
 // No in-memory cache: Next.js bundles Server Actions and Server Component
@@ -42,14 +45,46 @@ let writeQueue: Promise<void> = Promise.resolve();
 
 async function loadDb(): Promise<LocalDb> {
   if (!existsSync(DB_PATH)) {
-    return { photos: [], documents: [] };
+    return { photos: [], documents: [], checklistItems: [] };
   }
   try {
     const raw = await readFile(DB_PATH, "utf-8");
-    return JSON.parse(raw) as LocalDb;
+    const parsed = JSON.parse(raw) as Partial<LocalDb>;
+    // checklistItems is a newer field (specs/028-room-checklist) — an
+    // existing db.json written before this feature won't have it yet.
+    const db: LocalDb = { photos: [], documents: [], checklistItems: [], ...parsed };
+    db.checklistItems = db.checklistItems.map(normalizeChecklistItem);
+    return db;
   } catch {
-    return { photos: [], documents: [] };
+    return { photos: [], documents: [], checklistItems: [] };
   }
+}
+
+// A checklistItems entry may have been written by an earlier version of
+// this feature — specs/028/029 (is_done only) or specs/031
+// (room_completions with a boolean is_done) — before status/detail/dates
+// existed (specs/032-checklist-detail-status-colors). Coerces any of those
+// shapes forward to the current one.
+function normalizeChecklistItem(raw: ChecklistItem & { is_done?: boolean; room_completions?: { room_id: string; is_done: boolean }[] }): ChecklistItem {
+  const status: ChecklistStatus = raw.status ?? (raw.is_done ? "done" : "todo");
+  const room_statuses =
+    raw.room_statuses ??
+    raw.room_completions?.map((rc) => ({ room_id: rc.room_id, status: (rc.is_done ? "done" : "todo") as ChecklistStatus })) ??
+    raw.room_ids.map((roomId) => ({ room_id: roomId, status }));
+  return {
+    id: raw.id,
+    text: raw.text,
+    detail: raw.detail ?? null,
+    status,
+    start_date: raw.start_date ?? null,
+    due_date: raw.due_date ?? null,
+    room_ids: raw.room_ids,
+    room_statuses,
+    parent_id: raw.parent_id ?? null,
+    sub_items: [],
+    created_at: raw.created_at,
+    updated_at: raw.updated_at,
+  };
 }
 
 function persist(db: LocalDb): Promise<void> {
@@ -238,4 +273,196 @@ export async function localGetRoomPhotoCounts(): Promise<Record<string, number>>
     counts[photo.room_id] = (counts[photo.room_id] ?? 0) + 1;
   }
   return counts;
+}
+
+// Room checklist (specs/028-room-checklist) — room_ids are embedded
+// directly on the local record (not a separate junction file), since this
+// backend is a single JSON document, not a relational store. parent_id/
+// sub_items (specs/029-checklist-subitems) add one level of breakdown —
+// sub_items is never persisted on a record itself, only computed at read
+// time by grouping children under their parent. status (specs/032-
+// checklist-detail-status-colors) is a direct value for an item with no
+// room tags and no sub-items, otherwise a derived rollup (room_statuses for
+// 1+ room tags, else its sub-items) kept in sync via recomputeStatus below.
+function byCreatedDesc(a: ChecklistItem, b: ChecklistItem): number {
+  return b.created_at.localeCompare(a.created_at);
+}
+
+function recomputeStatus(item: ChecklistItem): void {
+  if (item.room_statuses.length > 0) {
+    item.status = rollupChecklistStatus(item.room_statuses.map((rs) => rs.status));
+  }
+}
+
+export async function localGetChecklistItems(): Promise<ChecklistItem[]> {
+  const db = await loadDb();
+  const topLevel = db.checklistItems.filter((item) => !item.parent_id).sort(byCreatedDesc);
+  return topLevel.map((item) => ({
+    ...item,
+    sub_items: db.checklistItems
+      .filter((sub) => sub.parent_id === item.id)
+      .sort(byCreatedDesc),
+  }));
+}
+
+// Relevant to this room = tagged to it, and that room's own tag not yet
+// done (specs/031-checklist-room-completion Decision 4, specs/032 status =
+// "done") — every item shown is directly tagged by construction, no
+// reaching around via sub-items needed (unlike specs/030's removed union
+// logic).
+export async function localGetRoomChecklistItems(roomId: string): Promise<ChecklistItem[]> {
+  const db = await loadDb();
+
+  function roomNotDone(item: ChecklistItem): boolean {
+    const roomStatus = item.room_statuses.find((rs) => rs.room_id === roomId);
+    return item.room_ids.includes(roomId) && !!roomStatus && roomStatus.status !== "done";
+  }
+
+  const topLevel = db.checklistItems.filter((item) => !item.parent_id && roomNotDone(item)).sort(byCreatedDesc);
+
+  return topLevel.map((item) => ({
+    ...item,
+    sub_items: db.checklistItems
+      .filter(
+        (sub) =>
+          sub.parent_id === item.id &&
+          sub.status !== "done" &&
+          (sub.room_ids.length === 0 || roomNotDone(sub))
+      )
+      .sort(byCreatedDesc),
+  }));
+}
+
+export async function localAddChecklistItem(input: {
+  text: string;
+  roomIds: string[];
+  parentId?: string;
+  detail?: string;
+  startDate?: string;
+  dueDate?: string;
+}): Promise<ChecklistItem> {
+  const db = await loadDb();
+  const item: ChecklistItem = {
+    id: randomUUID(),
+    text: input.text,
+    detail: input.detail ?? null,
+    status: "todo",
+    start_date: input.startDate ?? null,
+    due_date: input.dueDate ?? null,
+    room_ids: input.roomIds,
+    room_statuses: input.roomIds.map((roomId) => ({ room_id: roomId, status: "todo" as ChecklistStatus })),
+    parent_id: input.parentId ?? null,
+    sub_items: [],
+    created_at: nowIso(),
+    updated_at: nowIso(),
+  };
+  db.checklistItems.push(item);
+  await persist(db);
+  return item;
+}
+
+// Keeps a parent's status in sync with its sub-items in both directions
+// (specs/029-checklist-subitems FR-003/FR-004, now 3-way per specs/032):
+// setting a sub-item's status recomputes its parent via rollup over all
+// siblings; setting a parent's status cascades to every sub-item. Only ever
+// the mechanism for an item with no room tags (a room-tagged item's own
+// status control isn't exposed — see localSetChecklistItemRoomStatus).
+export async function localSetChecklistItemStatus(
+  id: string,
+  status: ChecklistStatus
+): Promise<ChecklistItem | null> {
+  const db = await loadDb();
+  const item = db.checklistItems.find((i) => i.id === id);
+  if (!item) return null;
+
+  item.status = status;
+  item.updated_at = nowIso();
+
+  if (item.parent_id) {
+    const siblings = db.checklistItems.filter((i) => i.parent_id === item.parent_id);
+    const parent = db.checklistItems.find((i) => i.id === item.parent_id);
+    if (parent) {
+      parent.status = rollupChecklistStatus(siblings.map((sibling) => sibling.status));
+      parent.updated_at = nowIso();
+    }
+  } else {
+    for (const child of db.checklistItems) {
+      if (child.parent_id === id) {
+        child.status = status;
+        child.updated_at = nowIso();
+      }
+    }
+  }
+
+  await persist(db);
+  return item;
+}
+
+// A single room tag's own status (specs/031-checklist-room-completion,
+// specs/032-checklist-detail-status-colors) — writes that one
+// room_statuses entry, recomputes the item's own derived status, then
+// re-syncs the parent from siblings if this item has one (upward sync
+// only, specs/031 research.md Decision 5).
+export async function localSetChecklistItemRoomStatus(
+  itemId: string,
+  roomId: string,
+  status: ChecklistStatus
+): Promise<{ status: ChecklistStatus } | null> {
+  const db = await loadDb();
+  const item = db.checklistItems.find((i) => i.id === itemId);
+  if (!item) return null;
+
+  const roomStatus = item.room_statuses.find((rs) => rs.room_id === roomId);
+  if (!roomStatus) return null;
+  roomStatus.status = status;
+  recomputeStatus(item);
+  item.updated_at = nowIso();
+
+  if (item.parent_id) {
+    const siblings = db.checklistItems.filter((i) => i.parent_id === item.parent_id);
+    const parent = db.checklistItems.find((i) => i.id === item.parent_id);
+    if (parent) {
+      parent.status = rollupChecklistStatus(siblings.map((sibling) => sibling.status));
+      parent.updated_at = nowIso();
+    }
+  }
+
+  await persist(db);
+  return { status: item.status };
+}
+
+export async function localEditChecklistItem(
+  id: string,
+  updates: { text?: string; roomIds?: string[]; detail?: string | null; startDate?: string | null; dueDate?: string | null }
+): Promise<ChecklistItem | null> {
+  const db = await loadDb();
+  const item = db.checklistItems.find((i) => i.id === id);
+  if (!item) return null;
+  if (updates.text !== undefined) item.text = updates.text;
+  if (updates.detail !== undefined) item.detail = updates.detail;
+  if (updates.startDate !== undefined) item.start_date = updates.startDate;
+  if (updates.dueDate !== undefined) item.due_date = updates.dueDate;
+  if (updates.roomIds !== undefined) {
+    // Full-replace semantics, same as the Supabase branch: the new room set
+    // starts fresh, none of it done yet.
+    item.room_ids = updates.roomIds;
+    item.room_statuses = updates.roomIds.map((roomId) => ({ room_id: roomId, status: "todo" as ChecklistStatus }));
+    if (updates.roomIds.length > 0) item.status = "todo";
+  }
+  item.updated_at = nowIso();
+  await persist(db);
+  return item;
+}
+
+export async function localDeleteChecklistItem(id: string): Promise<ChecklistItem | null> {
+  const db = await loadDb();
+  const index = db.checklistItems.findIndex((i) => i.id === id);
+  if (index === -1) return null;
+  const [removed] = db.checklistItems.splice(index, 1);
+  // No real FK to cascade on in a JSON store — remove sub-items by hand
+  // (specs/029-checklist-subitems Edge Cases: deleting a parent deletes
+  // every one of its sub-items).
+  db.checklistItems = db.checklistItems.filter((item) => item.parent_id !== id);
+  await persist(db);
+  return removed;
 }

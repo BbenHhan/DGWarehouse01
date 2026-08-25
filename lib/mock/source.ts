@@ -4,7 +4,7 @@ import { readdirSync } from "node:fs";
 import path from "node:path";
 import type { DateFilter } from "@/lib/date-filter";
 import { photoMatchesDateFilter } from "@/lib/date-filter";
-import type { Document, DocumentCategory, Photo, Room, WorkType } from "@/lib/types";
+import type { ChecklistItem, Document, DocumentCategory, Photo, Room, WorkType } from "@/lib/types";
 
 // Root of the real v7 local folder this mock data layer reads from.
 // Override with MOCK_DATA_ROOT if the folder lives somewhere else.
@@ -267,6 +267,17 @@ export async function mockGetDocuments(categoryId: string): Promise<Document[]> 
 // import script — the only writer of real note values — never ran against
 // this frozen, read-only snapshot), so there's nothing to suggest.
 export async function mockGetDocumentNotes(): Promise<string[]> {
+  return [];
+}
+
+// The mock backend is a frozen, read-only v7 folder snapshot with no
+// checklist concept at all (specs/028-room-checklist/research.md
+// Decision 3, same precedent as mockGetDocumentNotes above).
+export async function mockGetChecklistItems(): Promise<ChecklistItem[]> {
+  return [];
+}
+
+export async function mockGetRoomChecklistItems(): Promise<ChecklistItem[]> {
   return [];
 }
 
