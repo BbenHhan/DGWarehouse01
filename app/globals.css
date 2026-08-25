@@ -60,44 +60,48 @@
    app/layout.tsx runs — is already correct for a first-time visitor
    (spec FR-002). */
 :root {
-  /* Minimal — warm cream/peach/pink pastel, the default mode. */
-  --background: #fff8f0;
-  --foreground: #44403c;
-  --card: #ffffff;
-  --card-foreground: #44403c;
-  --popover: #ffffff;
-  --popover-foreground: #44403c;
-  --primary: #fb7185;
-  --primary-foreground: #ffffff;
-  --secondary: #ffe8d6;
-  --secondary-foreground: #7c2d12;
-  --muted: #fdf2e9;
-  --muted-foreground: #a8967d;
-  --accent: #fbcfe8;
-  --accent-foreground: #9d174d;
+  /* Minimal — the original warm construction-site palette carried over from
+     the v7 viewer. The peach/pink pastel introduced in specs/033 was reverted
+     at the account holder's request: Minimal is now exactly the look the app
+     shipped with before the multi-theme work (commit 9b78d15). Light, Dark,
+     and Pixel below keep their specs/033-039 palettes untouched. */
+  --background: #f4ede0;
+  --foreground: #1e140a;
+  --card: #ece4d3;
+  --card-foreground: #1e140a;
+  --popover: #ece4d3;
+  --popover-foreground: #1e140a;
+  --primary: #9b5e28;
+  --primary-foreground: #f8f2e6;
+  --secondary: #e4d9c6;
+  --secondary-foreground: #5c3d1e;
+  --muted: #e4d9c6;
+  --muted-foreground: #9b7a55;
+  --accent: #e9dcc0;
+  --accent-foreground: #5c3d1e;
   --destructive: oklch(0.577 0.245 27.325);
-  --border: #f5e6d3;
-  --input: #f5e6d3;
-  --ring: #fb7185;
-  --chart-1: #fb7185;
-  --chart-2: #fdba74;
-  --chart-3: #a78bfa;
-  --chart-4: #6ee7b7;
-  --chart-5: #fde68a;
-  --radius: 1.25rem;
-  --sidebar: #ffffff;
-  --sidebar-foreground: #44403c;
-  --sidebar-primary: #fb7185;
-  --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #ffe8d6;
-  --sidebar-accent-foreground: #7c2d12;
-  --sidebar-border: #f5e6d3;
-  --sidebar-ring: #fb7185;
+  --border: #c6b49a;
+  --input: #c6b49a;
+  --ring: #a8760a;
+  --chart-1: #9b5e28;
+  --chart-2: #a8760a;
+  --chart-3: #5c3d1e;
+  --chart-4: #c6b49a;
+  --chart-5: #9b7a55;
+  --radius: 0.875rem;
+  --sidebar: #ece4d3;
+  --sidebar-foreground: #1e140a;
+  --sidebar-primary: #9b5e28;
+  --sidebar-primary-foreground: #f8f2e6;
+  --sidebar-accent: #e4d9c6;
+  --sidebar-accent-foreground: #5c3d1e;
+  --sidebar-border: #c6b49a;
+  --sidebar-ring: #a8760a;
 
   /* Gradient/glow accents — not part of shadcn's token set, used for the
      brand mark, active pills, and progress-style highlights. */
-  --primary-2: #fdba74;
-  --gold: #f59e0b;
+  --primary-2: #7a4318;
+  --gold: #a8760a;
 
   /* Room/status colors (specs/032, theme-scoped by specs/034) — identical
      to the original hardcoded values every non-Pixel theme keeps. */
@@ -296,11 +300,12 @@
   background: var(--muted-foreground);
 }
 
-/* Minimal/Pixel's rounder, warmer body font (specs/033-multi-theme-system
-   research.md Decision 3). Targets `body` directly rather than overriding
+/* Pixel's rounder, warmer body font (specs/033-multi-theme-system
+   research.md Decision 3). Minimal used to share it, but reverting Minimal to
+   the pre-033 look put it back on Noto Sans Thai with Light and Dark.
+   Targets `body` directly rather than overriding
    --font-sans, so it wins regardless of stylesheet order against next/font's
    own generated rule for the same custom property. */
-[data-theme="minimal"] body,
 [data-theme="pixel"] body {
   font-family: var(--font-mitr);
 }
