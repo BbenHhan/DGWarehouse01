@@ -10,6 +10,14 @@ export default defineConfig({
       "server-only": path.resolve(__dirname, "vitest.server-only-shim.ts"),
     },
   },
+  // tsconfig.json sets "jsx": "preserve" because Next.js does its own JSX
+  // transform at build time. Vitest honours that tsconfig setting and would
+  // hand untransformed JSX straight to the bundler, so component tests fail to
+  // parse — this overrides it with the standard automatic runtime for tests
+  // only, leaving the app's own build untouched.
+  oxc: {
+    jsx: { runtime: "automatic" },
+  },
   test: {
     environment: "node",
     setupFiles: ["./vitest.setup.ts"],
