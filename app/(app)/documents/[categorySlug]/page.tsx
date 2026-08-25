@@ -71,11 +71,7 @@ export default async function DocumentCategoryPage({
       </nav>
 
       {!USE_MOCK_DATA && userCanEdit && (
-        <DocUploader
-          categoryId={currentCategory.id}
-          categoryOptions={categoryMoveOptions}
-          existingNotes={documentNotes}
-        />
+        <DocUploader categoryId={currentCategory.id} existingNotes={documentNotes} />
       )}
 
       <div className="border-t border-border/70 pt-4">

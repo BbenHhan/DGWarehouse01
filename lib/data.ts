@@ -3,24 +3,28 @@ import "server-only";
 import { createServiceClient, requireUser } from "@/lib/supabase/server";
 import { DATA_SOURCE } from "@/lib/data-config";
 import {
+  mockGetChecklistItems,
   mockGetDocumentCategories,
   mockGetDocumentNotes,
   mockGetDocuments,
   mockGetPhotos,
+  mockGetRoomChecklistItems,
   mockGetRoomPhotoCounts,
   mockGetRooms,
   mockGetSiteStats,
   mockGetWorkTypes,
 } from "@/lib/mock/source";
 import {
+  localGetChecklistItems,
   localGetDocumentNotes,
   localGetDocuments,
   localGetPhotos,
+  localGetRoomChecklistItems,
   localGetRoomPhotoCounts,
   localGetSiteStats,
 } from "@/lib/local/store";
 import type { DateFilter } from "@/lib/date-filter";
-import type { Document, DocumentCategory, Photo, Room, WorkType } from "@/lib/types";
+import type { ChecklistItem, Document, DocumentCategory, Photo, Room, WorkType } from "@/lib/types";
 
 // Rooms/work types/document categories are the same fixed lookup lists in
 // both non-Supabase modes ("local" and "mock") — neither depends on disk
@@ -146,6 +150,134 @@ export async function getSiteStats(): Promise<{
   ]);
   const totalDays = new Set((photos ?? []).map((photo) => photo.date)).size;
   return { totalPhotos: totalPhotos ?? 0, totalDocuments: totalDocuments ?? 0, totalDays };
+}
+
+// Shape shared by both checklist queries below — a raw Supabase row with its
+// room tags (and each tag's own status, specs/031/032) joined in, not yet
+// carrying its (separately-fetched) sub_items.
+type RawChecklistRow = {
+  id: string;
+  text: string;
+  detail: string | null;
+  status: string;
+  start_date: string | null;
+  due_date: string | null;
+  parent_id: string | null;
+  created_at: string;
+  updated_at: string;
+  checklist_item_rooms: { room_id: string; status: string }[];
+};
+
+function toChecklistItem(row: RawChecklistRow, subItems: ChecklistItem[] = []): ChecklistItem {
+  return {
+    id: row.id,
+    text: row.text,
+    detail: row.detail,
+    status: row.status as ChecklistItem["status"],
+    start_date: row.start_date,
+    due_date: row.due_date,
+    room_ids: row.checklist_item_rooms.map((r) => r.room_id),
+    room_statuses: row.checklist_item_rooms.map((r) => ({
+      room_id: r.room_id,
+      status: r.status as ChecklistItem["status"],
+    })),
+    parent_id: row.parent_id,
+    sub_items: subItems,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+  };
+}
+
+// Every top-level checklist item sitewide, most recently created first, each
+// carrying its full sub-item list (any status — this is the full-history
+// view) — powers the standalone /checklist page (specs/028-room-checklist,
+// specs/029-checklist-subitems). room_ids/room_statuses come from a
+// joined select on the junction table rather than a second query.
+export async function getChecklistItems(): Promise<ChecklistItem[]> {
+  if (DATA_SOURCE === "mock") return mockGetChecklistItems();
+  if (DATA_SOURCE === "local") return localGetChecklistItems();
+
+  await requireUser();
+  const supabase = createServiceClient();
+
+  const { data: topLevel, error: topLevelError } = await supabase
+    .from("checklist_items")
+    .select("*, checklist_item_rooms(room_id, status)")
+    .is("parent_id", null)
+    .order("created_at", { ascending: false });
+  if (topLevelError) throw topLevelError;
+  if (topLevel.length === 0) return [];
+
+  const { data: subs, error: subsError } = await supabase
+    .from("checklist_items")
+    .select("*, checklist_item_rooms(room_id, status)")
+    .in(
+      "parent_id",
+      topLevel.map((row) => row.id)
+    )
+    .order("created_at", { ascending: false });
+  if (subsError) throw subsError;
+
+  return topLevel.map((row) =>
+    toChecklistItem(
+      row,
+      subs.filter((sub) => sub.parent_id === row.id).map((sub) => toChecklistItem(sub))
+    )
+  );
+}
+
+// Top-level checklist items relevant to one specific room — tagged to it,
+// and that room's own tag not yet done (specs/031-checklist-room-completion
+// Decision 4, specs/032-checklist-detail-status-colors status !== "done";
+// supersedes specs/030's union-of-parent-sets logic, no longer needed since
+// every relevant item is directly tagged by construction) — each carrying
+// only the not-yet-done sub-items relevant to that room: a sub-item with no
+// room tags of its own inherits its parent's rooms (using its own status);
+// one with its own tags shows only where that room's tag isn't yet done
+// (specs/029-checklist-subitems research.md Decision 4, updated to check
+// the tag's own status). Powers the room/work-type page's sidebar checklist
+// box.
+export async function getRoomChecklistItems(roomId: string): Promise<ChecklistItem[]> {
+  if (DATA_SOURCE === "mock") return mockGetRoomChecklistItems();
+  if (DATA_SOURCE === "local") return localGetRoomChecklistItems(roomId);
+
+  await requireUser();
+  const supabase = createServiceClient();
+
+  const { data: topLevel, error: topLevelError } = await supabase
+    .from("checklist_items")
+    .select("*, checklist_item_rooms!inner(room_id, status)")
+    .eq("checklist_item_rooms.room_id", roomId)
+    .neq("checklist_item_rooms.status", "done")
+    .is("parent_id", null)
+    .order("created_at", { ascending: false });
+  if (topLevelError) throw topLevelError;
+  if (topLevel.length === 0) return [];
+
+  const { data: subs, error: subsError } = await supabase
+    .from("checklist_items")
+    .select("*, checklist_item_rooms(room_id, status)")
+    .in(
+      "parent_id",
+      topLevel.map((row) => row.id)
+    )
+    .neq("status", "done")
+    .order("created_at", { ascending: false });
+  if (subsError) throw subsError;
+
+  return topLevel.map((row) =>
+    toChecklistItem(
+      row,
+      subs
+        .filter((sub) => sub.parent_id === row.id)
+        .filter((sub) => {
+          if (sub.checklist_item_rooms.length === 0) return true; // inherits the parent's rooms
+          const tag = sub.checklist_item_rooms.find((r) => r.room_id === roomId);
+          return !!tag && tag.status !== "done";
+        })
+        .map((sub) => toChecklistItem(sub))
+    )
+  );
 }
 
 // Total photo count per room, across every work type/date — sidebar badges.

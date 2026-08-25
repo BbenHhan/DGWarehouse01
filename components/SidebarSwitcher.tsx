@@ -26,6 +26,9 @@ export function SidebarSwitcher({
   if (pathname.startsWith("/documents")) {
     currentLabel = "รายการเอกสาร";
     currentEmoji = "📄";
+  } else if (pathname.startsWith("/checklist")) {
+    currentLabel = "เช็คลิสต์";
+    currentEmoji = "✅";
   } else if (pathname.startsWith("/photos")) {
     const room = rooms.find((r) => r.slug === pathname.split("/")[2]);
     if (room) {

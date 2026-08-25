@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Box, CalendarDays, FileText, Images } from "lucide-react";
 import type { Role } from "@/lib/roles";
 import { AccountMenu } from "@/components/AccountMenu";
+import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 
 function StatChip({ icon, label }: { icon: React.ReactNode; label: string }) {
   return (
@@ -53,7 +54,10 @@ export function Header({
           />
         </div>
 
-        {user && <AccountMenu {...user} />}
+        <div className="flex items-center gap-2">
+          <ThemeSwitcher />
+          {user && <AccountMenu {...user} />}
+        </div>
       </div>
     </header>
   );

@@ -49,8 +49,22 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
+/* specs/033-multi-theme-system: four selectable modes, all through this one
+   token layer — every component already consumes only these semantic
+   Tailwind classes (bg-card, text-foreground, border-border, …), never a
+   raw color, so switching modes never needs a component-file change
+   (research.md Decision 1).
+
+   :root is Minimal itself (not a [data-theme="minimal"] block) so the very
+   first server-rendered paint — before the anti-flash script in
+   app/layout.tsx runs — is already correct for a first-time visitor
+   (spec FR-002). */
 :root {
-  /* Warm construction-site palette, carried over from the original v7 viewer. */
+  /* Minimal — the original warm construction-site palette carried over from
+     the v7 viewer. The peach/pink pastel introduced in specs/033 was reverted
+     at the account holder's request: Minimal is now exactly the look the app
+     shipped with before the multi-theme work (commit 9b78d15). Light, Dark,
+     and Pixel below keep their specs/033-039 palettes untouched. */
   --background: #f4ede0;
   --foreground: #1e140a;
   --card: #ece4d3;
@@ -88,43 +102,168 @@
      brand mark, active pills, and progress-style highlights. */
   --primary-2: #7a4318;
   --gold: #a8760a;
+
+  /* Room/status colors (specs/032, theme-scoped by specs/034) — identical
+     to the original hardcoded values every non-Pixel theme keeps. */
+  --room-1-bg: #f0f9ff; --room-1-fg: #0369a1; --room-1-border: #bae6fd;
+  --room-2-bg: #ecfdf5; --room-2-fg: #047857; --room-2-border: #a7f3d0;
+  --room-3-bg: #f5f3ff; --room-3-fg: #6d28d9; --room-3-border: #ddd6fe;
+  --room-4-bg: #fff1f2; --room-4-fg: #be123c; --room-4-border: #fecdd3;
+  --room-5-bg: #fffbeb; --room-5-fg: #92400e; --room-5-border: #fde68a;
+  --room-6-bg: #fff7ed; --room-6-fg: #c2410c; --room-6-border: #fed7aa;
+  --status-todo-bg: var(--secondary); --status-todo-fg: var(--muted-foreground); --status-todo-border: var(--border);
+  --status-progress-bg: #fffbeb; --status-progress-fg: #92400e; --status-progress-border: #fde68a;
+  --status-done-bg: #ecfdf5; --status-done-fg: #047857; --status-done-border: #a7f3d0;
+}
+
+[data-theme="light"] {
+  /* Light — Clean Slate: off-white, indigo accent, tight modern SaaS feel. */
+  --background: #fafaf9;
+  --foreground: #18181b;
+  --card: #ffffff;
+  --card-foreground: #18181b;
+  --popover: #ffffff;
+  --popover-foreground: #18181b;
+  --primary: #4f46e5;
+  --primary-foreground: #ffffff;
+  --secondary: #f4f4f5;
+  --secondary-foreground: #27272a;
+  --muted: #f4f4f5;
+  --muted-foreground: #71717a;
+  --accent: #eef2ff;
+  --accent-foreground: #4338ca;
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: #e4e4e7;
+  --input: #e4e4e7;
+  --ring: #4f46e5;
+  --chart-1: #4f46e5;
+  --chart-2: #0ea5e9;
+  --chart-3: #22c55e;
+  --chart-4: #a1a1aa;
+  --chart-5: #71717a;
+  --radius: 0.625rem;
+  --sidebar: #ffffff;
+  --sidebar-foreground: #18181b;
+  --sidebar-primary: #4f46e5;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #eef2ff;
+  --sidebar-accent-foreground: #4338ca;
+  --sidebar-border: #e4e4e7;
+  --sidebar-ring: #4f46e5;
+
+  --primary-2: #6366f1;
+  --gold: #eab308;
+
+  --room-1-bg: #f0f9ff; --room-1-fg: #0369a1; --room-1-border: #bae6fd;
+  --room-2-bg: #ecfdf5; --room-2-fg: #047857; --room-2-border: #a7f3d0;
+  --room-3-bg: #f5f3ff; --room-3-fg: #6d28d9; --room-3-border: #ddd6fe;
+  --room-4-bg: #fff1f2; --room-4-fg: #be123c; --room-4-border: #fecdd3;
+  --room-5-bg: #fffbeb; --room-5-fg: #92400e; --room-5-border: #fde68a;
+  --room-6-bg: #fff7ed; --room-6-fg: #c2410c; --room-6-border: #fed7aa;
+  --status-todo-bg: var(--secondary); --status-todo-fg: var(--muted-foreground); --status-todo-border: var(--border);
+  --status-progress-bg: #fffbeb; --status-progress-fg: #92400e; --status-progress-border: #fde68a;
+  --status-done-bg: #ecfdf5; --status-done-fg: #047857; --status-done-border: #a7f3d0;
 }
 
 .dark {
-  --background: #17110b;
-  --foreground: #f0e6d6;
-  --card: #221a13;
-  --card-foreground: #f0e6d6;
-  --popover: #221a13;
-  --popover-foreground: #f0e6d6;
-  --primary: #d1974f;
-  --primary-foreground: #1a1310;
-  --secondary: #2c221a;
-  --secondary-foreground: #e8dcc8;
-  --muted: #2c221a;
-  --muted-foreground: #b8a68c;
-  --accent: #3a2c1f;
-  --accent-foreground: #f0e6d6;
+  /* Dark — Site Ops: dark navy technical dashboard, cyan accent. */
+  --background: #0b0f14;
+  --foreground: #e2e8f0;
+  --card: #0f151c;
+  --card-foreground: #e2e8f0;
+  --popover: #0f151c;
+  --popover-foreground: #e2e8f0;
+  --primary: #22d3ee;
+  --primary-foreground: #0b0f14;
+  --secondary: #132029;
+  --secondary-foreground: #e2e8f0;
+  --muted: #132029;
+  --muted-foreground: #94a3b8;
+  --accent: #0b1a22;
+  --accent-foreground: #22d3ee;
   --destructive: oklch(0.704 0.191 22.216);
-  --border: #3d2f22;
-  --input: #3d2f22;
-  --ring: #d1974f;
-  --chart-1: #d1974f;
-  --chart-2: #c98a4b;
-  --chart-3: #e8dcc8;
-  --chart-4: #3d2f22;
-  --chart-5: #b8a68c;
-  --sidebar: #221a13;
-  --sidebar-foreground: #f0e6d6;
-  --sidebar-primary: #d1974f;
-  --sidebar-primary-foreground: #1a1310;
-  --sidebar-accent: #2c221a;
-  --sidebar-accent-foreground: #e8dcc8;
-  --sidebar-border: #3d2f22;
-  --sidebar-ring: #d1974f;
+  --border: #29394a;
+  --input: #29394a;
+  --ring: #22d3ee;
+  --chart-1: #22d3ee;
+  --chart-2: #34d399;
+  --chart-3: #fbbf24;
+  --chart-4: #1e2732;
+  --chart-5: #64748b;
+  --radius: 0.5rem;
+  --sidebar: #0f151c;
+  --sidebar-foreground: #e2e8f0;
+  --sidebar-primary: #22d3ee;
+  --sidebar-primary-foreground: #0b0f14;
+  --sidebar-accent: #132029;
+  --sidebar-accent-foreground: #e2e8f0;
+  --sidebar-border: #1e2732;
+  --sidebar-ring: #22d3ee;
 
-  --primary-2: #a05e28;
-  --gold: #d4a843;
+  --primary-2: #06b6d4;
+  --gold: #fbbf24;
+
+  /* specs/038-dark-mode-contrast: Dark's own room/status values — deep-
+     toned backgrounds with muted-bright text, not Light's pastel values
+     (a near-white chip in a dark UI reads as both glaring and, per the
+     account holder, still somehow hard to read since it was never tuned
+     for a dark surface to begin with). */
+  --room-1-bg: #0c4a6e; --room-1-fg: #7dd3fc; --room-1-border: #0369a1;
+  --room-2-bg: #064e3b; --room-2-fg: #6ee7b7; --room-2-border: #047857;
+  --room-3-bg: #4c1d95; --room-3-fg: #c4b5fd; --room-3-border: #6d28d9;
+  --room-4-bg: #881337; --room-4-fg: #fda4af; --room-4-border: #be123c;
+  --room-5-bg: #78350f; --room-5-fg: #fcd34d; --room-5-border: #b45309;
+  --room-6-bg: #7c2d12; --room-6-fg: #fdba74; --room-6-border: #c2410c;
+  --status-todo-bg: var(--secondary); --status-todo-fg: var(--muted-foreground); --status-todo-border: var(--border);
+  --status-progress-bg: #78350f; --status-progress-fg: #fcd34d; --status-progress-border: #b45309;
+  --status-done-bg: #064e3b; --status-done-fg: #6ee7b7; --status-done-border: #047857;
+}
+
+[data-theme="pixel"] {
+  /* Pixel — specs/036-pixel-mode-pastel-flat's revision: the same nine-
+     color, staircase-corner identity, but every hue softened to pastel
+     (the account holder found the earlier bold saturated primary colors
+     too harsh, and gradients — from-primary to-primary-2 blending blue
+     into yellow — read as a muddy teal instead of two distinct colors).
+     Solid, flat fills now everywhere (see the gradient-flattening rule
+     further down) — no gradient in Pixel mode at all. */
+  --background: #fffbeb;
+  --foreground: #1a1a1a;
+  --card: #ffffff;
+  --card-foreground: #1a1a1a;
+  --popover: #ffffff;
+  --popover-foreground: #1a1a1a;
+  --primary: #93c5fd;
+  --primary-foreground: #1a1a1a;
+  --secondary: #fde68a;
+  --secondary-foreground: #1a1a1a;
+  --muted: #f5f5f0;
+  --muted-foreground: #78716c;
+  --accent: #fbcfe8;
+  --accent-foreground: #1a1a1a;
+  --border: #1a1a1a;
+  --input: #1a1a1a;
+  --ring: #93c5fd;
+  --radius: 0.625rem;
+
+  --primary-2: #93c5fd;
+  --gold: #fde68a;
+
+  /* Nine mutually-distinct pastel colors (spec FR-003) — every room/status
+     text stays the same dark color regardless of background (spec FR-004). */
+  --room-1-bg: #bfdbfe; --room-1-fg: #1a1a1a; --room-1-border: #1a1a1a;
+  --room-2-bg: #fbcfe8; --room-2-fg: #1a1a1a; --room-2-border: #1a1a1a;
+  --room-3-bg: #ddd6fe; --room-3-fg: #1a1a1a; --room-3-border: #1a1a1a;
+  --room-4-bg: #a5f3fc; --room-4-fg: #1a1a1a; --room-4-border: #1a1a1a;
+  --room-5-bg: #fecaca; --room-5-fg: #1a1a1a; --room-5-border: #1a1a1a;
+  --room-6-bg: #99f6e4; --room-6-fg: #1a1a1a; --room-6-border: #1a1a1a;
+  --status-todo-bg: #e2e8f0; --status-todo-fg: #1a1a1a; --status-todo-border: #1a1a1a;
+  --status-progress-bg: #fed7aa; --status-progress-fg: #1a1a1a; --status-progress-border: #1a1a1a;
+  --status-done-bg: #bbf7d0; --status-done-fg: #1a1a1a; --status-done-border: #1a1a1a;
+
+  /* The room checklist box's always-yellow background (spec FR-006) — a
+     pastel yellow a step deeper than the page background. */
+  --pixel-box-bg: #fde68a;
 }
 
 @layer base {
@@ -159,4 +298,79 @@
 }
 .scroll-thin::-webkit-scrollbar-thumb:hover {
   background: var(--muted-foreground);
+}
+
+/* Pixel's rounder, warmer body font (specs/033-multi-theme-system
+   research.md Decision 3). Minimal used to share it, but reverting Minimal to
+   the pre-033 look put it back on Noto Sans Thai with Light and Dark.
+   Targets `body` directly rather than overriding
+   --font-sans, so it wins regardless of stylesheet order against next/font's
+   own generated rule for the same custom property. */
+[data-theme="pixel"] body {
+  font-family: var(--font-mitr);
+}
+
+/* Pixel mode's chunky-border, flat-offset-shadow "sticker" look
+   (specs/033 research.md Decision 4) — a best-effort global rule over the
+   app's already-shared card radii, not a per-component treatment. Extended
+   by specs/034-pixel-mode-refresh with genuine staircase-cut corners
+   (research.md Decision 2, spec FR-001/FR-002) — browsers already clip
+   box-shadow to the same shape, so the offset shadow below follows the
+   staircase notch instead of poking out past it. */
+[data-theme="pixel"] .rounded-xl,
+[data-theme="pixel"] .rounded-2xl {
+  border-width: 2px;
+  box-shadow: 3px 3px 0 var(--border);
+  clip-path: polygon(
+    0 8px, 8px 8px, 8px 0,
+    calc(100% - 8px) 0, calc(100% - 8px) 8px, 100% 8px,
+    100% calc(100% - 8px), calc(100% - 8px) calc(100% - 8px), calc(100% - 8px) 100%,
+    8px 100%, 8px calc(100% - 8px), 0 calc(100% - 8px)
+  );
+}
+[data-theme="pixel"] .rounded-full {
+  border-width: 2px;
+  clip-path: polygon(
+    0 4px, 4px 4px, 4px 0,
+    calc(100% - 4px) 0, calc(100% - 4px) 4px, 100% 4px,
+    100% calc(100% - 4px), calc(100% - 4px) calc(100% - 4px), calc(100% - 4px) 100%,
+    4px 100%, 4px calc(100% - 4px), 0 calc(100% - 4px)
+  );
+}
+/* Form controls (Select/Input/Autocomplete, all rounded-lg) get the same
+   treatment so they match the cards around them instead of looking like a
+   leftover from a different theme (specs/035-select-dropdown-polish FR-003). */
+[data-theme="pixel"] .rounded-lg {
+  border-width: 2px;
+  clip-path: polygon(
+    0 6px, 6px 6px, 6px 0,
+    calc(100% - 6px) 0, calc(100% - 6px) 6px, 100% 6px,
+    100% calc(100% - 6px), calc(100% - 6px) calc(100% - 6px), calc(100% - 6px) 100%,
+    6px 100%, 6px calc(100% - 6px), 0 calc(100% - 6px)
+  );
+}
+
+/* The room/work-type page's big checklist box always reads as "the yellow
+   box" in Pixel mode, independent of which room it belongs to — the
+   per-room chips/rows inside it are untouched by this rule and keep their
+   own distinct colors from the block above
+   (specs/034-pixel-mode-refresh research.md Decision 3, spec FR-006). */
+[data-theme="pixel"] .checklist-box {
+  background-color: var(--pixel-box-bg);
+}
+
+/* Pixel mode never gradients — every from-primary-to-X icon/accent bar
+   across the app (Header's logo mark, every page's header icon, the top
+   accent bar) flattens to a single solid --primary fill instead
+   (specs/036-pixel-mode-pastel-flat FR-005). A gradient between two
+   different hues (blue to yellow) reads as a third, muddy color rather
+   than "blue and yellow" — flat pixel-art fills don't have this problem. */
+/* Deliberately excludes .bg-gradient-to-t: its only use in the app
+   (PhotoGrid's hover caption scrim, black/transparent) is an unrelated
+   legibility overlay, not a primary-color accent — flattening it would
+   paint over the photo entirely instead of just its caption strip. */
+[data-theme="pixel"] .bg-gradient-to-r,
+[data-theme="pixel"] .bg-gradient-to-br {
+  background-image: none;
+  background-color: var(--primary);
 }
