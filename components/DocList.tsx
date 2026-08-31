@@ -5,9 +5,12 @@ import Image from "next/image";
 import { ChevronDown, Download, ExternalLink, FileText, Share2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import type { Document, DocumentGroup } from "@/lib/types";
+import { useManageMode } from "@/components/ManageModeProvider";
+import { createGroup } from "@/app/actions/document-taxonomy";
 import { publicFileUrl } from "@/lib/storage";
 import { fileKindFromName } from "@/lib/file-kind";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
   AlertDialog,
@@ -229,17 +232,59 @@ function DocumentRow({
   );
 }
 
+// The add field for a new sub-group, shown at the end of the list while
+// management mode is on. Its text lives in the provider, not here, so leaving
+// management mode and coming back does not discard what was typed (FR-025).
+function AddGroupForm({ categoryId }: { categoryId: string }) {
+  const { draft, setDraft, clearDraft } = useManageMode();
+  const [isPending, startTransition] = useTransition();
+  const value = draft(categoryId);
+
+  function handleAdd(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const trimmed = value.trim();
+    if (!trimmed) return;
+
+    startTransition(async () => {
+      const result = await createGroup({ categoryId, nameTh: trimmed });
+      if (!result.ok) {
+        toast.error(result.error);
+        return;
+      }
+      clearDraft(categoryId);
+    });
+  }
+
+  return (
+    <form onSubmit={handleAdd} className="flex gap-2 pt-1">
+      <Input
+        placeholder="เพิ่มหมวดย่อย เช่น 1.5 งานระบบระบายน้ำ"
+        value={value}
+        onChange={(event) => setDraft(categoryId, event.target.value)}
+        disabled={isPending}
+        className="h-9 text-sm"
+      />
+      <Button type="submit" size="sm" disabled={isPending || !value.trim()}>
+        {isPending ? "กำลังเพิ่ม..." : "เพิ่ม"}
+      </Button>
+    </form>
+  );
+}
+
 export function DocList({
   documents,
   documentGroups,
+  categoryId,
   categoryMoveOptions,
   canEdit,
 }: {
   documents: Document[];
   documentGroups: DocumentGroup[];
+  categoryId: string;
   categoryMoveOptions: CategoryMoveOption[];
   canEdit: boolean;
 }) {
+  const { managing } = useManageMode();
   const [, startTransition] = useTransition();
   const [optimisticDocuments, removeOptimisticDocument] = useOptimistic(
     documents,
@@ -322,6 +367,8 @@ export function DocList({
           </CollapsibleContent>
         </Collapsible>
       ))}
+
+      {managing && <AddGroupForm categoryId={categoryId} />}
     </div>
   );
 }

@@ -50,11 +50,11 @@ description: "Task list for Editable Document Taxonomy"
 
 **Independent test**: quickstart Scenarios 2 and 3.
 
-- [ ] T015 [P] [US1] Add taxonomy schemas to `lib/validation.ts`: `createGroupSchema` (`categoryId`, non-blank trimmed `nameTh`), plus the shared non-blank/duplicate-sibling rules FR-012 requires
-- [ ] T016 [US1] Create `app/actions/document-taxonomy.ts` with `createGroup`. Gate on `requireRole("editor")` — **not `"admin"`**, per FR-015/FR-017a and Constitution VII. Branch `local`/`supabase` as the checklist actions do; reject on `mock`. Revalidate `/documents` and `/documents/[categorySlug]`
-- [ ] T017 [US1] Create `components/DocumentTaxonomyManager.tsx`: the management-mode toggle plus per-category add field. Rows keep their position and labels when the mode flips — only the attached controls change (FR-019). The toggle is hidden for viewers (FR-016)
-- [ ] T018 [US1] Hold the add-field values in state owned by the component that stays mounted across the mode toggle, keyed by category, so unsubmitted typing survives leaving and re-entering management mode (FR-025, research.md Decision 8)
-- [ ] T019 [US1] Update `components/DocUploader.tsx` to source its group picker from `getDocumentGroups(categoryId)`: every group in this category whether or not it holds files, and none from other categories (FR-023)
+- [X] T015 [P] [US1] Add taxonomy schemas to `lib/validation.ts`: `createGroupSchema` (`categoryId`, non-blank trimmed `nameTh`), plus the shared non-blank/duplicate-sibling rules FR-012 requires
+- [X] T016 [US1] Create `app/actions/document-taxonomy.ts` with `createGroup`. Gate on `requireRole("editor")` — **not `"admin"`**, per FR-015/FR-017a and Constitution VII. Branch `local`/`supabase` as the checklist actions do; reject on `mock`. Revalidate `/documents` and `/documents/[categorySlug]`
+- [X] T017 [US1] Create `components/DocumentTaxonomyManager.tsx`: the management-mode toggle plus per-category add field. Rows keep their position and labels when the mode flips — only the attached controls change (FR-019). The toggle is hidden for viewers (FR-016)
+- [X] T018 [US1] Hold the add-field values in state owned by the component that stays mounted across the mode toggle, keyed by category, so unsubmitted typing survives leaving and re-entering management mode (FR-025, research.md Decision 8)
+- [X] T019 [US1] Update `components/DocUploader.tsx` to source its group picker from `getDocumentGroups(categoryId)`: every group in this category whether or not it holds files, and none from other categories (FR-023)
 - [X] T020 [US1] Update `uploadDoc` in `app/actions/documents.ts`: resolve a typed group name against existing groups in that category, creating one through the same path `createGroup` uses if it does not exist (FR-024), then attach `group_id`
 - [X] T021 [P] [US1] Create `lib/local/document-groups.test.ts`: creating a group in an empty category, uniqueness within a category, the same name allowed under two different categories, blank and whitespace-only names refused
 - [ ] T022 [US1] Run quickstart Scenarios 2 and 3
@@ -184,6 +184,25 @@ Phases 2, 3, 5 and 6 are independent of each other and can be done in any order 
 ---
 
 ## Implementation log
+
+**Phase 2 landed (T015–T019).** Management mode is a shared context
+(`ManageModeProvider`) rather than a self-contained panel, because the toggle
+sits in the page header while the controls it reveals are further down the page,
+and both have to move together without prop-drilling through server components.
+That context also holds the unsubmitted add-field text, which is what makes
+FR-025 work.
+
+**Layout decision, taken with the account holder.** The mockup that was approved
+showed every category with its groups nested; the real page shows one category
+at a time behind a tab bar, so the two did not match and the category-level
+controls had nowhere to live. Given three options, the account holder chose
+putting a category panel above the tab bar while sub-groups are edited in place
+in the list. Only the sub-group half exists so far — the category panel arrives
+in Phase 3, when rename gives it something to do. Showing controls that do
+nothing yet would be worse than showing none.
+
+T022 is left for the account holder: it needs a signed-in editor, which this
+environment cannot provide.
 
 **Phase 1 complete (T001–T014).** Migration 0014 applied to the live project by
 the account holder; the guard did not fire, so the backfill was complete before

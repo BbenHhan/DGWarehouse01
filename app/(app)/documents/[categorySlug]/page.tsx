@@ -6,6 +6,7 @@ import { canEdit as roleCanEdit } from "@/lib/roles";
 import { getCurrentUser } from "@/lib/supabase/server";
 import { DocList } from "@/components/DocList";
 import { DocUploader } from "@/components/DocUploader";
+import { ManageModeProvider, ManageModeToggle } from "@/components/ManageModeProvider";
 
 function tabClass(active: boolean) {
   return [
@@ -44,7 +45,8 @@ export default async function DocumentCategoryPage({
       }));
 
   return (
-    <div className="flex flex-col gap-5">
+    <ManageModeProvider canManage={!USE_MOCK_DATA && userCanEdit}>
+      <div className="flex flex-col gap-5">
       <div className="flex items-center gap-3">
         <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-primary-2 text-xl shadow-[0_4px_18px_rgba(155,94,40,.3)]">
           {currentCategory.emoji}
@@ -54,6 +56,9 @@ export default async function DocumentCategoryPage({
             {currentCategory.name_th}
           </h1>
           <p className="text-sm text-muted-foreground">รายการเอกสาร · {documents.length} ไฟล์</p>
+        </div>
+        <div className="ml-auto">
+          <ManageModeToggle />
         </div>
       </div>
 
@@ -78,10 +83,12 @@ export default async function DocumentCategoryPage({
         <DocList
           documents={documents}
           documentGroups={documentGroups}
+          categoryId={currentCategory.id}
           categoryMoveOptions={categoryMoveOptions}
           canEdit={userCanEdit}
         />
       </div>
-    </div>
+      </div>
+    </ManageModeProvider>
   );
 }
