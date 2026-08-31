@@ -136,12 +136,12 @@ description: "Task list for Editable Document Taxonomy"
 
 ## Phase 8: Polish & Cross-Cutting
 
-- [ ] T051 [P] Run quickstart Scenario 8: a viewer sees the list unchanged with no management control, and a taxonomy action invoked directly is refused by the server, not merely hidden
-- [ ] T052 [P] Run quickstart Scenario 9: unsubmitted typing survives leaving and re-entering management mode
-- [ ] T053 [P] Run quickstart Scenario 10 at 375px: every control reachable, a very long group name does not break the row, no horizontal scrolling (Constitution IV)
-- [ ] T054 [P] Run quickstart Scenario 11: a failed write is reported and the list returns to the true saved state, never left showing an unsaved change (Constitution V, FR-022)
-- [ ] T055 Run `npm test`, `npm run lint`, `npx tsc --noEmit`, and `npm run build` — all clean. Stop the dev server before building; a production build over a running dev server wipes `.next` and breaks it
-- [ ] T056 Update `README.md` if the documents section describes groups as coming from document text
+- [ ] T051 **[needs a signed-in editor]** [P] Run quickstart Scenario 8: a viewer sees the list unchanged with no management control, and a taxonomy action invoked directly is refused by the server, not merely hidden
+- [ ] T052 **[needs a signed-in editor]** [P] Run quickstart Scenario 9: unsubmitted typing survives leaving and re-entering management mode
+- [ ] T053 **[needs a signed-in editor]** [P] Run quickstart Scenario 10 at 375px: every control reachable, a very long group name does not break the row, no horizontal scrolling (Constitution IV)
+- [ ] T054 **[needs a signed-in editor]** [P] Run quickstart Scenario 11: a failed write is reported and the list returns to the true saved state, never left showing an unsaved change (Constitution V, FR-022)
+- [X] T055 Run `npm test`, `npm run lint`, `npx tsc --noEmit`, and `npm run build` — all clean. Stop the dev server before building; a production build over a running dev server wipes `.next` and breaks it
+- [X] T056 Update `README.md` — checked: it does not describe document groups at all, so nothing to correct
 
 ---
 
@@ -184,6 +184,14 @@ Phases 2, 3, 5 and 6 are independent of each other and can be done in any order 
 ---
 
 ## Implementation log
+
+**Phase 8: what is left is what this environment cannot do.** T055 passes — 210
+tests, lint, `tsc --noEmit`, and a production build, run with the dev server
+stopped. T056 needed no change: README never described document groups.
+
+The nine remaining tasks are all manual passes that need a signed-in editor
+(T022, T027, T032, T037, T050, T051–T054). They are the account holder's to run;
+everything they check is implemented.
 
 **Phase 7 landed (T043–T049).** The disposition is enforced in the Server
 Action, not the dialog: every refusal happens before anything is written, so a
