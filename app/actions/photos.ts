@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { createServiceClient, requireRole } from "@/lib/supabase/server";
 import { PHOTO_MIME_TYPES, editPhotoSchema, uploadPhotoSchema, validateFile } from "@/lib/validation";
 import { DATA_SOURCE } from "@/lib/data-config";
+import { storageKeyFileName } from "@/lib/storage-key";
 import { localDeletePhoto, localSavePhotoFile, localUpdatePhoto } from "@/lib/local/store";
 import type { ActionResult, Photo, UploadPhotoOutput } from "@/lib/types";
 
@@ -65,7 +66,7 @@ export async function uploadPhoto(
       continue;
     }
 
-    const storagePath = `${parsed.data.roomId}-${parsed.data.workTypeId}/${randomUUID()}-${file.name}`;
+    const storagePath = `${parsed.data.roomId}-${parsed.data.workTypeId}/${randomUUID()}-${storageKeyFileName(file.name)}`;
     const { error: uploadError } = await supabase.storage
       .from("photos")
       .upload(storagePath, file, { contentType: file.type });
