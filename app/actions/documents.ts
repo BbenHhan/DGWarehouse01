@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { createServiceClient, requireRole } from "@/lib/supabase/server";
 import { DOCUMENT_MIME_TYPES, editDocSchema, uploadDocSchema, validateFile } from "@/lib/validation";
 import { DATA_SOURCE } from "@/lib/data-config";
+import { storageKeyFileName } from "@/lib/storage-key";
 import {
   localDeleteDocument,
   localSaveDocumentFile,
@@ -64,7 +65,7 @@ export async function uploadDoc(
       continue;
     }
 
-    const storagePath = `${categoryId}/${randomUUID()}-${file.name}`;
+    const storagePath = `${categoryId}/${randomUUID()}-${storageKeyFileName(file.name)}`;
     const { error: uploadError } = await supabase.storage
       .from("documents")
       .upload(storagePath, file, { contentType: file.type });
