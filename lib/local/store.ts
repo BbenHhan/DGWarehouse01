@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
-import type { ChecklistItem, Document, Photo } from "@/lib/types";
+import type { ChecklistItem, Document, DocumentGroup, Photo } from "@/lib/types";
 import type { ChecklistStatus } from "@/lib/checklist-status";
 import { rollupChecklistStatus } from "@/lib/checklist-status";
 import type { DateFilter } from "@/lib/date-filter";
@@ -29,6 +29,7 @@ const DB_PATH = path.join(LOCAL_BASE_DIR, "db.json");
 type LocalDb = {
   photos: Photo[];
   documents: Document[];
+  documentGroups: DocumentGroup[];
   checklistItems: ChecklistItem[];
 };
 
@@ -45,18 +46,72 @@ let writeQueue: Promise<void> = Promise.resolve();
 
 async function loadDb(): Promise<LocalDb> {
   if (!existsSync(DB_PATH)) {
-    return { photos: [], documents: [], checklistItems: [] };
+    return { photos: [], documents: [], documentGroups: [], checklistItems: [] };
   }
   try {
     const raw = await readFile(DB_PATH, "utf-8");
     const parsed = JSON.parse(raw) as Partial<LocalDb>;
     // checklistItems is a newer field (specs/028-room-checklist) — an
     // existing db.json written before this feature won't have it yet.
-    const db: LocalDb = { photos: [], documents: [], checklistItems: [], ...parsed };
+    const db: LocalDb = { photos: [], documents: [], documentGroups: [], checklistItems: [], ...parsed };
     db.checklistItems = db.checklistItems.map(normalizeChecklistItem);
+    migrateDocumentNotes(db);
     return db;
   } catch {
-    return { photos: [], documents: [], checklistItems: [] };
+    return { photos: [], documents: [], documentGroups: [], checklistItems: [] };
+  }
+}
+
+// The local mirror of migration 0014 (specs/040-editable-document-taxonomy).
+// A db.json written before that feature stores a document's sub-group as a
+// `note` string on the document itself. Promote each distinct (category, note)
+// pair to a real group record and repoint the documents at it, so the local
+// backend keeps the same contract as Supabase (Constitution III) instead of
+// silently dropping everyone's grouping.
+//
+// Ordering matches the SQL: groups sort by their own names, which are already
+// numbered by hand.
+function migrateDocumentNotes(db: LocalDb): void {
+  const legacy = db.documents as Array<Document & { note?: string | null }>;
+  if (!legacy.some((document) => typeof document.note === "string" && document.note.trim() !== "")) return;
+
+  const byCategory = new Map<string, Set<string>>();
+  for (const document of legacy) {
+    const note = document.note?.trim();
+    if (!note) continue;
+    if (!byCategory.has(document.category_id)) byCategory.set(document.category_id, new Set());
+    byCategory.get(document.category_id)!.add(note);
+  }
+
+  for (const [categoryId, names] of byCategory) {
+    const existing = new Set(
+      db.documentGroups.filter((group) => group.category_id === categoryId).map((group) => group.name_th)
+    );
+    let order = db.documentGroups.filter((group) => group.category_id === categoryId).length;
+    for (const name of [...names].sort()) {
+      if (existing.has(name)) continue;
+      order += 1;
+      db.documentGroups.push({
+        id: randomUUID(),
+        category_id: categoryId,
+        name_th: name,
+        sort_order: order,
+        document_count: 0,
+      });
+    }
+  }
+
+  for (const document of legacy) {
+    const note = document.note?.trim();
+    if (note) {
+      const group = db.documentGroups.find(
+        (candidate) => candidate.category_id === document.category_id && candidate.name_th === note
+      );
+      document.group_id = group?.id ?? null;
+    } else if (document.group_id === undefined) {
+      document.group_id = null;
+    }
+    delete document.note;
   }
 }
 
@@ -193,7 +248,7 @@ export async function localGetDocuments(categoryId: string): Promise<Document[]>
 
 export async function localSaveDocumentFile(
   categoryId: string,
-  note: string | null,
+  groupId: string | null,
   file: File
 ): Promise<Document> {
   const db = await loadDb();
@@ -206,7 +261,7 @@ export async function localSaveDocumentFile(
     category_id: categoryId,
     storage_path: storagePath,
     file_name: file.name,
-    note,
+    group_id: groupId,
     created_at: nowIso(),
     updated_at: nowIso(),
   };
@@ -215,17 +270,112 @@ export async function localSaveDocumentFile(
   return document;
 }
 
-// Distinct previously-used note values across every document, sitewide —
-// suggests a naming convention to reuse at upload time
-// (specs/025-document-upload-categorization) rather than every manual
-// upload retyping (or forgetting) the same grouping label.
-export async function localGetDocumentNotes(): Promise<string[]> {
+// specs/040-editable-document-taxonomy. Replaces localGetDocumentNotes, which
+// could only report names some document already carried and drew from every
+// category at once — the two faults that made this feature necessary.
+export async function localGetDocumentGroups(categoryId: string): Promise<DocumentGroup[]> {
   const db = await loadDb();
-  const notes = new Set<string>();
-  for (const document of db.documents) {
-    if (document.note) notes.add(document.note);
-  }
-  return [...notes];
+  return db.documentGroups
+    .filter((group) => group.category_id === categoryId)
+    .sort((a, b) => a.sort_order - b.sort_order)
+    .map((group) => ({
+      ...group,
+      document_count: db.documents.filter((document) => document.group_id === group.id).length,
+    }));
+}
+
+export async function localCreateDocumentGroup(categoryId: string, nameTh: string): Promise<DocumentGroup | null> {
+  const db = await loadDb();
+  const siblings = db.documentGroups.filter((group) => group.category_id === categoryId);
+  // Uniqueness is per category (FR-004): the same name under a different
+  // category is fine. Returning null rather than throwing keeps the Server
+  // Action's ActionResult shape.
+  if (siblings.some((group) => group.name_th === nameTh)) return null;
+
+  const group: DocumentGroup = {
+    id: randomUUID(),
+    category_id: categoryId,
+    name_th: nameTh,
+    sort_order: siblings.length + 1,
+    document_count: 0,
+  };
+  db.documentGroups.push(group);
+  await persist(db);
+  return group;
+}
+
+export async function localRenameDocumentGroup(id: string, nameTh: string): Promise<DocumentGroup | null> {
+  const db = await loadDb();
+  const group = db.documentGroups.find((candidate) => candidate.id === id);
+  if (!group) return null;
+  const clash = db.documentGroups.some(
+    (candidate) => candidate.category_id === group.category_id && candidate.name_th === nameTh && candidate.id !== id
+  );
+  if (clash) return null;
+  group.name_th = nameTh;
+  await persist(db);
+  return group;
+}
+
+// Swap with the neighbour, then renumber that category's groups to a
+// contiguous 1..n. Dense renumbering is fine at this size and keeps the
+// numbers readable when inspecting db.json by hand (research.md Decision 3).
+export async function localMoveDocumentGroup(id: string, direction: "up" | "down"): Promise<DocumentGroup[] | null> {
+  const db = await loadDb();
+  const group = db.documentGroups.find((candidate) => candidate.id === id);
+  if (!group) return null;
+
+  const siblings = db.documentGroups
+    .filter((candidate) => candidate.category_id === group.category_id)
+    .sort((a, b) => a.sort_order - b.sort_order);
+  const index = siblings.findIndex((candidate) => candidate.id === id);
+  const target = direction === "up" ? index - 1 : index + 1;
+  if (target < 0 || target >= siblings.length) return null;
+
+  [siblings[index], siblings[target]] = [siblings[target], siblings[index]];
+  siblings.forEach((sibling, position) => {
+    sibling.sort_order = position + 1;
+  });
+  await persist(db);
+  return siblings.map((sibling) => ({
+    ...sibling,
+    document_count: db.documents.filter((document) => document.group_id === sibling.id).length,
+  }));
+}
+
+// Deliberately refuses while documents still point at the group — the caller
+// re-parents or removes them first (contracts/server-actions.md,
+// DocumentDisposition). The equivalent of the SQL's `on delete restrict`.
+export async function localDeleteDocumentGroup(id: string): Promise<{ id: string } | null> {
+  const db = await loadDb();
+  const index = db.documentGroups.findIndex((group) => group.id === id);
+  if (index === -1) return null;
+  if (db.documents.some((document) => document.group_id === id)) return null;
+
+  const [removed] = db.documentGroups.splice(index, 1);
+  const siblings = db.documentGroups
+    .filter((group) => group.category_id === removed.category_id)
+    .sort((a, b) => a.sort_order - b.sort_order);
+  siblings.forEach((sibling, position) => {
+    sibling.sort_order = position + 1;
+  });
+  await persist(db);
+  return { id: removed.id };
+}
+
+// Resolve a freely typed group name to an id, creating the group if this
+// category has never seen it (FR-024). Shared by the upload path so a group
+// born at upload time is indistinguishable from one made in management mode.
+export async function localResolveDocumentGroup(categoryId: string, nameTh: string | null): Promise<string | null> {
+  const trimmed = nameTh?.trim();
+  if (!trimmed) return null;
+  const db = await loadDb();
+  const existing = db.documentGroups.find(
+    (group) => group.category_id === categoryId && group.name_th === trimmed
+  );
+  if (existing) return existing.id;
+  const created = await localCreateDocumentGroup(categoryId, trimmed);
+  return created?.id ?? null;
 }
 
 export async function localDeleteDocument(documentId: string): Promise<Document | null> {
@@ -240,13 +390,13 @@ export async function localDeleteDocument(documentId: string): Promise<Document 
 
 export async function localUpdateDocument(
   documentId: string,
-  updates: { fileName?: string; note?: string; categoryId?: string }
+  updates: { fileName?: string; groupId?: string | null; categoryId?: string }
 ): Promise<Document | null> {
   const db = await loadDb();
   const document = db.documents.find((d) => d.id === documentId);
   if (!document) return null;
   if (updates.fileName !== undefined) document.file_name = updates.fileName;
-  if (updates.note !== undefined) document.note = updates.note;
+  if (updates.groupId !== undefined) document.group_id = updates.groupId;
   if (updates.categoryId !== undefined) document.category_id = updates.categoryId;
   document.updated_at = nowIso();
   await persist(db);

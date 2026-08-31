@@ -103,11 +103,14 @@ export const editDocSchema = z
   .object({
     documentId: uuid,
     fileName: z.string().trim().min(1, "ชื่อไฟล์ห้ามว่าง").optional(),
-    note: z.string().optional(),
+    // null moves the document out of every sub-group
+    // (specs/040-editable-document-taxonomy). Replaces the free-text `note`,
+    // which the taxonomy tables now own.
+    groupId: foreignKeyId.nullable().optional(),
     categoryId: foreignKeyId.optional(),
   })
   .refine(
-    (input) => input.fileName !== undefined || input.note !== undefined || input.categoryId !== undefined,
+    (input) => input.fileName !== undefined || input.groupId !== undefined || input.categoryId !== undefined,
     { message: "ต้องระบุอย่างน้อยหนึ่งฟิลด์ที่จะแก้ไข" }
   );
 

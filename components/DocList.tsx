@@ -4,7 +4,7 @@ import { useOptimistic, useTransition } from "react";
 import Image from "next/image";
 import { ChevronDown, Download, ExternalLink, FileText, Share2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import type { Document } from "@/lib/types";
+import type { Document, DocumentGroup } from "@/lib/types";
 import { publicFileUrl } from "@/lib/storage";
 import { fileKindFromName } from "@/lib/file-kind";
 import { Button } from "@/components/ui/button";
@@ -155,11 +155,13 @@ function DocumentPreview({ doc }: { doc: Document }) {
 function DocumentRow({
   doc,
   canEdit,
+  documentGroups,
   categoryMoveOptions,
   onDelete,
 }: {
   doc: Document;
   canEdit: boolean;
+  documentGroups: DocumentGroup[];
   categoryMoveOptions: CategoryMoveOption[];
   onDelete: (documentId: string) => void;
 }) {
@@ -184,6 +186,7 @@ function DocumentRow({
               kind="document"
               item={doc}
               moveOptions={categoryMoveOptions}
+              groups={documentGroups}
               moveLabel="ย้ายไปหมวด"
             />
 
@@ -228,10 +231,12 @@ function DocumentRow({
 
 export function DocList({
   documents,
+  documentGroups,
   categoryMoveOptions,
   canEdit,
 }: {
   documents: Document[];
+  documentGroups: DocumentGroup[];
   categoryMoveOptions: CategoryMoveOption[];
   canEdit: boolean;
 }) {
@@ -261,27 +266,19 @@ export function DocList({
     );
   }
 
-  // Documents with no note (no source sub-folder) show directly; documents
-  // sharing a note are grouped under a collapsible dropdown so a category
-  // with many sub-folders (e.g. 31 documents across 5 sub-folders) doesn't
-  // dump everything into one long flat list.
-  const ungrouped: Document[] = [];
-  const groups: Array<{ note: string; docs: Document[] }> = [];
-  const groupIndexByNote = new Map<string, number>();
-
-  for (const doc of optimisticDocuments) {
-    if (!doc.note) {
-      ungrouped.push(doc);
-      continue;
-    }
-    const existingIndex = groupIndexByNote.get(doc.note);
-    if (existingIndex === undefined) {
-      groupIndexByNote.set(doc.note, groups.length);
-      groups.push({ note: doc.note, docs: [doc] });
-    } else {
-      groups[existingIndex].docs.push(doc);
-    }
-  }
+  // Groups come from the taxonomy now, not from scanning the documents
+  // (specs/040-editable-document-taxonomy). That is what lets a group with no
+  // documents still appear, and what makes the order deliberate rather than
+  // "whichever document happened to come first".
+  //
+  // Documents belonging to no group still show directly above the groups,
+  // exactly as a document with an empty note did before.
+  const ungrouped = optimisticDocuments.filter((doc) => !doc.group_id);
+  const groups = documentGroups.map((group) => ({
+    id: group.id,
+    name: group.name_th,
+    docs: optimisticDocuments.filter((doc) => doc.group_id === group.id),
+  }));
 
   return (
     <div className="flex flex-col gap-3">
@@ -292,6 +289,7 @@ export function DocList({
               key={doc.id}
               doc={doc}
               canEdit={canEdit}
+              documentGroups={documentGroups}
               categoryMoveOptions={categoryMoveOptions}
               onDelete={handleDelete}
             />
@@ -300,9 +298,9 @@ export function DocList({
       )}
 
       {groups.map((group) => (
-        <Collapsible key={group.note} className="rounded-xl border border-border/60 bg-card/40">
+        <Collapsible key={group.id} className="rounded-xl border border-border/60 bg-card/40">
           <CollapsibleTrigger className="group flex w-full items-center justify-between gap-3 p-3 text-left">
-            <span className="min-w-0 truncate text-sm font-medium text-foreground">{group.note}</span>
+            <span className="min-w-0 truncate text-sm font-medium text-foreground">{group.name}</span>
             <span className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
               {group.docs.length} ไฟล์
               <ChevronDown className="h-4 w-4 transition-transform group-data-panel-open:rotate-180" />
@@ -315,6 +313,7 @@ export function DocList({
                   key={doc.id}
                   doc={doc}
                   canEdit={canEdit}
+                  documentGroups={documentGroups}
                   categoryMoveOptions={categoryMoveOptions}
                   onDelete={handleDelete}
                 />

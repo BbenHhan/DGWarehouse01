@@ -25,19 +25,19 @@ description: "Task list for Editable Document Taxonomy"
 
 **⚠️ This phase contains the only irreversible step in the feature. Do not start Phase 2 until T013 passes.**
 
-- [ ] T001 Take a fresh database backup before touching anything, into `supabase/backups/<timestamp>/` (git-ignored). One JSON export per table; `documents.json` must contain the `note` column, since T012 destroys it
-- [ ] T002 Create `supabase/migrations/0014_document_groups.sql` following data-model.md's migration outline: create `document_groups` (id, category_id, name_th, sort_order, created_at) with `unique (category_id, name_th)`, a non-blank check on `name_th`, an index on `category_id`, and the `authenticated` full-access RLS policy every other table in this project uses
-- [ ] T003 In the same migration, insert one `document_groups` row per distinct `(category_id, note)` where `note` is non-null, assigning `sort_order` by sorting `note` as text within each category (research.md Decision 2 — the names are already numbered by hand, so a text sort reproduces the intended order)
-- [ ] T004 In the same migration, add `documents.group_id uuid null references document_groups(id) on delete restrict` — `restrict`, not cascade, so the database itself refuses to drop a group out from under its documents
-- [ ] T005 In the same migration, backfill `documents.group_id` from each document's `(category_id, note)` pair
-- [ ] T006 In the same migration, add a verification step that aborts if any document with a non-null `note` has a null `group_id`. This guard is the difference between a failed migration and silent data loss
-- [ ] T007 [P] Update `lib/types.ts`: add `DocumentGroup` (`id`, `category_id`, `name_th`, `sort_order`, `document_count`); change `Document.note: string | null` to `Document.group_id: string | null`
-- [ ] T008 [P] Update `lib/database.types.ts`: add the `document_groups` table with its FK relationship to `document_categories`; swap `note` for `group_id` on `documents`
-- [ ] T009 Update `lib/local/store.ts`: `LocalDb` gains a `documentGroups` array beside `photos`/`documents`/`checklistItems`; add read/create/rename/reorder/delete functions mirroring the Supabase contract; normalize any pre-existing `note`-shaped records in `loadDb()` the way the checklist's status migration did
-- [ ] T010 [P] Update `lib/mock/source.ts`: add `mockGetDocumentGroups()` returning an empty array, following `mockGetChecklistItems`' precedent — the frozen v7 snapshot has no taxonomy
-- [ ] T011 Update `lib/data.ts`: add `getDocumentGroups(categoryId)` returning that category's groups in `sort_order` with a document count each; **remove `getDocumentNotes()` entirely** (its two faults — only returning names some document already carried, and drawing from every category at once — are what triggered this feature); `getDocuments()` returns `group_id` in place of `note`
-- [ ] T012 Apply migration 0014 to the live Supabase project (manual, Supabase SQL Editor). **Blocked on the account holder.** Run T001 first
-- [ ] T013 Update `components/DocList.tsx` to build its groups from `getDocumentGroups()` instead of scanning `doc.note`, and `app/(app)/documents/[categorySlug]/page.tsx` to load them. Documents with a null `group_id` still render outside every group, exactly as an empty `note` does today
+- [X] T001 Take a fresh database backup before touching anything, into `supabase/backups/<timestamp>/` (git-ignored). One JSON export per table; `documents.json` must contain the `note` column, since T012 destroys it
+- [X] T002 Create `supabase/migrations/0014_document_groups.sql` following data-model.md's migration outline: create `document_groups` (id, category_id, name_th, sort_order, created_at) with `unique (category_id, name_th)`, a non-blank check on `name_th`, an index on `category_id`, and the `authenticated` full-access RLS policy every other table in this project uses
+- [X] T003 In the same migration, insert one `document_groups` row per distinct `(category_id, note)` where `note` is non-null, assigning `sort_order` by sorting `note` as text within each category (research.md Decision 2 — the names are already numbered by hand, so a text sort reproduces the intended order)
+- [X] T004 In the same migration, add `documents.group_id uuid null references document_groups(id) on delete restrict` — `restrict`, not cascade, so the database itself refuses to drop a group out from under its documents
+- [X] T005 In the same migration, backfill `documents.group_id` from each document's `(category_id, note)` pair
+- [X] T006 In the same migration, add a verification step that aborts if any document with a non-null `note` has a null `group_id`. This guard is the difference between a failed migration and silent data loss
+- [X] T007 [P] Update `lib/types.ts`: add `DocumentGroup` (`id`, `category_id`, `name_th`, `sort_order`, `document_count`); change `Document.note: string | null` to `Document.group_id: string | null`
+- [X] T008 [P] Update `lib/database.types.ts`: add the `document_groups` table with its FK relationship to `document_categories`; swap `note` for `group_id` on `documents`
+- [X] T009 Update `lib/local/store.ts`: `LocalDb` gains a `documentGroups` array beside `photos`/`documents`/`checklistItems`; add read/create/rename/reorder/delete functions mirroring the Supabase contract; normalize any pre-existing `note`-shaped records in `loadDb()` the way the checklist's status migration did
+- [X] T010 [P] Update `lib/mock/source.ts`: add `mockGetDocumentGroups()` returning an empty array, following `mockGetChecklistItems`' precedent — the frozen v7 snapshot has no taxonomy
+- [X] T011 Update `lib/data.ts`: add `getDocumentGroups(categoryId)` returning that category's groups in `sort_order` with a document count each; **remove `getDocumentNotes()` entirely** (its two faults — only returning names some document already carried, and drawing from every category at once — are what triggered this feature); `getDocuments()` returns `group_id` in place of `note`
+- [ ] T012 Apply migration 0014 to the live Supabase project (manual, Supabase SQL Editor). **Blocked on the account holder.** Backup for T001 is at `supabase/backups/20260831-125614/` — `documents.json` there carries the `note` column this migration drops
+- [X] T013 Update `components/DocList.tsx` to build its groups from `getDocumentGroups()` instead of scanning `doc.note`, and `app/(app)/documents/[categorySlug]/page.tsx` to load them. Documents with a null `group_id` still render outside every group, exactly as an empty `note` does today
 - [ ] T014 Run quickstart Scenario 1 against the real data: every category shows the same documents under the same group names as the T001 backup, totals unchanged, `safety` still empty. **Stop and fix before Phase 2 if any count differs**
 
 **Checkpoint**: Groups are real records. The page looks identical to before — that is the point.
@@ -55,8 +55,8 @@ description: "Task list for Editable Document Taxonomy"
 - [ ] T017 [US1] Create `components/DocumentTaxonomyManager.tsx`: the management-mode toggle plus per-category add field. Rows keep their position and labels when the mode flips — only the attached controls change (FR-019). The toggle is hidden for viewers (FR-016)
 - [ ] T018 [US1] Hold the add-field values in state owned by the component that stays mounted across the mode toggle, keyed by category, so unsubmitted typing survives leaving and re-entering management mode (FR-025, research.md Decision 8)
 - [ ] T019 [US1] Update `components/DocUploader.tsx` to source its group picker from `getDocumentGroups(categoryId)`: every group in this category whether or not it holds files, and none from other categories (FR-023)
-- [ ] T020 [US1] Update `uploadDoc` in `app/actions/documents.ts`: resolve a typed group name against existing groups in that category, creating one through the same path `createGroup` uses if it does not exist (FR-024), then attach `group_id`
-- [ ] T021 [P] [US1] Create `lib/local/document-groups.test.ts`: creating a group in an empty category, uniqueness within a category, the same name allowed under two different categories, blank and whitespace-only names refused
+- [X] T020 [US1] Update `uploadDoc` in `app/actions/documents.ts`: resolve a typed group name against existing groups in that category, creating one through the same path `createGroup` uses if it does not exist (FR-024), then attach `group_id`
+- [X] T021 [P] [US1] Create `lib/local/document-groups.test.ts`: creating a group in an empty category, uniqueness within a category, the same name allowed under two different categories, blank and whitespace-only names refused
 - [ ] T022 [US1] Run quickstart Scenarios 2 and 3
 
 **Checkpoint**: The reported problem is fixed — `หมวดที่ 4` can hold topics before it holds files, and the picker is correct.
@@ -83,9 +83,9 @@ description: "Task list for Editable Document Taxonomy"
 
 **Independent test**: quickstart Scenario 6.
 
-- [ ] T028 [P] [US6] Update `editDocSchema` in `lib/validation.ts`: add `groupId?: string | null` (null meaning no sub-group), remove `note`, keep the "at least one field" rule
+- [X] T028 [P] [US6] Update `editDocSchema` in `lib/validation.ts`: add `groupId?: string | null` (null meaning no sub-group), remove `note`, keep the "at least one field" rule
 - [ ] T029 [US6] Update `editDoc` in `app/actions/documents.ts` to accept and apply `groupId`, and add `moveDocuments({ documentIds, toCategoryId, toGroupId })` as the bulk form Phase 7's disposition will call. Both write database columns only — `storage_path` is never rewritten (research.md Decision 5)
-- [ ] T030 [US6] Update the move control in `components/DocList.tsx` from a flat category list to category plus group, with "no sub-group" as an option. Destinations are read live, so a group created moments ago is selectable without a reload (FR-026)
+- [X] T030 [US6] Update the move control in `components/DocList.tsx` from a flat category list to category plus group, with "no sub-group" as an option. Destinations are read live, so a group created moments ago is selectable without a reload (FR-026)
 - [ ] T031 [P] [US6] Extend the local-store tests: moving between groups in different categories, moving to no group, counts updating on both sides, `storage_path` unchanged after a move
 - [ ] T032 [US6] Run quickstart Scenario 6, including opening a moved file to confirm it still downloads
 
@@ -179,3 +179,33 @@ Phases 2, 3, 5 and 6 are independent of each other and can be done in any order 
 ## Task count
 
 56 tasks — 14 foundational, 36 across six user stories, 6 polish.
+
+
+---
+
+## Implementation log
+
+**Phase 1 landed (T001–T011, T013).** Migration written, types swapped, all three
+backends carrying groups, `DocList` reading real group records, 20 new tests.
+`tsc --noEmit`, `npm run lint`, `npm test` (173) and `npm run build` all clean.
+
+**Three later tasks landed early, forced by the type system rather than chosen.**
+Removing `documents.note` in T011 broke every remaining caller of it, and there is
+no compiling intermediate state where the column is gone but its callers still
+reference it:
+
+- **T020** (`uploadDoc` resolves or creates a group from a typed name) — the
+  upload path wrote `note` directly.
+- **T028** (`editDocSchema` gains `groupId`, loses `note`) — the edit path did too.
+- **T030** (the move control offers a group) — `EditModal`'s note textarea had to
+  become something, and a group picker is what it was always going to be. `DocList`
+  now plumbs `documentGroups` down to each row for it.
+
+Their tests and quickstart scenarios still belong to their own phases and are not
+done. `moveDocuments` (the bulk form, also T029) is not written yet.
+
+**Also updated, not in the task list**: `supabase/seed/import-documents.ts` wrote
+`note` on insert and read it back for duplicate detection. It now resolves
+sub-folder names to group records through the same create-if-missing path the
+uploader uses, and keys duplicate detection on the group's name joined back in.
+It was missed when the tasks were written.

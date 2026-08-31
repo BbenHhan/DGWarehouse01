@@ -17,18 +17,25 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { editPhoto } from "@/app/actions/photos";
 import { editDoc } from "@/app/actions/documents";
-import type { Document, Photo } from "@/lib/types";
+import type { Document, DocumentGroup, Photo } from "@/lib/types";
 
 type MoveOption = { value: string; label: string };
 
 type EditModalProps =
-  | { kind: "photo"; item: Photo; moveOptions: MoveOption[]; moveLabel: string }
-  | { kind: "document"; item: Document; moveOptions: MoveOption[]; moveLabel: string };
+  | { kind: "photo"; item: Photo; moveOptions: MoveOption[]; moveLabel: string; groups?: undefined }
+  | { kind: "document"; item: Document; moveOptions: MoveOption[]; moveLabel: string; groups: DocumentGroup[] };
 
-export function EditModal({ kind, item, moveOptions, moveLabel }: EditModalProps) {
+// A photo's `note` is a free-text caption and stays exactly as it was. A
+// document's grouping is no longer text at all — it is a reference to a real
+// sub-group (specs/040-editable-document-taxonomy), so the document branch gets
+// a picker over this category's groups instead of a textarea.
+const NO_GROUP = "__none__";
+
+export function EditModal({ kind, item, moveOptions, moveLabel, groups }: EditModalProps) {
   const [open, setOpen] = useState(false);
   const [fileName, setFileName] = useState(item.file_name);
-  const [note, setNote] = useState(item.note ?? "");
+  const [note, setNote] = useState(kind === "photo" ? item.note ?? "" : "");
+  const [groupId, setGroupId] = useState(kind === "document" ? item.group_id ?? NO_GROUP : NO_GROUP);
   const [date, setDate] = useState(kind === "photo" ? item.date : "");
   // Photos move between room/work-type pairs (composite "roomId::workTypeId"
   // value, specs/018-per-photo-dates); documents move between categories.
@@ -56,10 +63,11 @@ export function EditModal({ kind, item, moveOptions, moveLabel }: EditModalProps
           workTypeId,
         });
       } else {
+        const nextGroupId = groupId === NO_GROUP ? null : groupId;
         result = await editDoc({
           documentId: item.id,
           fileName: trimmedName !== item.file_name ? trimmedName : undefined,
-          note: note !== (item.note ?? "") ? note : undefined,
+          groupId: nextGroupId !== (item.group_id ?? null) ? nextGroupId : undefined,
           categoryId: moveTo !== initialMoveTo ? moveTo : undefined,
         });
       }
@@ -110,17 +118,40 @@ export function EditModal({ kind, item, moveOptions, moveLabel }: EditModalProps
             </div>
           )}
 
-          <div className="space-y-1">
-            <label className="text-sm font-medium" htmlFor="edit-note">
-              คำอธิบาย
-            </label>
-            <Textarea
-              id="edit-note"
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              rows={3}
-            />
-          </div>
+          {kind === "photo" ? (
+            <div className="space-y-1">
+              <label className="text-sm font-medium" htmlFor="edit-note">
+                คำอธิบาย
+              </label>
+              <Textarea
+                id="edit-note"
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                rows={3}
+              />
+            </div>
+          ) : (
+            <div className="space-y-1">
+              <span className="text-sm font-medium">หมวดย่อย</span>
+              <Select value={groupId} onValueChange={(value) => value !== null && setGroupId(value)}>
+                <SelectTrigger className="w-full">
+                  <SelectValue>
+                    {(value: string | null) =>
+                      groups?.find((group) => group.id === value)?.name_th ?? "ไม่มีหมวดย่อย"
+                    }
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NO_GROUP}>ไม่มีหมวดย่อย</SelectItem>
+                  {groups?.map((group) => (
+                    <SelectItem key={group.id} value={group.id}>
+                      {group.name_th}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           <div className="space-y-1">
             <span className="text-sm font-medium">{moveLabel}</span>

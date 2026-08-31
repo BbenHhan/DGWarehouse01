@@ -12,6 +12,7 @@ import {
   AutocompleteTrigger,
 } from "@/components/ui/autocomplete";
 import { uploadDoc } from "@/app/actions/documents";
+import type { DocumentGroup } from "@/lib/types";
 
 // Group (note) selection at upload time (specs/025-document-upload-
 // categorization) — previously every upload silently went to whichever
@@ -24,13 +25,17 @@ import { uploadDoc } from "@/app/actions/documents";
 // current page's own category.
 export function DocUploader({
   categoryId,
-  existingNotes,
+  groups,
 }: {
   categoryId: string;
-  existingNotes: string[];
+  groups: DocumentGroup[];
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [note, setNote] = useState("");
+  // Every group in THIS category, whether or not it holds files — the two
+  // things the old note-scanning suggestion list could not do
+  // (specs/040-editable-document-taxonomy, FR-023).
+  const groupNames = groups.map((group) => group.name_th);
   const [isPending, startTransition] = useTransition();
 
   function handleFiles(fileList: FileList | null) {
@@ -67,9 +72,9 @@ export function DocUploader({
           {/* Free-text with styled suggestions (specs/035-select-dropdown-
               polish) — replaces a native <input list>/<datalist> pair, whose
               suggestion popup is browser-native and can't be styled at all.
-              Typing a value not in `existingNotes` is still accepted
+              Typing a value not in this category's groups is still accepted
               (specs/025-document-upload-categorization's whole point). */}
-          <Autocomplete items={existingNotes} value={note} onValueChange={setNote} openOnInputClick>
+          <Autocomplete items={groupNames} value={note} onValueChange={setNote} openOnInputClick>
             <AutocompleteInputGroup>
               <AutocompleteInput
                 id="doc-upload-note"

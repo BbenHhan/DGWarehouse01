@@ -5,7 +5,7 @@ import { DATA_SOURCE } from "@/lib/data-config";
 import {
   mockGetChecklistItems,
   mockGetDocumentCategories,
-  mockGetDocumentNotes,
+  mockGetDocumentGroups,
   mockGetDocuments,
   mockGetPhotos,
   mockGetRoomChecklistItems,
@@ -16,7 +16,7 @@ import {
 } from "@/lib/mock/source";
 import {
   localGetChecklistItems,
-  localGetDocumentNotes,
+  localGetDocumentGroups,
   localGetDocuments,
   localGetPhotos,
   localGetRoomChecklistItems,
@@ -24,7 +24,7 @@ import {
   localGetSiteStats,
 } from "@/lib/local/store";
 import type { DateFilter } from "@/lib/date-filter";
-import type { ChecklistItem, Document, DocumentCategory, Photo, Room, WorkType } from "@/lib/types";
+import type { ChecklistItem, Document, DocumentCategory, DocumentGroup, Photo, Room, WorkType } from "@/lib/types";
 
 // Rooms/work types/document categories are the same fixed lookup lists in
 // both non-Supabase modes ("local" and "mock") — neither depends on disk
@@ -110,23 +110,35 @@ export async function getDocuments(categoryId: string): Promise<Document[]> {
   return data;
 }
 
-// Distinct previously-used note (sub-folder/group) values across every
-// document, sitewide — powers the upload control's "reuse an existing group
-// name" suggestion (specs/025-document-upload-categorization) rather than
-// scoping to one category, since the uploader can pick any category anyway.
-export async function getDocumentNotes(): Promise<string[]> {
-  if (DATA_SOURCE === "mock") return mockGetDocumentNotes();
-  if (DATA_SOURCE === "local") return localGetDocumentNotes();
+// One category's sub-groups, in the order an editor set, each carrying how many
+// documents it holds (specs/040-editable-document-taxonomy).
+//
+// Replaces getDocumentNotes(), whose two faults are what made this feature
+// necessary: it could only report names that some document already carried, so
+// a group with no files was invisible, and it scanned every category at once,
+// so one category's page offered another category's groups. Both are fixed by
+// reading real records scoped to the category being viewed (FR-023).
+export async function getDocumentGroups(categoryId: string): Promise<DocumentGroup[]> {
+  if (DATA_SOURCE === "mock") return mockGetDocumentGroups();
+  if (DATA_SOURCE === "local") return localGetDocumentGroups(categoryId);
 
   await requireUser();
   const supabase = createServiceClient();
-  const { data, error } = await supabase.from("documents").select("note");
-  if (error) throw error;
-  const notes = new Set<string>();
-  for (const row of data) {
-    if (row.note) notes.add(row.note);
+  const [{ data: groups, error: groupsError }, { data: documents, error: documentsError }] = await Promise.all([
+    supabase.from("document_groups").select("*").eq("category_id", categoryId).order("sort_order"),
+    supabase.from("documents").select("group_id").eq("category_id", categoryId),
+  ]);
+  if (groupsError) throw groupsError;
+  if (documentsError) throw documentsError;
+
+  // Counted here rather than stored: the numbers are small, and a stored
+  // counter that drifted would make the delete confirmation lie about how many
+  // files are about to be destroyed (FR-011a).
+  const counts = new Map<string, number>();
+  for (const row of documents) {
+    if (row.group_id) counts.set(row.group_id, (counts.get(row.group_id) ?? 0) + 1);
   }
-  return [...notes];
+  return groups.map((group) => ({ ...group, document_count: counts.get(group.id) ?? 0 }));
 }
 
 // Header stats chips (total photos/documents/distinct photographed days
