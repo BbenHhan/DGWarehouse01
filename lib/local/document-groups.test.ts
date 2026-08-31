@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import {
   localCreateDocumentGroup,
+  localGetDocumentCategories,
+  localRenameDocumentCategory,
   localDeleteDocumentGroup,
   localGetDocumentGroups,
   localMoveDocumentGroup,
@@ -213,5 +215,38 @@ describe("localResolveDocumentGroup", () => {
     const group = await localCreateDocumentGroup(catA, "แปลน");
 
     expect(await localResolveDocumentGroup(catA, "  แปลน  ")).toBe(group!.id);
+  });
+});
+
+describe("localRenameDocumentCategory", () => {
+  it("renames a category without touching its slug — the slug is a live URL", async () => {
+    const before = (await localGetDocumentCategories()).find((c) => c.slug === "structure");
+    const renamed = await localRenameDocumentCategory(before!.id, { nameTh: "หมวดที่ 1 โครงสร้างและสถาปัตยกรรม" });
+
+    expect(renamed?.name_th).toBe("หมวดที่ 1 โครงสร้างและสถาปัตยกรรม");
+    expect(renamed?.slug).toBe("structure");
+
+    // restore, so later tests see the seeded name
+    await localRenameDocumentCategory(before!.id, { nameTh: before!.name_th });
+  });
+
+  it("changes the icon on its own", async () => {
+    const category = (await localGetDocumentCategories()).find((c) => c.slug === "safety");
+    const renamed = await localRenameDocumentCategory(category!.id, { emoji: "🧯" });
+
+    expect(renamed?.emoji).toBe("🧯");
+    expect(renamed?.name_th).toBe(category!.name_th);
+
+    await localRenameDocumentCategory(category!.id, { emoji: category!.emoji });
+  });
+
+  it("returns null for an id that isn't in the store", async () => {
+    expect(await localRenameDocumentCategory("no-such-id", { nameTh: "x" })).toBeNull();
+  });
+
+  it("seeds the four real categories on a fresh store, in order", async () => {
+    const categories = await localGetDocumentCategories();
+    expect(categories.map((c) => c.slug)).toEqual(["structure", "electrical", "environment", "safety"]);
+    expect(categories.map((c) => c.sort_order)).toEqual([1, 2, 3, 4]);
   });
 });

@@ -16,6 +16,8 @@ import {
 } from "@/lib/mock/source";
 import {
   localGetChecklistItems,
+  localGetDocumentCategories,
+  localGetDocumentCountsByCategory,
   localGetDocumentGroups,
   localGetDocuments,
   localGetPhotos,
@@ -83,7 +85,11 @@ export async function getPhotos(
 }
 
 export async function getDocumentCategories(): Promise<DocumentCategory[]> {
-  if (DATA_SOURCE !== "supabase") return mockGetDocumentCategories();
+  if (DATA_SOURCE === "mock") return mockGetDocumentCategories();
+  // The local backend owns its categories now that they are editable
+  // (specs/040-editable-document-taxonomy) rather than borrowing the mock's
+  // fixed list.
+  if (DATA_SOURCE === "local") return localGetDocumentCategories();
 
   await requireUser();
   const supabase = createServiceClient();
@@ -118,6 +124,24 @@ export async function getDocuments(categoryId: string): Promise<Document[]> {
 // a group with no files was invisible, and it scanned every category at once,
 // so one category's page offered another category's groups. Both are fixed by
 // reading real records scoped to the category being viewed (FR-023).
+// How many documents each category holds, for the management panel's rows
+// (FR-020) — so the effect of a deletion is visible before it is attempted.
+export async function getDocumentCountsByCategory(): Promise<Record<string, number>> {
+  if (DATA_SOURCE === "mock") return {};
+  if (DATA_SOURCE === "local") return localGetDocumentCountsByCategory();
+
+  await requireUser();
+  const supabase = createServiceClient();
+  const { data, error } = await supabase.from("documents").select("category_id");
+  if (error) throw error;
+
+  const counts: Record<string, number> = {};
+  for (const row of data) {
+    counts[row.category_id] = (counts[row.category_id] ?? 0) + 1;
+  }
+  return counts;
+}
+
 export async function getDocumentGroups(categoryId: string): Promise<DocumentGroup[]> {
   if (DATA_SOURCE === "mock") return mockGetDocumentGroups();
   if (DATA_SOURCE === "local") return localGetDocumentGroups(categoryId);

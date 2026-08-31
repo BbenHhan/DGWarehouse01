@@ -2,10 +2,14 @@
 
 import { revalidatePath } from "next/cache";
 import { createServiceClient, requireRole } from "@/lib/supabase/server";
-import { createGroupSchema } from "@/lib/validation";
+import { createGroupSchema, renameCategorySchema, renameGroupSchema } from "@/lib/validation";
 import { DATA_SOURCE } from "@/lib/data-config";
-import { localCreateDocumentGroup } from "@/lib/local/store";
-import type { ActionResult, DocumentGroup } from "@/lib/types";
+import {
+  localCreateDocumentGroup,
+  localRenameDocumentCategory,
+  localRenameDocumentGroup,
+} from "@/lib/local/store";
+import type { ActionResult, DocumentCategory, DocumentGroup } from "@/lib/types";
 
 // specs/040-editable-document-taxonomy.
 //
@@ -83,4 +87,91 @@ export async function createGroup(input: {
 
   revalidateDocumentPaths();
   return { ok: true, data: { ...group, document_count: 0 } };
+}
+
+// Renaming is one write against one row. No document is read, updated, or
+// re-uploaded — which is the whole reason sub-groups became records
+// (FR-009): correcting a name used to mean correcting the identical string on
+// every document carrying it, and missing one silently split the group in two.
+export async function renameGroup(input: { id: string; nameTh: string }): Promise<ActionResult<DocumentGroup>> {
+  const authError = await assertCanEdit();
+  if (authError) return { ok: false, error: authError };
+
+  const parsed = renameGroupSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0]?.message ?? "ข้อมูลไม่ถูกต้อง" };
+  }
+  const { id, nameTh } = parsed.data;
+
+  if (DATA_SOURCE === "mock") return { ok: false, error: "โหมดตัวอย่างแก้ไขข้อมูลไม่ได้" };
+
+  if (DATA_SOURCE === "local") {
+    const group = await localRenameDocumentGroup(id, nameTh);
+    if (!group) return { ok: false, error: "มีหมวดย่อยชื่อนี้อยู่แล้วในหมวดนี้" };
+    revalidateDocumentPaths();
+    return { ok: true, data: group };
+  }
+
+  const supabase = createServiceClient();
+  const { data: group, error } = await supabase
+    .from("document_groups")
+    .update({ name_th: nameTh })
+    .eq("id", id)
+    .select("*")
+    .single();
+
+  if (error || !group) {
+    const duplicate = error?.code === "23505";
+    return {
+      ok: false,
+      error: duplicate ? "มีหมวดย่อยชื่อนี้อยู่แล้วในหมวดนี้" : error?.message ?? "เปลี่ยนชื่อไม่สำเร็จ",
+    };
+  }
+
+  revalidateDocumentPaths();
+  return { ok: true, data: { ...group, document_count: 0 } };
+}
+
+// Changes the display name and icon only. The slug is not accepted as input
+// anywhere in this module, so a rename can never break a live URL (FR-013).
+export async function renameCategory(input: {
+  id: string;
+  nameTh?: string;
+  emoji?: string;
+}): Promise<ActionResult<DocumentCategory>> {
+  const authError = await assertCanEdit();
+  if (authError) return { ok: false, error: authError };
+
+  const parsed = renameCategorySchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0]?.message ?? "ข้อมูลไม่ถูกต้อง" };
+  }
+  const { id, nameTh, emoji } = parsed.data;
+
+  if (DATA_SOURCE === "mock") return { ok: false, error: "โหมดตัวอย่างแก้ไขข้อมูลไม่ได้" };
+
+  if (DATA_SOURCE === "local") {
+    const category = await localRenameDocumentCategory(id, { nameTh, emoji });
+    if (!category) return { ok: false, error: "เปลี่ยนชื่อไม่สำเร็จ" };
+    revalidateDocumentPaths();
+    return { ok: true, data: category };
+  }
+
+  const supabase = createServiceClient();
+  const { data: category, error } = await supabase
+    .from("document_categories")
+    .update({
+      ...(nameTh !== undefined ? { name_th: nameTh } : {}),
+      ...(emoji !== undefined ? { emoji } : {}),
+    })
+    .eq("id", id)
+    .select("*")
+    .single();
+
+  if (error || !category) {
+    return { ok: false, error: error?.message ?? "เปลี่ยนชื่อไม่สำเร็จ" };
+  }
+
+  revalidateDocumentPaths();
+  return { ok: true, data: category };
 }

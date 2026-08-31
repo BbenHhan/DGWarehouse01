@@ -69,10 +69,10 @@ description: "Task list for Editable Document Taxonomy"
 
 **Independent test**: quickstart Scenario 4.
 
-- [ ] T023 [P] [US2] Add `renameGroupSchema` and `renameCategorySchema` to `lib/validation.ts`. `renameCategorySchema` accepts `nameTh` and `emoji` only — **it must not accept `slug` at all**, so a rename cannot break a live URL (FR-013)
-- [ ] T024 [US2] Add `renameGroup` and `renameCategory` to `app/actions/document-taxonomy.ts`, plus their `local` counterparts in `lib/local/store.ts`
-- [ ] T025 [US2] Add inline name editing to `components/DocumentTaxonomyManager.tsx` for both levels: click the name to edit, blur to save. Clearing the field restores the previous name rather than saving a blank (FR-012)
-- [ ] T026 [P] [US2] Extend `lib/local/document-groups.test.ts`: renaming a group holding documents leaves every document attached to it; renaming to a sibling's name is refused; a category rename leaves `slug` untouched
+- [X] T023 [P] [US2] Add `renameGroupSchema` and `renameCategorySchema` to `lib/validation.ts`. `renameCategorySchema` accepts `nameTh` and `emoji` only — **it must not accept `slug` at all**, so a rename cannot break a live URL (FR-013)
+- [X] T024 [US2] Add `renameGroup` and `renameCategory` to `app/actions/document-taxonomy.ts`, plus their `local` counterparts in `lib/local/store.ts`
+- [X] T025 [US2] Add inline name editing to `components/DocumentTaxonomyManager.tsx` for both levels: click the name to edit, blur to save. Clearing the field restores the previous name rather than saving a blank (FR-012)
+- [X] T026 [P] [US2] Extend `lib/local/document-groups.test.ts`: renaming a group holding documents leaves every document attached to it; renaming to a sibling's name is refused; a category rename leaves `slug` untouched
 - [ ] T027 [US2] Run quickstart Scenario 4
 
 ---
@@ -184,6 +184,16 @@ Phases 2, 3, 5 and 6 are independent of each other and can be done in any order 
 ---
 
 ## Implementation log
+
+**Phase 3 landed (T023–T026).** Rename works at both levels, in place, and the
+category panel from layout A now exists above the tab bar.
+
+**A second thing the task list missed.** `getDocumentCategories()` served the
+`local` backend from the read-only mock's fixed list, so categories were not
+editable there at all — and the whole test suite runs on `local`. The local
+backend now owns its categories, seeded on first load with the same four
+`0004_seed_lookups.sql` seeded production with. Constitution III leaves no
+choice: `local` has to be a drop-in for Supabase, not a partial one.
 
 **Phase 2 landed (T015–T019).** Management mode is a shared context
 (`ManageModeProvider`) rather than a self-contained panel, because the toggle

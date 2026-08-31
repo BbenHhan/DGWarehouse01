@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
-import type { ChecklistItem, Document, DocumentGroup, Photo } from "@/lib/types";
+import type { ChecklistItem, Document, DocumentCategory, DocumentGroup, Photo } from "@/lib/types";
 import type { ChecklistStatus } from "@/lib/checklist-status";
 import { rollupChecklistStatus } from "@/lib/checklist-status";
 import type { DateFilter } from "@/lib/date-filter";
@@ -29,9 +29,23 @@ const DB_PATH = path.join(LOCAL_BASE_DIR, "db.json");
 type LocalDb = {
   photos: Photo[];
   documents: Document[];
+  documentCategories: DocumentCategory[];
   documentGroups: DocumentGroup[];
   checklistItems: ChecklistItem[];
 };
+
+// Categories used to be a fixed list this backend borrowed from the read-only
+// mock source. They are editable now (specs/040-editable-document-taxonomy), so
+// the local backend has to own them like every other table — Constitution III
+// requires it to be a drop-in for Supabase, and the test suite runs here.
+// Seeded once, on the first load that finds none, with the same four the
+// production project was seeded with in 0004_seed_lookups.sql.
+const SEED_CATEGORIES: DocumentCategory[] = [
+  { id: "structure", slug: "structure", name_th: "หมวดที่ 1 โครงสร้างอาคาร", emoji: "🏗️", sort_order: 1 },
+  { id: "electrical", slug: "electrical", name_th: "หมวดที่ 2 ระบบไฟฟ้า", emoji: "⚡", sort_order: 2 },
+  { id: "environment", slug: "environment", name_th: "หมวดที่ 3 สิ่งแวดล้อม", emoji: "🌿", sort_order: 3 },
+  { id: "safety", slug: "safety", name_th: "หมวดที่ 4 ความปลอดภัย", emoji: "🦺", sort_order: 4 },
+];
 
 // No in-memory cache: Next.js bundles Server Actions and Server Component
 // renders into separate module instances even within the same dev process,
@@ -46,19 +60,27 @@ let writeQueue: Promise<void> = Promise.resolve();
 
 async function loadDb(): Promise<LocalDb> {
   if (!existsSync(DB_PATH)) {
-    return { photos: [], documents: [], documentGroups: [], checklistItems: [] };
+    return { photos: [], documents: [], documentCategories: [...SEED_CATEGORIES], documentGroups: [], checklistItems: [] };
   }
   try {
     const raw = await readFile(DB_PATH, "utf-8");
     const parsed = JSON.parse(raw) as Partial<LocalDb>;
     // checklistItems is a newer field (specs/028-room-checklist) — an
     // existing db.json written before this feature won't have it yet.
-    const db: LocalDb = { photos: [], documents: [], documentGroups: [], checklistItems: [], ...parsed };
+    const db: LocalDb = {
+      photos: [],
+      documents: [],
+      documentCategories: [],
+      documentGroups: [],
+      checklistItems: [],
+      ...parsed,
+    };
+    if (db.documentCategories.length === 0) db.documentCategories = [...SEED_CATEGORIES];
     db.checklistItems = db.checklistItems.map(normalizeChecklistItem);
     migrateDocumentNotes(db);
     return db;
   } catch {
-    return { photos: [], documents: [], documentGroups: [], checklistItems: [] };
+    return { photos: [], documents: [], documentCategories: [...SEED_CATEGORIES], documentGroups: [], checklistItems: [] };
   }
 }
 
@@ -273,6 +295,35 @@ export async function localSaveDocumentFile(
 // specs/040-editable-document-taxonomy. Replaces localGetDocumentNotes, which
 // could only report names some document already carried and drew from every
 // category at once — the two faults that made this feature necessary.
+export async function localGetDocumentCategories(): Promise<DocumentCategory[]> {
+  const db = await loadDb();
+  return [...db.documentCategories].sort((a, b) => a.sort_order - b.sort_order);
+}
+
+// Name and icon only. The slug is never touched — it is a live URL, so a
+// rename must not break existing links (FR-013).
+export async function localRenameDocumentCategory(
+  id: string,
+  updates: { nameTh?: string; emoji?: string }
+): Promise<DocumentCategory | null> {
+  const db = await loadDb();
+  const category = db.documentCategories.find((candidate) => candidate.id === id);
+  if (!category) return null;
+  if (updates.nameTh !== undefined) category.name_th = updates.nameTh;
+  if (updates.emoji !== undefined) category.emoji = updates.emoji;
+  await persist(db);
+  return category;
+}
+
+export async function localGetDocumentCountsByCategory(): Promise<Record<string, number>> {
+  const db = await loadDb();
+  const counts: Record<string, number> = {};
+  for (const document of db.documents) {
+    counts[document.category_id] = (counts[document.category_id] ?? 0) + 1;
+  }
+  return counts;
+}
+
 export async function localGetDocumentGroups(categoryId: string): Promise<DocumentGroup[]> {
   const db = await loadDb();
   return db.documentGroups

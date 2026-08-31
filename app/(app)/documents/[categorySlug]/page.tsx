@@ -1,12 +1,18 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getDocumentCategories, getDocumentGroups, getDocuments } from "@/lib/data";
+import {
+  getDocumentCategories,
+  getDocumentCountsByCategory,
+  getDocumentGroups,
+  getDocuments,
+} from "@/lib/data";
 import { USE_MOCK_DATA } from "@/lib/data-config";
 import { canEdit as roleCanEdit } from "@/lib/roles";
 import { getCurrentUser } from "@/lib/supabase/server";
 import { DocList } from "@/components/DocList";
 import { DocUploader } from "@/components/DocUploader";
 import { ManageModeProvider, ManageModeToggle } from "@/components/ManageModeProvider";
+import { CategoryManagePanel } from "@/components/CategoryManagePanel";
 
 function tabClass(active: boolean) {
   return [
@@ -31,10 +37,11 @@ export default async function DocumentCategoryPage({
     notFound();
   }
 
-  const [documents, currentUser, documentGroups] = await Promise.all([
+  const [documents, currentUser, documentGroups, documentCounts] = await Promise.all([
     getDocuments(currentCategory.id),
     getCurrentUser(),
     getDocumentGroups(currentCategory.id),
+    getDocumentCountsByCategory(),
   ]);
   const userCanEdit = currentUser ? roleCanEdit(currentUser.role) : false;
   const categoryMoveOptions = USE_MOCK_DATA
@@ -61,6 +68,8 @@ export default async function DocumentCategoryPage({
           <ManageModeToggle />
         </div>
       </div>
+
+      <CategoryManagePanel categories={categories} documentCounts={documentCounts} />
 
       <nav className="scroll-thin flex gap-2 overflow-x-auto pb-2">
         {categories.map((category) => (

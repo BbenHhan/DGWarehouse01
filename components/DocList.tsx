@@ -6,7 +6,8 @@ import { ChevronDown, Download, ExternalLink, FileText, Share2, Trash2 } from "l
 import { toast } from "sonner";
 import type { Document, DocumentGroup } from "@/lib/types";
 import { useManageMode } from "@/components/ManageModeProvider";
-import { createGroup } from "@/app/actions/document-taxonomy";
+import { createGroup, renameGroup } from "@/app/actions/document-taxonomy";
+import { EditableName } from "@/components/EditableName";
 import { publicFileUrl } from "@/lib/storage";
 import { fileKindFromName } from "@/lib/file-kind";
 import { Button } from "@/components/ui/button";
@@ -344,13 +345,29 @@ export function DocList({
 
       {groups.map((group) => (
         <Collapsible key={group.id} className="rounded-xl border border-border/60 bg-card/40">
-          <CollapsibleTrigger className="group flex w-full items-center justify-between gap-3 p-3 text-left">
-            <span className="min-w-0 truncate text-sm font-medium text-foreground">{group.name}</span>
-            <span className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
-              {group.docs.length} ไฟล์
-              <ChevronDown className="h-4 w-4 transition-transform group-data-panel-open:rotate-180" />
-            </span>
-          </CollapsibleTrigger>
+          {/* The row keeps its place and its label either way; only the
+              controls attached to it change (FR-019). In management mode the
+              header stops being a collapse trigger, because its whole width is
+              now an editable field. */}
+          {managing ? (
+            <div className="flex w-full items-center justify-between gap-3 p-3">
+              <EditableName
+                value={group.name}
+                ariaLabel={`ชื่อหมวดย่อย ${group.name}`}
+                className="text-sm font-medium text-foreground"
+                onRename={(nameTh) => renameGroup({ id: group.id, nameTh })}
+              />
+              <span className="shrink-0 text-xs text-muted-foreground">{group.docs.length} ไฟล์</span>
+            </div>
+          ) : (
+            <CollapsibleTrigger className="group flex w-full items-center justify-between gap-3 p-3 text-left">
+              <span className="min-w-0 truncate text-sm font-medium text-foreground">{group.name}</span>
+              <span className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
+                {group.docs.length} ไฟล์
+                <ChevronDown className="h-4 w-4 transition-transform group-data-panel-open:rotate-180" />
+              </span>
+            </CollapsibleTrigger>
+          )}
           <CollapsibleContent className="overflow-hidden data-ending-style:h-0 data-starting-style:h-0">
             <div className="space-y-2 border-t border-border/60 p-3 pt-2">
               {group.docs.map((doc) => (

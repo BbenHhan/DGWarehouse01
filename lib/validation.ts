@@ -180,3 +180,21 @@ export const createGroupSchema = z.object({
   categoryId: foreignKeyId,
   nameTh: taxonomyName,
 });
+
+export const renameGroupSchema = z.object({
+  id: uuid,
+  nameTh: taxonomyName,
+});
+
+// Deliberately has no `slug` field, and must never gain one: a category's slug
+// is a live URL (/documents/structure), so renaming one would break every
+// existing link and bookmark (FR-013). Only the display name and icon change.
+export const renameCategorySchema = z
+  .object({
+    id: foreignKeyId,
+    nameTh: taxonomyName.optional(),
+    emoji: z.string().trim().min(1).optional(),
+  })
+  .refine((input) => input.nameTh !== undefined || input.emoji !== undefined, {
+    message: "ต้องระบุอย่างน้อยหนึ่งฟิลด์ที่จะแก้ไข",
+  });
