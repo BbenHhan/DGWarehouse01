@@ -36,9 +36,9 @@ description: "Task list for Editable Document Taxonomy"
 - [X] T009 Update `lib/local/store.ts`: `LocalDb` gains a `documentGroups` array beside `photos`/`documents`/`checklistItems`; add read/create/rename/reorder/delete functions mirroring the Supabase contract; normalize any pre-existing `note`-shaped records in `loadDb()` the way the checklist's status migration did
 - [X] T010 [P] Update `lib/mock/source.ts`: add `mockGetDocumentGroups()` returning an empty array, following `mockGetChecklistItems`' precedent — the frozen v7 snapshot has no taxonomy
 - [X] T011 Update `lib/data.ts`: add `getDocumentGroups(categoryId)` returning that category's groups in `sort_order` with a document count each; **remove `getDocumentNotes()` entirely** (its two faults — only returning names some document already carried, and drawing from every category at once — are what triggered this feature); `getDocuments()` returns `group_id` in place of `note`
-- [ ] T012 Apply migration 0014 to the live Supabase project (manual, Supabase SQL Editor). **Blocked on the account holder.** Backup for T001 is at `supabase/backups/20260831-125614/` — `documents.json` there carries the `note` column this migration drops
+- [X] T012 Apply migration 0014 to the live Supabase project (manual, Supabase SQL Editor). **Blocked on the account holder.** Backup for T001 is at `supabase/backups/20260831-125614/` — `documents.json` there carries the `note` column this migration drops
 - [X] T013 Update `components/DocList.tsx` to build its groups from `getDocumentGroups()` instead of scanning `doc.note`, and `app/(app)/documents/[categorySlug]/page.tsx` to load them. Documents with a null `group_id` still render outside every group, exactly as an empty `note` does today
-- [ ] T014 Run quickstart Scenario 1 against the real data: every category shows the same documents under the same group names as the T001 backup, totals unchanged, `safety` still empty. **Stop and fix before Phase 2 if any count differs**
+- [X] T014 Run quickstart Scenario 1 against the real data: every category shows the same documents under the same group names as the T001 backup, totals unchanged, `safety` still empty. **Stop and fix before Phase 2 if any count differs**
 
 **Checkpoint**: Groups are real records. The page looks identical to before — that is the point.
 
@@ -185,7 +185,17 @@ Phases 2, 3, 5 and 6 are independent of each other and can be done in any order 
 
 ## Implementation log
 
-**Phase 1 landed (T001–T011, T013).** Migration written, types swapped, all three
+**Phase 1 complete (T001–T014).** Migration 0014 applied to the live project by
+the account holder; the guard did not fire, so the backfill was complete before
+the column was dropped.
+
+T014 verified against the pre-migration backup: 33 documents before, 33 after;
+all 7 groups created with their document counts matching exactly (12 / 1 / 7 / 7
+/ 4 / 1 / 1); `sort_order` contiguous from 1 and in the hand-numbered order
+(0. → 1.1 → 1.2 → 1.3 → 1.4). `documents.note` now returns 400, and no document
+was left without a group. `safety` remains empty, which is the case Phase 2 fixes.
+
+**Phase 1 detail (T001–T011, T013).** Migration written, types swapped, all three
 backends carrying groups, `DocList` reading real group records, 20 new tests.
 `tsc --noEmit`, `npm run lint`, `npm test` (173) and `npm run build` all clean.
 
