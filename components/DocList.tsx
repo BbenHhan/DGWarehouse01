@@ -6,7 +6,8 @@ import { ChevronDown, Download, ExternalLink, FileText, Share2, Trash2 } from "l
 import { toast } from "sonner";
 import type { Document, DocumentGroup } from "@/lib/types";
 import { useManageMode } from "@/components/ManageModeProvider";
-import { createGroup, renameGroup } from "@/app/actions/document-taxonomy";
+import { createGroup, moveGroup, renameGroup } from "@/app/actions/document-taxonomy";
+import { ReorderButtons } from "@/components/ReorderButtons";
 import { EditableName } from "@/components/EditableName";
 import { publicFileUrl } from "@/lib/storage";
 import { fileKindFromName } from "@/lib/file-kind";
@@ -346,7 +347,7 @@ export function DocList({
         </div>
       )}
 
-      {groups.map((group) => (
+      {groups.map((group, groupIndex) => (
         <Collapsible key={group.id} className="rounded-xl border border-border/60 bg-card/40">
           {/* The row keeps its place and its label either way; only the
               controls attached to it change (FR-019). In management mode the
@@ -361,6 +362,12 @@ export function DocList({
                 onRename={(nameTh) => renameGroup({ id: group.id, nameTh })}
               />
               <span className="shrink-0 text-xs text-muted-foreground">{group.docs.length} ไฟล์</span>
+              <ReorderButtons
+                isFirst={groupIndex === 0}
+                isLast={groupIndex === groups.length - 1}
+                label={group.name}
+                onMove={(direction) => moveGroup({ id: group.id, direction })}
+              />
             </div>
           ) : (
             <CollapsibleTrigger className="group flex w-full items-center justify-between gap-3 p-3 text-left">

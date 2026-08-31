@@ -97,10 +97,10 @@ description: "Task list for Editable Document Taxonomy"
 
 **Independent test**: quickstart Scenario 5.
 
-- [ ] T033 [US3] Add `moveGroup` and `moveCategory` (`{ id, direction }`) to `app/actions/document-taxonomy.ts` and `lib/local/store.ts`: swap with the neighbour, then renumber that parent's rows to a contiguous 1..n in one statement (research.md Decision 3)
-- [ ] T034 [US3] Add up/down buttons per row in `components/DocumentTaxonomyManager.tsx` — buttons, not drag (FR-021: this is used on a phone on site). No "up" on the first row, no "down" on the last
-- [ ] T035 [US3] Debounce rapid reorder clicks into a single write, so four fast taps settle on the order shown rather than racing (spec Edge Cases, research.md Decision 7)
-- [ ] T036 [P] [US3] Extend the local-store tests: a move renumbers contiguously, moving the first row up is a no-op, moving the last down is a no-op, order survives a reload
+- [X] T033 [US3] Add `moveGroup` and `moveCategory` (`{ id, direction }`) to `app/actions/document-taxonomy.ts` and `lib/local/store.ts`: swap with the neighbour, then renumber that parent's rows to a contiguous 1..n in one statement (research.md Decision 3)
+- [X] T034 [US3] Add up/down buttons per row in `components/DocumentTaxonomyManager.tsx` — buttons, not drag (FR-021: this is used on a phone on site). No "up" on the first row, no "down" on the last
+- [X] T035 [US3] Debounce rapid reorder clicks into a single write, so four fast taps settle on the order shown rather than racing (spec Edge Cases, research.md Decision 7)
+- [X] T036 [P] [US3] Extend the local-store tests: a move renumbers contiguously, moving the first row up is a no-op, moving the last down is a no-op, order survives a reload
 - [ ] T037 [US3] Run quickstart Scenario 5
 
 ---
@@ -184,6 +184,14 @@ Phases 2, 3, 5 and 6 are independent of each other and can be done in any order 
 ---
 
 ## Implementation log
+
+**Phase 5 landed (T033–T036), with T035 done differently than written.** The task
+said to debounce rapid reorder clicks into a single write. That would have been
+wrong: an arrow swaps with its neighbour, so three quick taps are three swaps,
+and collapsing them into one moves the row a single position while the screen
+shows three — the opposite of the edge case it was meant to satisfy. Clicks are
+serialized instead: every one is sent, none overlaps, and the order that settles
+is the order on screen.
 
 **Phase 4 landed (T029, T031; T028/T030 were already in from Phase 1).** Adding
 `moveDocuments` exposed a real gap in what Phase 1 had shipped: the group picker

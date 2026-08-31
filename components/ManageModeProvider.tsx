@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState } from "react";
+import { createContext, useContext, useRef, useState } from "react";
 import { Check, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -24,6 +24,17 @@ type ManageModeValue = {
   draft: (key: string) => string;
   setDraft: (key: string, value: string) => void;
   clearDraft: (key: string) => void;
+  /**
+   * Runs reorder writes strictly one after another.
+   *
+   * tasks.md called for debouncing rapid clicks into one write, which would be
+   * wrong here: an arrow swaps with the neighbour, so three quick taps are three
+   * swaps, and collapsing them into one would move the row a single position
+   * while the screen showed three. Serializing instead sends every click but
+   * never lets two overlap, so the order that settles is the order on screen —
+   * which is what the spec's edge case actually asks for.
+   */
+  enqueue: (task: () => Promise<unknown>) => void;
 };
 
 const ManageModeContext = createContext<ManageModeValue | null>(null);
@@ -41,6 +52,7 @@ export function useManageMode(): ManageModeValue {
       draft: () => "",
       setDraft: () => {},
       clearDraft: () => {},
+      enqueue: () => {},
     }
   );
 }
@@ -54,6 +66,7 @@ export function ManageModeProvider({
 }) {
   const [managing, setManaging] = useState(false);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const queue = useRef<Promise<unknown>>(Promise.resolve());
 
   return (
     <ManageModeContext.Provider
@@ -64,6 +77,12 @@ export function ManageModeProvider({
         draft: (key) => drafts[key] ?? "",
         setDraft: (key, value) => setDrafts((current) => ({ ...current, [key]: value })),
         clearDraft: (key) => setDrafts((current) => ({ ...current, [key]: "" })),
+        enqueue: (task) => {
+          // A rejected task must not poison the chain for everything queued
+          // behind it — each link swallows its own failure, and the task itself
+          // is responsible for reporting it.
+          queue.current = queue.current.then(task, task);
+        },
       }}
     >
       {children}

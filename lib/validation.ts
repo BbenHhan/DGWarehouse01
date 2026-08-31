@@ -206,3 +206,8 @@ export const moveDocumentsSchema = z.object({
   toCategoryId: foreignKeyId,
   toGroupId: uuid.nullable(),
 });
+
+const moveDirection = z.enum(["up", "down"]);
+
+export const moveGroupSchema = z.object({ id: uuid, direction: moveDirection });
+export const moveCategorySchema = z.object({ id: foreignKeyId, direction: moveDirection });

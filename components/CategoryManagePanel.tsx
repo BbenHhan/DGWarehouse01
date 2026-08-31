@@ -1,6 +1,7 @@
 "use client";
 
-import { renameCategory } from "@/app/actions/document-taxonomy";
+import { moveCategory, renameCategory } from "@/app/actions/document-taxonomy";
+import { ReorderButtons } from "@/components/ReorderButtons";
 import { EditableName } from "@/components/EditableName";
 import { useManageMode } from "@/components/ManageModeProvider";
 import type { DocumentCategory } from "@/lib/types";
@@ -28,7 +29,7 @@ export function CategoryManagePanel({
     <div className="rounded-xl border border-primary/30 bg-card/40 p-3">
       <p className="mb-2 text-xs text-muted-foreground">หมวดใหญ่</p>
       <div className="flex flex-col">
-        {categories.map((category) => (
+        {categories.map((category, index) => (
           <div
             key={category.id}
             className="flex items-center gap-2 border-b border-border/60 py-1.5 last:border-b-0"
@@ -43,6 +44,12 @@ export function CategoryManagePanel({
             <span className="shrink-0 text-xs text-muted-foreground">
               {documentCounts[category.id] ?? 0} ไฟล์
             </span>
+            <ReorderButtons
+              isFirst={index === 0}
+              isLast={index === categories.length - 1}
+              label={category.name_th}
+              onMove={(direction) => moveCategory({ id: category.id, direction })}
+            />
           </div>
         ))}
       </div>

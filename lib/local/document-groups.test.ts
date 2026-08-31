@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import {
   localCreateDocumentGroup,
   localGetDocumentCategories,
+  localMoveDocumentCategory,
   localRenameDocumentCategory,
   localDeleteDocumentGroup,
   localGetDocumentGroups,
@@ -314,5 +315,52 @@ describe("localGetAllDocumentGroups", () => {
     const names = (await localGetAllDocumentGroups()).map((g) => g.name_th);
     expect(names).toContain("ของ A");
     expect(names).toContain("ของ B");
+  });
+});
+
+describe("localMoveDocumentCategory", () => {
+  it("reorders categories and renumbers them contiguously", async () => {
+    const before = await localGetDocumentCategories();
+    const second = before[1];
+
+    await localMoveDocumentCategory(second.id, "up");
+
+    const after = await localGetDocumentCategories();
+    expect(after[0].id).toBe(second.id);
+    expect(after.map((c) => c.sort_order)).toEqual([1, 2, 3, 4]);
+
+    // restore for other tests, which read the seeded order
+    await localMoveDocumentCategory(second.id, "down");
+    expect((await localGetDocumentCategories()).map((c) => c.slug)).toEqual(before.map((c) => c.slug));
+  });
+
+  it("refuses to move the first up or the last down", async () => {
+    const categories = await localGetDocumentCategories();
+
+    expect(await localMoveDocumentCategory(categories[0].id, "up")).toBeNull();
+    expect(await localMoveDocumentCategory(categories[categories.length - 1].id, "down")).toBeNull();
+  });
+
+  it("returns null for an id that isn't in the store", async () => {
+    expect(await localMoveDocumentCategory("no-such-id", "up")).toBeNull();
+  });
+});
+
+describe("reordering settles where the clicks left it", () => {
+  it("three moves up carry a group from last to first", async () => {
+    const { catA } = categories();
+    await localCreateDocumentGroup(catA, "หนึ่ง");
+    await localCreateDocumentGroup(catA, "สอง");
+    await localCreateDocumentGroup(catA, "สาม");
+    const last = await localCreateDocumentGroup(catA, "สี่");
+
+    // Serialized, exactly as the UI queues them — three clicks, three swaps.
+    await localMoveDocumentGroup(last!.id, "up");
+    await localMoveDocumentGroup(last!.id, "up");
+    await localMoveDocumentGroup(last!.id, "up");
+
+    const groups = await localGetDocumentGroups(catA);
+    expect(groups.map((g) => g.name_th)).toEqual(["สี่", "หนึ่ง", "สอง", "สาม"]);
+    expect(groups.map((g) => g.sort_order)).toEqual([1, 2, 3, 4]);
   });
 });

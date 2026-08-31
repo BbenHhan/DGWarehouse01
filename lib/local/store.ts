@@ -324,6 +324,28 @@ export async function localGetDocumentCountsByCategory(): Promise<Record<string,
   return counts;
 }
 
+// Same swap-then-renumber shape as localMoveDocumentGroup, over the flat list
+// of categories (research.md Decision 3).
+export async function localMoveDocumentCategory(
+  id: string,
+  direction: "up" | "down"
+): Promise<DocumentCategory[] | null> {
+  const db = await loadDb();
+  const ordered = [...db.documentCategories].sort((a, b) => a.sort_order - b.sort_order);
+  const index = ordered.findIndex((category) => category.id === id);
+  if (index === -1) return null;
+
+  const target = direction === "up" ? index - 1 : index + 1;
+  if (target < 0 || target >= ordered.length) return null;
+
+  [ordered[index], ordered[target]] = [ordered[target], ordered[index]];
+  ordered.forEach((category, position) => {
+    category.sort_order = position + 1;
+  });
+  await persist(db);
+  return ordered;
+}
+
 export async function localGetDocumentGroups(categoryId: string): Promise<DocumentGroup[]> {
   const db = await loadDb();
   return db.documentGroups
