@@ -36,6 +36,11 @@ export function EditModal({ kind, item, moveOptions, moveLabel, groups }: EditMo
   const [fileName, setFileName] = useState(item.file_name);
   const [note, setNote] = useState(kind === "photo" ? item.note ?? "" : "");
   const [groupId, setGroupId] = useState(kind === "document" ? item.group_id ?? NO_GROUP : NO_GROUP);
+  // `groups` carries every category's groups; which ones are offered follows
+  // whichever category is currently selected below, so moving a document to
+  // another category can still put it straight into one of that category's
+  // sub-groups (FR-026).
+  const groupsForDestination = groups?.filter((group) => group.category_id === moveTo) ?? [];
   const [date, setDate] = useState(kind === "photo" ? item.date : "");
   // Photos move between room/work-type pairs (composite "roomId::workTypeId"
   // value, specs/018-per-photo-dates); documents move between categories.
@@ -137,13 +142,13 @@ export function EditModal({ kind, item, moveOptions, moveLabel, groups }: EditMo
                 <SelectTrigger className="w-full">
                   <SelectValue>
                     {(value: string | null) =>
-                      groups?.find((group) => group.id === value)?.name_th ?? "ไม่มีหมวดย่อย"
+                      groupsForDestination.find((group) => group.id === value)?.name_th ?? "ไม่มีหมวดย่อย"
                     }
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value={NO_GROUP}>ไม่มีหมวดย่อย</SelectItem>
-                  {groups?.map((group) => (
+                  {groupsForDestination.map((group) => (
                     <SelectItem key={group.id} value={group.id}>
                       {group.name_th}
                     </SelectItem>
@@ -155,7 +160,17 @@ export function EditModal({ kind, item, moveOptions, moveLabel, groups }: EditMo
 
           <div className="space-y-1">
             <span className="text-sm font-medium">{moveLabel}</span>
-            <Select value={moveTo} onValueChange={(value) => value !== null && setMoveTo(value)}>
+            <Select
+              value={moveTo}
+              onValueChange={(value) => {
+                if (value === null) return;
+                setMoveTo(value);
+                // The old group belongs to the old category, so it cannot come
+                // along; the document lands ungrouped unless one of the new
+                // category's groups is picked.
+                if (kind === "document" && value !== moveTo) setGroupId(NO_GROUP);
+              }}
+            >
               <SelectTrigger className="w-full">
                 <SelectValue>
                   {(value: string | null) =>

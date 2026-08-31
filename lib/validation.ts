@@ -198,3 +198,11 @@ export const renameCategorySchema = z
   .refine((input) => input.nameTh !== undefined || input.emoji !== undefined, {
     message: "ต้องระบุอย่างน้อยหนึ่งฟิลด์ที่จะแก้ไข",
   });
+
+// A destination is a category plus optionally one of its groups; null means the
+// documents land outside every group (FR-026).
+export const moveDocumentsSchema = z.object({
+  documentIds: z.array(uuid),
+  toCategoryId: foreignKeyId,
+  toGroupId: uuid.nullable(),
+});

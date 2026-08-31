@@ -18,6 +18,7 @@ import {
   localGetChecklistItems,
   localGetDocumentCategories,
   localGetDocumentCountsByCategory,
+  localGetAllDocumentGroups,
   localGetDocumentGroups,
   localGetDocuments,
   localGetPhotos,
@@ -140,6 +141,30 @@ export async function getDocumentCountsByCategory(): Promise<Record<string, numb
     counts[row.category_id] = (counts[row.category_id] ?? 0) + 1;
   }
   return counts;
+}
+
+// Every category's groups at once. The per-document move control needs this:
+// a document can be moved to any category and any group inside it (FR-026), so
+// once a different category is chosen the picker has to be able to offer that
+// category's groups, not the ones belonging to the page you happen to be on.
+export async function getAllDocumentGroups(): Promise<DocumentGroup[]> {
+  if (DATA_SOURCE === "mock") return [];
+  if (DATA_SOURCE === "local") return localGetAllDocumentGroups();
+
+  await requireUser();
+  const supabase = createServiceClient();
+  const [{ data: groups, error: groupsError }, { data: documents, error: documentsError }] = await Promise.all([
+    supabase.from("document_groups").select("*").order("category_id").order("sort_order"),
+    supabase.from("documents").select("group_id"),
+  ]);
+  if (groupsError) throw groupsError;
+  if (documentsError) throw documentsError;
+
+  const counts = new Map<string, number>();
+  for (const row of documents) {
+    if (row.group_id) counts.set(row.group_id, (counts.get(row.group_id) ?? 0) + 1);
+  }
+  return groups.map((group) => ({ ...group, document_count: counts.get(group.id) ?? 0 }));
 }
 
 export async function getDocumentGroups(categoryId: string): Promise<DocumentGroup[]> {

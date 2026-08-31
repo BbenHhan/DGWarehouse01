@@ -275,12 +275,15 @@ function AddGroupForm({ categoryId }: { categoryId: string }) {
 export function DocList({
   documents,
   documentGroups,
+  allGroups,
   categoryId,
   categoryMoveOptions,
   canEdit,
 }: {
   documents: Document[];
   documentGroups: DocumentGroup[];
+  /** Every category's groups — the move picker spans all of them (FR-026). */
+  allGroups: DocumentGroup[];
   categoryId: string;
   categoryMoveOptions: CategoryMoveOption[];
   canEdit: boolean;
@@ -335,7 +338,7 @@ export function DocList({
               key={doc.id}
               doc={doc}
               canEdit={canEdit}
-              documentGroups={documentGroups}
+              documentGroups={allGroups}
               categoryMoveOptions={categoryMoveOptions}
               onDelete={handleDelete}
             />
@@ -375,7 +378,7 @@ export function DocList({
                   key={doc.id}
                   doc={doc}
                   canEdit={canEdit}
-                  documentGroups={documentGroups}
+                  documentGroups={allGroups}
                   categoryMoveOptions={categoryMoveOptions}
                   onDelete={handleDelete}
                 />

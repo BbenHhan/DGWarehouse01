@@ -84,9 +84,9 @@ description: "Task list for Editable Document Taxonomy"
 **Independent test**: quickstart Scenario 6.
 
 - [X] T028 [P] [US6] Update `editDocSchema` in `lib/validation.ts`: add `groupId?: string | null` (null meaning no sub-group), remove `note`, keep the "at least one field" rule
-- [ ] T029 [US6] Update `editDoc` in `app/actions/documents.ts` to accept and apply `groupId`, and add `moveDocuments({ documentIds, toCategoryId, toGroupId })` as the bulk form Phase 7's disposition will call. Both write database columns only — `storage_path` is never rewritten (research.md Decision 5)
+- [X] T029 [US6] Update `editDoc` in `app/actions/documents.ts` to accept and apply `groupId`, and add `moveDocuments({ documentIds, toCategoryId, toGroupId })` as the bulk form Phase 7's disposition will call. Both write database columns only — `storage_path` is never rewritten (research.md Decision 5)
 - [X] T030 [US6] Update the move control in `components/DocList.tsx` from a flat category list to category plus group, with "no sub-group" as an option. Destinations are read live, so a group created moments ago is selectable without a reload (FR-026)
-- [ ] T031 [P] [US6] Extend the local-store tests: moving between groups in different categories, moving to no group, counts updating on both sides, `storage_path` unchanged after a move
+- [X] T031 [P] [US6] Extend the local-store tests: moving between groups in different categories, moving to no group, counts updating on both sides, `storage_path` unchanged after a move
 - [ ] T032 [US6] Run quickstart Scenario 6, including opening a moved file to confirm it still downloads
 
 ---
@@ -184,6 +184,14 @@ Phases 2, 3, 5 and 6 are independent of each other and can be done in any order 
 ---
 
 ## Implementation log
+
+**Phase 4 landed (T029, T031; T028/T030 were already in from Phase 1).** Adding
+`moveDocuments` exposed a real gap in what Phase 1 had shipped: the group picker
+in `EditModal` only ever held the *current page's* category's groups, so choosing
+a different destination category left no way to pick a group inside it — FR-026
+was not actually met. The page now loads every category's groups, the picker
+filters them by whichever destination category is selected, and changing that
+category clears a group that can no longer apply.
 
 **Phase 3 landed (T023–T026).** Rename works at both levels, in place, and the
 category panel from layout A now exists above the tab bar.

@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import {
   getDocumentCategories,
   getDocumentCountsByCategory,
+  getAllDocumentGroups,
   getDocumentGroups,
   getDocuments,
 } from "@/lib/data";
@@ -37,10 +38,11 @@ export default async function DocumentCategoryPage({
     notFound();
   }
 
-  const [documents, currentUser, documentGroups, documentCounts] = await Promise.all([
+  const [documents, currentUser, documentGroups, allGroups, documentCounts] = await Promise.all([
     getDocuments(currentCategory.id),
     getCurrentUser(),
     getDocumentGroups(currentCategory.id),
+    getAllDocumentGroups(),
     getDocumentCountsByCategory(),
   ]);
   const userCanEdit = currentUser ? roleCanEdit(currentUser.role) : false;
@@ -92,6 +94,7 @@ export default async function DocumentCategoryPage({
         <DocList
           documents={documents}
           documentGroups={documentGroups}
+          allGroups={allGroups}
           categoryId={currentCategory.id}
           categoryMoveOptions={categoryMoveOptions}
           canEdit={userCanEdit}

@@ -335,6 +335,16 @@ export async function localGetDocumentGroups(categoryId: string): Promise<Docume
     }));
 }
 
+export async function localGetAllDocumentGroups(): Promise<DocumentGroup[]> {
+  const db = await loadDb();
+  return [...db.documentGroups]
+    .sort((a, b) => a.category_id.localeCompare(b.category_id) || a.sort_order - b.sort_order)
+    .map((group) => ({
+      ...group,
+      document_count: db.documents.filter((document) => document.group_id === group.id).length,
+    }));
+}
+
 export async function localCreateDocumentGroup(categoryId: string, nameTh: string): Promise<DocumentGroup | null> {
   const db = await loadDb();
   const siblings = db.documentGroups.filter((group) => group.category_id === categoryId);

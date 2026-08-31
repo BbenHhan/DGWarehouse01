@@ -9,6 +9,9 @@ import {
   localRenameDocumentGroup,
   localResolveDocumentGroup,
   localSaveDocumentFile,
+  localGetAllDocumentGroups,
+  localGetDocuments,
+  localUpdateDocument,
 } from "@/lib/local/store";
 
 // vitest.setup.ts points the local store at a disposable temp directory for the
@@ -248,5 +251,68 @@ describe("localRenameDocumentCategory", () => {
     const categories = await localGetDocumentCategories();
     expect(categories.map((c) => c.slug)).toEqual(["structure", "electrical", "environment", "safety"]);
     expect(categories.map((c) => c.sort_order)).toEqual([1, 2, 3, 4]);
+  });
+});
+
+describe("moving documents between groups", () => {
+  it("moves a document into another category's group, updating both counts", async () => {
+    const { catA, catB } = categories();
+    const from = await localCreateDocumentGroup(catA, "ต้นทาง");
+    const to = await localCreateDocumentGroup(catB, "ปลายทาง");
+    const doc = await localSaveDocumentFile(catA, from!.id, file());
+
+    await localUpdateDocument(doc.id, { categoryId: catB, groupId: to!.id });
+
+    expect((await localGetDocumentGroups(catA))[0].document_count).toBe(0);
+    expect((await localGetDocumentGroups(catB))[0].document_count).toBe(1);
+    expect((await localGetDocuments(catB)).map((d) => d.id)).toContain(doc.id);
+  });
+
+  it("moves a document out of every group when the destination is none", async () => {
+    const { catA } = categories();
+    const group = await localCreateDocumentGroup(catA, "มีกลุ่ม");
+    const doc = await localSaveDocumentFile(catA, group!.id, file());
+
+    await localUpdateDocument(doc.id, { groupId: null });
+
+    expect((await localGetDocumentGroups(catA))[0].document_count).toBe(0);
+    const moved = (await localGetDocuments(catA)).find((d) => d.id === doc.id);
+    expect(moved?.group_id).toBeNull();
+  });
+
+  it("never rewrites storage_path — a move is metadata only, so no file is re-keyed", async () => {
+    const { catA, catB } = categories();
+    const group = await localCreateDocumentGroup(catA, "ต้นทาง");
+    const doc = await localSaveDocumentFile(catA, group!.id, file("แปลนอาคาร.pdf"));
+    const originalPath = doc.storage_path;
+
+    await localUpdateDocument(doc.id, { categoryId: catB, groupId: null });
+
+    const moved = (await localGetDocuments(catB)).find((d) => d.id === doc.id);
+    expect(moved?.storage_path).toBe(originalPath);
+  });
+
+  it("frees a group to be deleted once its last document has moved out", async () => {
+    const { catA } = categories();
+    const group = await localCreateDocumentGroup(catA, "จะลบทีหลัง");
+    const doc = await localSaveDocumentFile(catA, group!.id, file());
+
+    expect(await localDeleteDocumentGroup(group!.id)).toBeNull();
+
+    await localUpdateDocument(doc.id, { groupId: null });
+
+    expect(await localDeleteDocumentGroup(group!.id)).not.toBeNull();
+  });
+});
+
+describe("localGetAllDocumentGroups", () => {
+  it("returns groups from every category, so the move picker can span them", async () => {
+    const { catA, catB } = categories();
+    await localCreateDocumentGroup(catA, "ของ A");
+    await localCreateDocumentGroup(catB, "ของ B");
+
+    const names = (await localGetAllDocumentGroups()).map((g) => g.name_th);
+    expect(names).toContain("ของ A");
+    expect(names).toContain("ของ B");
   });
 });

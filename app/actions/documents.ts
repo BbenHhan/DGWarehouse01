@@ -3,7 +3,13 @@
 import { randomUUID } from "crypto";
 import { revalidatePath } from "next/cache";
 import { createServiceClient, requireRole } from "@/lib/supabase/server";
-import { DOCUMENT_MIME_TYPES, editDocSchema, uploadDocSchema, validateFile } from "@/lib/validation";
+import {
+  DOCUMENT_MIME_TYPES,
+  editDocSchema,
+  moveDocumentsSchema,
+  uploadDocSchema,
+  validateFile,
+} from "@/lib/validation";
 import { DATA_SOURCE } from "@/lib/data-config";
 import { storageKeyFileName } from "@/lib/storage-key";
 import {
@@ -224,4 +230,46 @@ export async function editDoc(input: {
   revalidatePath("/documents/[categorySlug]", "page");
 
   return { ok: true, data: document };
+}
+
+// The bulk form of a move. Phase 7's deletion flow calls this to re-parent a
+// group's or a category's documents before the structure above them is removed,
+// which is what makes "move them instead of deleting them" possible at all
+// (spec FR-011, US6).
+//
+// Metadata only: storage_path is never rewritten, so no file is copied or
+// re-keyed and nothing can be lost part-way through (research.md Decision 5).
+export async function moveDocuments(input: {
+  documentIds: string[];
+  toCategoryId: string;
+  toGroupId: string | null;
+}): Promise<ActionResult<{ moved: number }>> {
+  const authError = await assertCanEdit();
+  if (authError) return { ok: false, error: authError };
+
+  const parsed = moveDocumentsSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0]?.message ?? "ข้อมูลไม่ถูกต้อง" };
+  }
+  const { documentIds, toCategoryId, toGroupId } = parsed.data;
+  if (documentIds.length === 0) return { ok: true, data: { moved: 0 } };
+
+  if (DATA_SOURCE === "local") {
+    for (const documentId of documentIds) {
+      await localUpdateDocument(documentId, { categoryId: toCategoryId, groupId: toGroupId });
+    }
+    revalidatePath("/documents/[categorySlug]", "page");
+    return { ok: true, data: { moved: documentIds.length } };
+  }
+
+  const supabase = createServiceClient();
+  const { error } = await supabase
+    .from("documents")
+    .update({ category_id: toCategoryId, group_id: toGroupId })
+    .in("id", documentIds);
+
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath("/documents/[categorySlug]", "page");
+  return { ok: true, data: { moved: documentIds.length } };
 }
