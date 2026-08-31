@@ -211,3 +211,10 @@ const moveDirection = z.enum(["up", "down"]);
 
 export const moveGroupSchema = z.object({ id: uuid, direction: moveDirection });
 export const moveCategorySchema = z.object({ id: foreignKeyId, direction: moveDirection });
+
+// No slug field, deliberately: the caller never supplies one. A category's slug
+// is generated (FR-014) and then immutable (FR-013).
+export const createCategorySchema = z.object({
+  nameTh: taxonomyName,
+  emoji: z.string().trim().min(1, "กรุณาเลือกไอคอน").default("📁"),
+});

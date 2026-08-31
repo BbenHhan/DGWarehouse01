@@ -326,6 +326,38 @@ export async function localGetDocumentCountsByCategory(): Promise<Record<string,
 
 // Same swap-then-renumber shape as localMoveDocumentGroup, over the flat list
 // of categories (research.md Decision 3).
+// `category-N`, N being the smallest positive integer not already taken
+// (research.md Decision 4). The slug is only ever a URL segment; Thai names do
+// not slugify into anything usable, and the four original slugs
+// (structure/electrical/environment/safety) are live URLs that must never be
+// regenerated.
+export function nextCategorySlug(taken: string[]): string {
+  const used = new Set(taken);
+  for (let n = 1; ; n += 1) {
+    const candidate = `category-${n}`;
+    if (!used.has(candidate)) return candidate;
+  }
+}
+
+export async function localCreateDocumentCategory(
+  nameTh: string,
+  emoji: string
+): Promise<DocumentCategory | null> {
+  const db = await loadDb();
+  if (db.documentCategories.some((category) => category.name_th === nameTh)) return null;
+
+  const category: DocumentCategory = {
+    id: randomUUID(),
+    slug: nextCategorySlug(db.documentCategories.map((existing) => existing.slug)),
+    name_th: nameTh,
+    emoji,
+    sort_order: db.documentCategories.length + 1,
+  };
+  db.documentCategories.push(category);
+  await persist(db);
+  return category;
+}
+
 export async function localMoveDocumentCategory(
   id: string,
   direction: "up" | "down"

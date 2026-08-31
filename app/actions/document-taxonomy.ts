@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createServiceClient, requireRole } from "@/lib/supabase/server";
 import {
+  createCategorySchema,
   createGroupSchema,
   moveCategorySchema,
   moveGroupSchema,
@@ -11,11 +12,13 @@ import {
 } from "@/lib/validation";
 import { DATA_SOURCE } from "@/lib/data-config";
 import {
+  localCreateDocumentCategory,
   localCreateDocumentGroup,
   localMoveDocumentCategory,
   localMoveDocumentGroup,
   localRenameDocumentCategory,
   localRenameDocumentGroup,
+  nextCategorySlug,
 } from "@/lib/local/store";
 import type { ActionResult, DocumentCategory, DocumentGroup } from "@/lib/types";
 
@@ -291,4 +294,52 @@ export async function moveCategory(input: {
 
   revalidateDocumentPaths();
   return { ok: true, data: { id } };
+}
+
+export async function createCategory(input: {
+  nameTh: string;
+  emoji?: string;
+}): Promise<ActionResult<DocumentCategory>> {
+  const authError = await assertCanEdit();
+  if (authError) return { ok: false, error: authError };
+
+  const parsed = createCategorySchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0]?.message ?? "ข้อมูลไม่ถูกต้อง" };
+  }
+  const { nameTh, emoji } = parsed.data;
+
+  if (DATA_SOURCE === "mock") return { ok: false, error: "โหมดตัวอย่างแก้ไขข้อมูลไม่ได้" };
+
+  if (DATA_SOURCE === "local") {
+    const category = await localCreateDocumentCategory(nameTh, emoji);
+    if (!category) return { ok: false, error: "มีหมวดชื่อนี้อยู่แล้ว" };
+    revalidateDocumentPaths();
+    return { ok: true, data: category };
+  }
+
+  const supabase = createServiceClient();
+  const { data: existing } = await supabase.from("document_categories").select("slug, name_th");
+
+  if ((existing ?? []).some((category) => category.name_th === nameTh)) {
+    return { ok: false, error: "มีหมวดชื่อนี้อยู่แล้ว" };
+  }
+
+  const { data: category, error } = await supabase
+    .from("document_categories")
+    .insert({
+      slug: nextCategorySlug((existing ?? []).map((row) => row.slug)),
+      name_th: nameTh,
+      emoji,
+      sort_order: (existing ?? []).length + 1,
+    })
+    .select("*")
+    .single();
+
+  if (error || !category) {
+    return { ok: false, error: error?.message ?? "เพิ่มหมวดไม่สำเร็จ" };
+  }
+
+  revalidateDocumentPaths();
+  return { ok: true, data: category };
 }

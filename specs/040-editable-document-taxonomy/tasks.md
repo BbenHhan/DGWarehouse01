@@ -109,11 +109,11 @@ description: "Task list for Editable Document Taxonomy"
 
 **Goal**: A fifth category can be created and behaves exactly like the original four.
 
-- [ ] T038 [P] [US4] Add `createCategorySchema` to `lib/validation.ts` (`nameTh`, `emoji`) — no `slug` field; the caller never supplies one
-- [ ] T039 [US4] Add `createCategory` to `app/actions/document-taxonomy.ts` and `lib/local/store.ts`, generating `slug` as `category-N` where N is the smallest positive integer not already taken (research.md Decision 4). Append last in `sort_order`
-- [ ] T040 [US4] Add the "add category" control to `components/DocumentTaxonomyManager.tsx`
-- [ ] T041 [P] [US4] Extend the local-store tests: slug generation skips taken numbers, a new category appears last, its slug is never regenerated on a later rename
-- [ ] T042 [US4] Verify a newly created category accepts sub-groups and file uploads with no extra wiring (Constitution VIII)
+- [X] T038 [P] [US4] Add `createCategorySchema` to `lib/validation.ts` (`nameTh`, `emoji`) — no `slug` field; the caller never supplies one
+- [X] T039 [US4] Add `createCategory` to `app/actions/document-taxonomy.ts` and `lib/local/store.ts`, generating `slug` as `category-N` where N is the smallest positive integer not already taken (research.md Decision 4). Append last in `sort_order`
+- [X] T040 [US4] Add the "add category" control to `components/DocumentTaxonomyManager.tsx`
+- [X] T041 [P] [US4] Extend the local-store tests: slug generation skips taken numbers, a new category appears last, its slug is never regenerated on a later rename
+- [X] T042 [US4] Verify a newly created category accepts sub-groups and file uploads with no extra wiring (Constitution VIII)
 
 ---
 
@@ -184,6 +184,13 @@ Phases 2, 3, 5 and 6 are independent of each other and can be done in any order 
 ---
 
 ## Implementation log
+
+**Phase 6 landed (T038–T042).** A new category's slug is generated as
+`category-N`, N being the smallest positive integer not already taken, so a gap
+left by a deleted category is reused rather than the number climbing forever.
+The four original slugs are ignored by that search and never regenerated — they
+are live URLs. There is a test asserting a generated slug survives a later
+rename.
 
 **Phase 5 landed (T033–T036), with T035 done differently than written.** The task
 said to debounce rapid reorder clicks into a single write. That would have been

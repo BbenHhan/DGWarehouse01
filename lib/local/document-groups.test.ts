@@ -1,8 +1,10 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import {
   localCreateDocumentGroup,
+  localCreateDocumentCategory,
   localGetDocumentCategories,
   localMoveDocumentCategory,
+  nextCategorySlug,
   localRenameDocumentCategory,
   localDeleteDocumentGroup,
   localGetDocumentGroups,
@@ -248,10 +250,17 @@ describe("localRenameDocumentCategory", () => {
     expect(await localRenameDocumentCategory("no-such-id", { nameTh: "x" })).toBeNull();
   });
 
-  it("seeds the four real categories on a fresh store, in order", async () => {
+  it("seeds the four real categories first, in order", async () => {
+    // Asserts the leading four rather than the whole list: other tests in this
+    // file add categories of their own, and the store is shared across the run.
     const categories = await localGetDocumentCategories();
-    expect(categories.map((c) => c.slug)).toEqual(["structure", "electrical", "environment", "safety"]);
-    expect(categories.map((c) => c.sort_order)).toEqual([1, 2, 3, 4]);
+    expect(categories.slice(0, 4).map((c) => c.slug)).toEqual([
+      "structure",
+      "electrical",
+      "environment",
+      "safety",
+    ]);
+    expect(categories.map((c) => c.sort_order)).toEqual(categories.map((_, i) => i + 1));
   });
 });
 
@@ -362,5 +371,61 @@ describe("reordering settles where the clicks left it", () => {
     const groups = await localGetDocumentGroups(catA);
     expect(groups.map((g) => g.name_th)).toEqual(["สี่", "หนึ่ง", "สอง", "สาม"]);
     expect(groups.map((g) => g.sort_order)).toEqual([1, 2, 3, 4]);
+  });
+});
+
+describe("nextCategorySlug", () => {
+  it("starts at category-1 when nothing is taken", () => {
+    expect(nextCategorySlug([])).toBe("category-1");
+  });
+
+  it("skips numbers already in use", () => {
+    expect(nextCategorySlug(["category-1", "category-2"])).toBe("category-3");
+  });
+
+  it("fills a gap rather than always appending", () => {
+    expect(nextCategorySlug(["category-1", "category-3"])).toBe("category-2");
+  });
+
+  it("ignores the original hand-written slugs", () => {
+    expect(nextCategorySlug(["structure", "electrical", "environment", "safety"])).toBe("category-1");
+  });
+});
+
+describe("localCreateDocumentCategory", () => {
+  it("appends a category last, with a generated slug the caller never supplied", async () => {
+    const name = `หมวดทดสอบ ${testId}`;
+    const created = await localCreateDocumentCategory(name, "📁");
+
+    expect(created?.name_th).toBe(name);
+    expect(created?.slug).toMatch(/^category-\d+$/);
+
+    const all = await localGetDocumentCategories();
+    expect(all[all.length - 1].id).toBe(created!.id);
+    expect(all.map((c) => c.sort_order)).toEqual(all.map((_, i) => i + 1));
+  });
+
+  it("refuses a duplicate name", async () => {
+    const name = `หมวดซ้ำ ${testId}`;
+    await localCreateDocumentCategory(name, "📁");
+
+    expect(await localCreateDocumentCategory(name, "📁")).toBeNull();
+  });
+
+  it("keeps its generated slug through a later rename", async () => {
+    const created = await localCreateDocumentCategory(`หมวดเปลี่ยนชื่อ ${testId}`, "📁");
+    const slug = created!.slug;
+
+    const renamed = await localRenameDocumentCategory(created!.id, { nameTh: `ชื่อใหม่ ${testId}` });
+
+    expect(renamed?.slug).toBe(slug);
+  });
+
+  it("accepts sub-groups and behaves like the original four", async () => {
+    const created = await localCreateDocumentCategory(`หมวดใหม่ ${testId}`, "📁");
+    const group = await localCreateDocumentGroup(created!.id, "กลุ่มแรก");
+
+    expect(group).not.toBeNull();
+    expect((await localGetDocumentGroups(created!.id)).map((g) => g.name_th)).toEqual(["กลุ่มแรก"]);
   });
 });

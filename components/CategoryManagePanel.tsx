@@ -1,9 +1,13 @@
 "use client";
 
-import { moveCategory, renameCategory } from "@/app/actions/document-taxonomy";
+import { createCategory, moveCategory, renameCategory } from "@/app/actions/document-taxonomy";
 import { ReorderButtons } from "@/components/ReorderButtons";
 import { EditableName } from "@/components/EditableName";
 import { useManageMode } from "@/components/ManageModeProvider";
+import { useTransition } from "react";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import type { DocumentCategory } from "@/lib/types";
 
 // Sits above the tab bar, visible only in management mode
@@ -15,6 +19,47 @@ import type { DocumentCategory } from "@/lib/types";
 // reordering. A panel also shows every category at once, which reordering needs
 // — you cannot put things in order that you cannot all see. The page itself
 // still shows one category at a time, unchanged.
+// Its text lives in the shared manage-mode state, not here, so leaving
+// management mode and coming back does not discard it (FR-025). The draft key is
+// distinct from any category id, so it cannot collide with a sub-group draft.
+const NEW_CATEGORY_DRAFT = "__new-category__";
+
+function AddCategoryForm() {
+  const { draft, setDraft, clearDraft } = useManageMode();
+  const [isPending, startTransition] = useTransition();
+  const value = draft(NEW_CATEGORY_DRAFT);
+
+  function handleAdd(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const trimmed = value.trim();
+    if (!trimmed) return;
+
+    startTransition(async () => {
+      const result = await createCategory({ nameTh: trimmed });
+      if (!result.ok) {
+        toast.error(result.error);
+        return;
+      }
+      clearDraft(NEW_CATEGORY_DRAFT);
+    });
+  }
+
+  return (
+    <form onSubmit={handleAdd} className="flex gap-2 pt-2">
+      <Input
+        placeholder="เพิ่มหมวดใหญ่ เช่น หมวดที่ 5 ..."
+        value={value}
+        onChange={(event) => setDraft(NEW_CATEGORY_DRAFT, event.target.value)}
+        disabled={isPending}
+        className="h-9 text-sm"
+      />
+      <Button type="submit" size="sm" disabled={isPending || !value.trim()}>
+        {isPending ? "กำลังเพิ่ม..." : "เพิ่ม"}
+      </Button>
+    </form>
+  );
+}
+
 export function CategoryManagePanel({
   categories,
   documentCounts,
@@ -53,6 +98,7 @@ export function CategoryManagePanel({
           </div>
         ))}
       </div>
+      <AddCategoryForm />
     </div>
   );
 }
