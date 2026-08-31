@@ -4,10 +4,11 @@ import { useOptimistic, useTransition } from "react";
 import Image from "next/image";
 import { ChevronDown, Download, ExternalLink, FileText, Share2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import type { Document, DocumentGroup } from "@/lib/types";
+import type { Document, DocumentCategory, DocumentGroup } from "@/lib/types";
 import { useManageMode } from "@/components/ManageModeProvider";
 import { createGroup, moveGroup, renameGroup } from "@/app/actions/document-taxonomy";
 import { ReorderButtons } from "@/components/ReorderButtons";
+import { DeleteTaxonomyDialog } from "@/components/DeleteTaxonomyDialog";
 import { EditableName } from "@/components/EditableName";
 import { publicFileUrl } from "@/lib/storage";
 import { fileKindFromName } from "@/lib/file-kind";
@@ -277,6 +278,7 @@ export function DocList({
   documents,
   documentGroups,
   allGroups,
+  categories,
   categoryId,
   categoryMoveOptions,
   canEdit,
@@ -285,6 +287,7 @@ export function DocList({
   documentGroups: DocumentGroup[];
   /** Every category's groups — the move picker spans all of them (FR-026). */
   allGroups: DocumentGroup[];
+  categories: DocumentCategory[];
   categoryId: string;
   categoryMoveOptions: CategoryMoveOption[];
   canEdit: boolean;
@@ -367,6 +370,12 @@ export function DocList({
                 isLast={groupIndex === groups.length - 1}
                 label={group.name}
                 onMove={(direction) => moveGroup({ id: group.id, direction })}
+              />
+              <DeleteTaxonomyDialog
+                target={{ kind: "group", id: group.id, name: group.name, categoryId }}
+                documentCount={group.docs.length}
+                categories={categories}
+                allGroups={allGroups}
               />
             </div>
           ) : (

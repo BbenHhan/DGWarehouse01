@@ -123,13 +123,13 @@ description: "Task list for Editable Document Taxonomy"
 
 **Independent test**: quickstart Scenario 7 — all four of its cases.
 
-- [ ] T043 [P] [US5] Add the `DocumentDisposition` schema to `lib/validation.ts`: `{ kind: "none" } | { kind: "move", toCategoryId, toGroupId } | { kind: "delete", confirmedCount }`. There is no default — every delete call must carry a decision
-- [ ] T044 [US5] Add `deleteGroup` and `deleteCategory` to `app/actions/document-taxonomy.ts` and `lib/local/store.ts`, enforcing the disposition rules **server-side, not in the UI**: `none` with documents present is refused with the real count; `move` re-parents first then removes; `delete` refuses unless `confirmedCount` matches the server's own count at call time; any refusal changes nothing at all (FR-011b)
-- [ ] T045 [US5] Deleting a category removes its sub-groups in the same action (FR-010) — the `on delete cascade` from T002 plus an explicit ordering so documents are re-parented or removed before their group is
-- [ ] T046 [US5] When the disposition is `delete`, remove the stored objects too, through the same storage layer `deleteDoc` already uses — deleting rows alone would orphan the files in Storage forever
-- [ ] T047 [US5] Create `components/DeleteTaxonomyDialog.tsx`: one confirmation when nothing holds files; the move-or-delete choice when something does, stating the count; a second confirmation naming the count when delete is chosen (FR-011a). Exclude the subtree being deleted from its own destination list (spec Edge Cases)
-- [ ] T048 [P] [US5] Extend the local-store tests: `none` refused when documents exist, `move` relocates every document and deletes nothing, `delete` with a stale `confirmedCount` is refused, a refusal leaves counts unchanged, deleting a category takes its groups
-- [ ] T049 [P] [US5] Create `components/DeleteTaxonomyDialog.test.tsx` in jsdom (following `RoomChecklistBox.test.tsx`): the second confirmation appears only for the delete path, dismissing either dialog calls no action, the count shown matches what is passed in
+- [X] T043 [P] [US5] Add the `DocumentDisposition` schema to `lib/validation.ts`: `{ kind: "none" } | { kind: "move", toCategoryId, toGroupId } | { kind: "delete", confirmedCount }`. There is no default — every delete call must carry a decision
+- [X] T044 [US5] Add `deleteGroup` and `deleteCategory` to `app/actions/document-taxonomy.ts` and `lib/local/store.ts`, enforcing the disposition rules **server-side, not in the UI**: `none` with documents present is refused with the real count; `move` re-parents first then removes; `delete` refuses unless `confirmedCount` matches the server's own count at call time; any refusal changes nothing at all (FR-011b)
+- [X] T045 [US5] Deleting a category removes its sub-groups in the same action (FR-010) — the `on delete cascade` from T002 plus an explicit ordering so documents are re-parented or removed before their group is
+- [X] T046 [US5] When the disposition is `delete`, remove the stored objects too, through the same storage layer `deleteDoc` already uses — deleting rows alone would orphan the files in Storage forever
+- [X] T047 [US5] Create `components/DeleteTaxonomyDialog.tsx`: one confirmation when nothing holds files; the move-or-delete choice when something does, stating the count; a second confirmation naming the count when delete is chosen (FR-011a). Exclude the subtree being deleted from its own destination list (spec Edge Cases)
+- [X] T048 [P] [US5] Extend the local-store tests: `none` refused when documents exist, `move` relocates every document and deletes nothing, `delete` with a stale `confirmedCount` is refused, a refusal leaves counts unchanged, deleting a category takes its groups
+- [X] T049 [P] [US5] Create `components/DeleteTaxonomyDialog.test.tsx` in jsdom (following `RoomChecklistBox.test.tsx`): the second confirmation appears only for the delete path, dismissing either dialog calls no action, the count shown matches what is passed in
 - [ ] T050 [US5] Run quickstart Scenario 7, all four cases, including confirming the stored file is gone after a destructive delete
 
 ---
@@ -184,6 +184,17 @@ Phases 2, 3, 5 and 6 are independent of each other and can be done in any order 
 ---
 
 ## Implementation log
+
+**Phase 7 landed (T043–T049).** The disposition is enforced in the Server
+Action, not the dialog: every refusal happens before anything is written, so a
+rejected delete leaves both the taxonomy and the documents untouched. A `delete`
+disposition whose `confirmedCount` no longer matches the server's own count is
+refused — if someone uploaded while the confirmation was open, the number the
+user agreed to was a lie.
+
+Storage objects are removed before their rows: a row without its file is a
+broken link someone can see and report, while a file without its row is
+invisible and orphaned forever.
 
 **Phase 6 landed (T038–T042).** A new category's slug is generated as
 `category-N`, N being the smallest positive integer not already taken, so a gap

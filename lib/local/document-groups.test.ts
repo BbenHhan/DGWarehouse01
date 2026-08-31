@@ -12,7 +12,11 @@ import {
   localRenameDocumentGroup,
   localResolveDocumentGroup,
   localSaveDocumentFile,
+  localCountDocumentsIn,
+  localDeleteDocumentCategory,
+  localDeleteDocumentsIn,
   localGetAllDocumentGroups,
+  localMoveDocumentsIn,
   localGetDocuments,
   localUpdateDocument,
 } from "@/lib/local/store";
@@ -427,5 +431,77 @@ describe("localCreateDocumentCategory", () => {
 
     expect(group).not.toBeNull();
     expect((await localGetDocumentGroups(created!.id)).map((g) => g.name_th)).toEqual(["กลุ่มแรก"]);
+  });
+});
+
+describe("the delete flow's building blocks", () => {
+  it("counts what is inside a group and inside a category", async () => {
+    const { catA } = categories();
+    const group = await localCreateDocumentGroup(catA, "นับ");
+    await localSaveDocumentFile(catA, group!.id, file("a.pdf"));
+    await localSaveDocumentFile(catA, group!.id, file("b.pdf"));
+    await localSaveDocumentFile(catA, null, file("c.pdf"));
+
+    expect(await localCountDocumentsIn({ groupId: group!.id })).toBe(2);
+    expect(await localCountDocumentsIn({ categoryId: catA })).toBe(3);
+  });
+
+  it("moves a whole group's documents to a destination without deleting any", async () => {
+    const { catA, catB } = categories();
+    const from = await localCreateDocumentGroup(catA, "ต้นทาง");
+    const to = await localCreateDocumentGroup(catB, "ปลายทาง");
+    await localSaveDocumentFile(catA, from!.id, file("a.pdf"));
+    await localSaveDocumentFile(catA, from!.id, file("b.pdf"));
+
+    const moved = await localMoveDocumentsIn({ groupId: from!.id }, catB, to!.id);
+
+    expect(moved).toBe(2);
+    expect(await localCountDocumentsIn({ groupId: from!.id })).toBe(0);
+    expect(await localCountDocumentsIn({ groupId: to!.id })).toBe(2);
+    // Nothing was destroyed — the documents still exist, elsewhere.
+    expect((await localGetDocuments(catB))).toHaveLength(2);
+  });
+
+  it("deletes a group's documents and their files when that is the chosen disposition", async () => {
+    const { catA } = categories();
+    const group = await localCreateDocumentGroup(catA, "จะลบพร้อมไฟล์");
+    await localSaveDocumentFile(catA, group!.id, file("a.pdf"));
+    await localSaveDocumentFile(catA, group!.id, file("b.pdf"));
+
+    const deleted = await localDeleteDocumentsIn({ groupId: group!.id });
+
+    expect(deleted).toBe(2);
+    expect(await localGetDocuments(catA)).toHaveLength(0);
+    // Only now can the group itself go.
+    expect(await localDeleteDocumentGroup(group!.id)).not.toBeNull();
+  });
+});
+
+describe("localDeleteDocumentCategory", () => {
+  it("takes the category's sub-groups with it in one action", async () => {
+    const created = await localCreateDocumentCategory(`หมวดจะลบ ${testId}`, "📁");
+    await localCreateDocumentGroup(created!.id, "กลุ่ม 1");
+    await localCreateDocumentGroup(created!.id, "กลุ่ม 2");
+
+    await localDeleteDocumentCategory(created!.id);
+
+    expect(await localGetDocumentGroups(created!.id)).toHaveLength(0);
+    expect((await localGetDocumentCategories()).map((c) => c.id)).not.toContain(created!.id);
+  });
+
+  it("refuses while documents remain, mirroring the SQL's on-delete-restrict", async () => {
+    const created = await localCreateDocumentCategory(`หมวดมีไฟล์ ${testId}`, "📁");
+    await localSaveDocumentFile(created!.id, null, file());
+
+    expect(await localDeleteDocumentCategory(created!.id)).toBeNull();
+    expect((await localGetDocumentCategories()).map((c) => c.id)).toContain(created!.id);
+  });
+
+  it("renumbers the remaining categories contiguously", async () => {
+    const created = await localCreateDocumentCategory(`หมวดชั่วคราว ${testId}`, "📁");
+    await localDeleteDocumentCategory(created!.id);
+
+    const remaining = await localGetDocumentCategories();
+    expect(remaining.map((c) => c.sort_order)).toEqual(remaining.map((_, i) => i + 1));
   });
 });

@@ -71,7 +71,11 @@ export default async function DocumentCategoryPage({
         </div>
       </div>
 
-      <CategoryManagePanel categories={categories} documentCounts={documentCounts} />
+      <CategoryManagePanel
+        categories={categories}
+        documentCounts={documentCounts}
+        allGroups={allGroups}
+      />
 
       <nav className="scroll-thin flex gap-2 overflow-x-auto pb-2">
         {categories.map((category) => (
@@ -95,6 +99,7 @@ export default async function DocumentCategoryPage({
           documents={documents}
           documentGroups={documentGroups}
           allGroups={allGroups}
+          categories={categories}
           categoryId={currentCategory.id}
           categoryMoveOptions={categoryMoveOptions}
           canEdit={userCanEdit}

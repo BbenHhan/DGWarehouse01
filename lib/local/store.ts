@@ -481,6 +481,72 @@ export async function localDeleteDocumentGroup(id: string): Promise<{ id: string
 // Resolve a freely typed group name to an id, creating the group if this
 // category has never seen it (FR-024). Shared by the upload path so a group
 // born at upload time is indistinguishable from one made in management mode.
+// Removes every document in a group or category, files included, then the
+// structure itself. Used only by the delete flow after the caller has confirmed
+// the count (specs/040-editable-document-taxonomy FR-011a).
+export async function localDeleteDocumentsIn(
+  scope: { groupId: string } | { categoryId: string }
+): Promise<number> {
+  const db = await loadDb();
+  const doomed = db.documents.filter((document) =>
+    "groupId" in scope ? document.group_id === scope.groupId : document.category_id === scope.categoryId
+  );
+  db.documents = db.documents.filter((document) => !doomed.includes(document));
+  await persist(db);
+  for (const document of doomed) {
+    await deleteUploadedFile(document.storage_path);
+  }
+  return doomed.length;
+}
+
+export async function localMoveDocumentsIn(
+  scope: { groupId: string } | { categoryId: string },
+  toCategoryId: string,
+  toGroupId: string | null
+): Promise<number | null> {
+  const db = await loadDb();
+  const moving = db.documents.filter((document) =>
+    "groupId" in scope ? document.group_id === scope.groupId : document.category_id === scope.categoryId
+  );
+  for (const document of moving) {
+    document.category_id = toCategoryId;
+    document.group_id = toGroupId;
+    document.updated_at = nowIso();
+  }
+  await persist(db);
+  return moving.length;
+}
+
+export async function localCountDocumentsIn(
+  scope: { groupId: string } | { categoryId: string }
+): Promise<number> {
+  const db = await loadDb();
+  return db.documents.filter((document) =>
+    "groupId" in scope ? document.group_id === scope.groupId : document.category_id === scope.categoryId
+  ).length;
+}
+
+// Deleting a category takes its groups with it in one action, so the editor is
+// not made to remove them one at a time first (FR-010). Documents must already
+// be gone or moved — the caller enforces that; this mirrors the SQL's
+// `on delete restrict` by refusing while any remain.
+export async function localDeleteDocumentCategory(id: string): Promise<{ id: string } | null> {
+  const db = await loadDb();
+  const index = db.documentCategories.findIndex((category) => category.id === id);
+  if (index === -1) return null;
+  if (db.documents.some((document) => document.category_id === id)) return null;
+
+  db.documentCategories.splice(index, 1);
+  db.documentGroups = db.documentGroups.filter((group) => group.category_id !== id);
+  db.documentCategories
+    .sort((a, b) => a.sort_order - b.sort_order)
+    .forEach((category, position) => {
+      category.sort_order = position + 1;
+    });
+  await persist(db);
+  return { id };
+}
+
 export async function localResolveDocumentGroup(categoryId: string, nameTh: string | null): Promise<string | null> {
   const trimmed = nameTh?.trim();
   if (!trimmed) return null;

@@ -5,6 +5,8 @@ import { createServiceClient, requireRole } from "@/lib/supabase/server";
 import {
   createCategorySchema,
   createGroupSchema,
+  deleteCategorySchema,
+  deleteGroupSchema,
   moveCategorySchema,
   moveGroupSchema,
   renameCategorySchema,
@@ -17,6 +19,11 @@ import {
   localMoveDocumentCategory,
   localMoveDocumentGroup,
   localRenameDocumentCategory,
+  localCountDocumentsIn,
+  localDeleteDocumentCategory,
+  localDeleteDocumentGroup,
+  localDeleteDocumentsIn,
+  localMoveDocumentsIn,
   localRenameDocumentGroup,
   nextCategorySlug,
 } from "@/lib/local/store";
@@ -342,4 +349,166 @@ export async function createCategory(input: {
 
   revalidateDocumentPaths();
   return { ok: true, data: category };
+}
+
+type DocumentDisposition =
+  | { kind: "none" }
+  | { kind: "move"; toCategoryId: string; toGroupId: string | null }
+  | { kind: "delete"; confirmedCount: number };
+
+// Applies the caller's decision about the documents inside something that is
+// about to be removed, and returns an error string if it must not proceed
+// (spec FR-011, FR-011a, FR-011b).
+//
+// Every refusal happens BEFORE anything is written, so a rejected delete leaves
+// the taxonomy and the documents exactly as they were — no partial delete, no
+// partial move.
+async function applyDisposition(
+  scope: { groupId: string } | { categoryId: string },
+  disposition: DocumentDisposition
+): Promise<string | null> {
+  const isLocal = DATA_SOURCE === "local";
+  const supabase = isLocal ? null : createServiceClient();
+
+  async function affected(): Promise<{ ids: string[]; paths: string[] }> {
+    if (isLocal) {
+      // The local store counts and deletes by scope directly; ids are only
+      // needed for the move path, handled below.
+      return { ids: [], paths: [] };
+    }
+    const query = supabase!.from("documents").select("id, storage_path");
+    const { data } = await ("groupId" in scope
+      ? query.eq("group_id", scope.groupId)
+      : query.eq("category_id", scope.categoryId));
+    return { ids: (data ?? []).map((row) => row.id), paths: (data ?? []).map((row) => row.storage_path) };
+  }
+
+  async function count(): Promise<number> {
+    if (isLocal) return localCountDocumentsIn(scope);
+    return (await affected()).ids.length;
+  }
+
+  if (disposition.kind === "none") {
+    const real = await count();
+    if (real > 0) {
+      return `ยังมีเอกสาร ${real} ไฟล์อยู่ข้างใน — เลือกก่อนว่าจะย้ายไปที่ไหน หรือจะลบไปพร้อมกัน`;
+    }
+    return null;
+  }
+
+  if (disposition.kind === "move") {
+    // Moving into the very thing being deleted would destroy the documents a
+    // moment later (spec Edge Cases). The UI does not offer it; the server
+    // refuses it too.
+    if ("categoryId" in scope && disposition.toCategoryId === scope.categoryId) {
+      return "เลือกปลายทางที่อยู่ในหมวดที่กำลังจะลบไม่ได้";
+    }
+    if ("groupId" in scope && disposition.toGroupId === scope.groupId) {
+      return "เลือกปลายทางเป็นหมวดย่อยที่กำลังจะลบไม่ได้";
+    }
+
+    if (isLocal) {
+      const db = await localCountDocumentsIn(scope);
+      if (db > 0) {
+        const moved = await localMoveDocumentsIn(scope, disposition.toCategoryId, disposition.toGroupId);
+        if (moved === null) return "ย้ายเอกสารไม่สำเร็จ";
+      }
+      return null;
+    }
+
+    const { ids } = await affected();
+    if (ids.length === 0) return null;
+    const { error } = await supabase!
+      .from("documents")
+      .update({ category_id: disposition.toCategoryId, group_id: disposition.toGroupId })
+      .in("id", ids);
+    return error ? error.message : null;
+  }
+
+  // kind === "delete"
+  const real = await count();
+  // The number the user agreed to must still be the number about to be
+  // destroyed. If someone uploaded in the meantime, the confirmation they saw
+  // was a lie, so refuse rather than destroy more than they agreed to.
+  if (real !== disposition.confirmedCount) {
+    return `จำนวนไฟล์เปลี่ยนไประหว่างยืนยัน (ตอนนี้ ${real} ไฟล์) — กรุณาลองใหม่อีกครั้ง`;
+  }
+  if (real === 0) return null;
+
+  if (isLocal) {
+    await localDeleteDocumentsIn(scope);
+    return null;
+  }
+
+  const { ids, paths } = await affected();
+  // Storage first: a row without its file is a broken link the user can see and
+  // report, while a file without its row is invisible and orphaned forever.
+  const { error: storageError } = await supabase!.storage.from("documents").remove(paths);
+  if (storageError) return storageError.message;
+  const { error } = await supabase!.from("documents").delete().in("id", ids);
+  return error ? error.message : null;
+}
+
+export async function deleteGroup(input: {
+  id: string;
+  documents: DocumentDisposition;
+}): Promise<ActionResult<{ id: string }>> {
+  const authError = await assertCanEdit();
+  if (authError) return { ok: false, error: authError };
+
+  const parsed = deleteGroupSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: "ข้อมูลไม่ถูกต้อง" };
+  const { id, documents } = parsed.data;
+
+  if (DATA_SOURCE === "mock") return { ok: false, error: "โหมดตัวอย่างแก้ไขข้อมูลไม่ได้" };
+
+  const problem = await applyDisposition({ groupId: id }, documents);
+  if (problem) return { ok: false, error: problem };
+
+  if (DATA_SOURCE === "local") {
+    const removed = await localDeleteDocumentGroup(id);
+    if (!removed) return { ok: false, error: "ลบหมวดย่อยไม่สำเร็จ" };
+    revalidateDocumentPaths();
+    return { ok: true, data: { id } };
+  }
+
+  const supabase = createServiceClient();
+  const { error } = await supabase.from("document_groups").delete().eq("id", id);
+  if (error) return { ok: false, error: error.message };
+
+  revalidateDocumentPaths();
+  return { ok: true, data: { id } };
+}
+
+export async function deleteCategory(input: {
+  id: string;
+  documents: DocumentDisposition;
+}): Promise<ActionResult<{ id: string }>> {
+  const authError = await assertCanEdit();
+  if (authError) return { ok: false, error: authError };
+
+  const parsed = deleteCategorySchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: "ข้อมูลไม่ถูกต้อง" };
+  const { id, documents } = parsed.data;
+
+  if (DATA_SOURCE === "mock") return { ok: false, error: "โหมดตัวอย่างแก้ไขข้อมูลไม่ได้" };
+
+  const problem = await applyDisposition({ categoryId: id }, documents);
+  if (problem) return { ok: false, error: problem };
+
+  if (DATA_SOURCE === "local") {
+    const removed = await localDeleteDocumentCategory(id);
+    if (!removed) return { ok: false, error: "ลบหมวดไม่สำเร็จ" };
+    revalidateDocumentPaths();
+    return { ok: true, data: { id } };
+  }
+
+  const supabase = createServiceClient();
+  // The category's groups go with it in one action (FR-010) — that is the
+  // `on delete cascade` on document_groups.category_id, so no separate sweep.
+  const { error } = await supabase.from("document_categories").delete().eq("id", id);
+  if (error) return { ok: false, error: error.message };
+
+  revalidateDocumentPaths();
+  return { ok: true, data: { id } };
 }

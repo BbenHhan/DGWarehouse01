@@ -2,13 +2,14 @@
 
 import { createCategory, moveCategory, renameCategory } from "@/app/actions/document-taxonomy";
 import { ReorderButtons } from "@/components/ReorderButtons";
+import { DeleteTaxonomyDialog } from "@/components/DeleteTaxonomyDialog";
 import { EditableName } from "@/components/EditableName";
 import { useManageMode } from "@/components/ManageModeProvider";
 import { useTransition } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import type { DocumentCategory } from "@/lib/types";
+import type { DocumentCategory, DocumentGroup } from "@/lib/types";
 
 // Sits above the tab bar, visible only in management mode
 // (specs/040-editable-document-taxonomy).
@@ -63,9 +64,11 @@ function AddCategoryForm() {
 export function CategoryManagePanel({
   categories,
   documentCounts,
+  allGroups,
 }: {
   categories: DocumentCategory[];
   documentCounts: Record<string, number>;
+  allGroups: DocumentGroup[];
 }) {
   const { managing } = useManageMode();
   if (!managing) return null;
@@ -94,6 +97,12 @@ export function CategoryManagePanel({
               isLast={index === categories.length - 1}
               label={category.name_th}
               onMove={(direction) => moveCategory({ id: category.id, direction })}
+            />
+            <DeleteTaxonomyDialog
+              target={{ kind: "category", id: category.id, name: category.name_th }}
+              documentCount={documentCounts[category.id] ?? 0}
+              categories={categories}
+              allGroups={allGroups}
             />
           </div>
         ))}

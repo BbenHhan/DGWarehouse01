@@ -218,3 +218,24 @@ export const createCategorySchema = z.object({
   nameTh: taxonomyName,
   emoji: z.string().trim().min(1, "กรุณาเลือกไอคอน").default("📁"),
 });
+
+// What becomes of the documents when the structure above them is removed
+// (spec FR-011). There is deliberately no default: every delete call has to
+// carry an explicit decision, so nothing can be destroyed as a side effect of
+// tidying up the taxonomy.
+export const documentDispositionSchema = z.discriminatedUnion("kind", [
+  // Asserts the target holds nothing. The server checks rather than trusting it.
+  z.object({ kind: z.literal("none") }),
+  z.object({
+    kind: z.literal("move"),
+    toCategoryId: foreignKeyId,
+    toGroupId: uuid.nullable(),
+  }),
+  // The count the user was shown and agreed to. The server compares it against
+  // its own before destroying anything, so FR-011a's "names the number to be
+  // destroyed" is a guarantee rather than a label.
+  z.object({ kind: z.literal("delete"), confirmedCount: z.number().int().nonnegative() }),
+]);
+
+export const deleteGroupSchema = z.object({ id: uuid, documents: documentDispositionSchema });
+export const deleteCategorySchema = z.object({ id: foreignKeyId, documents: documentDispositionSchema });
