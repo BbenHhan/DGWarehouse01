@@ -185,6 +185,13 @@ Phases 2, 3, 5 and 6 are independent of each other and can be done in any order 
 
 ## Implementation log
 
+**Bug found in acceptance, fixed.** Management mode switched itself off when
+you moved to another category. Switching category is a navigation between two
+`[categorySlug]` pages, and the provider holding the mode lived inside that page,
+so it unmounted every time — taking the unsubmitted add-field text with it. The
+provider moved to a new `app/(app)/documents/layout.tsx`, which is shared by
+every category and therefore stays mounted across those navigations.
+
 **Phase 8: what is left is what this environment cannot do.** T055 passes — 210
 tests, lint, `tsc --noEmit`, and a production build, run with the dev server
 stopped. T056 needed no change: README never described document groups.
