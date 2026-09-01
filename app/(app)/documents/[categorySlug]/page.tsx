@@ -68,11 +68,21 @@ export default async function DocumentCategoryPage({
           <p className="text-sm text-muted-foreground">รายการเอกสาร · {documents.length} ไฟล์</p>
         </div>
         <div className="ml-auto flex items-center gap-2">
+          {/* nativeButton={false} because this renders as a link rather than a
+              <button> — without it Base UI warns that native button semantics
+              have been removed. Same shape as DocList's "เปิดในแท็บใหม่". */}
           {!USE_MOCK_DATA && userCanEdit && (
-            <Button render={<Link href="/documents/upload" />} variant="outline" size="sm">
-              <Upload className="h-4 w-4" />
-              อัปโหลดหลายไฟล์
-            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              nativeButton={false}
+              render={
+                <Link href="/documents/upload">
+                  <Upload className="h-4 w-4" />
+                  อัปโหลดหลายไฟล์
+                </Link>
+              }
+            />
           )}
           <ManageModeToggle />
         </div>
