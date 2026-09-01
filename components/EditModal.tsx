@@ -36,17 +36,20 @@ export function EditModal({ kind, item, moveOptions, moveLabel, groups }: EditMo
   const [fileName, setFileName] = useState(item.file_name);
   const [note, setNote] = useState(kind === "photo" ? item.note ?? "" : "");
   const [groupId, setGroupId] = useState(kind === "document" ? item.group_id ?? NO_GROUP : NO_GROUP);
-  // `groups` carries every category's groups; which ones are offered follows
-  // whichever category is currently selected below, so moving a document to
-  // another category can still put it straight into one of that category's
-  // sub-groups (FR-026).
-  const groupsForDestination = groups?.filter((group) => group.category_id === moveTo) ?? [];
   const [date, setDate] = useState(kind === "photo" ? item.date : "");
   // Photos move between room/work-type pairs (composite "roomId::workTypeId"
   // value, specs/018-per-photo-dates); documents move between categories.
   const initialMoveTo = kind === "photo" ? `${item.room_id}::${item.work_type_id}` : item.category_id;
   const [moveTo, setMoveTo] = useState(initialMoveTo);
   const [isPending, startTransition] = useTransition();
+
+  // `groups` carries every category's groups; which ones are offered follows
+  // whichever destination category is currently selected, so moving a document
+  // to another category can still put it straight into one of that category's
+  // sub-groups (FR-026). Declared after `moveTo` — reading it above the
+  // useState that creates it is a temporal-dead-zone crash, which is exactly
+  // what this line did until a render test caught it.
+  const groupsForDestination = groups?.filter((group) => group.category_id === moveTo) ?? [];
 
   function handleSave() {
     const trimmedName = fileName.trim();

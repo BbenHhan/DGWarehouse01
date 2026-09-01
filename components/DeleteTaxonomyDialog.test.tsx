@@ -48,6 +48,19 @@ function renderDialog(
   );
 }
 
+// Base UI opens a Select's listbox through a portal on the next animation
+// frame. jsdom drives rAF off timers, so under a loaded parallel test run the
+// popup can take longer than findBy's default second to appear — which made
+// this file pass alone and fail intermittently in the full suite. Waiting
+// explicitly, and only ever clicking the trigger once, keeps it deterministic
+// without the retry-clicking that would toggle the popup shut again.
+const POPUP = { timeout: 5000 };
+
+async function openSelect(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(await screen.findByRole("combobox"));
+  await screen.findAllByRole("option", undefined, POPUP);
+}
+
 const GROUP_TARGET = { kind: "group", id: "grp-1", name: "กลุ่มใน 1", categoryId: "cat-1" } as const;
 const CATEGORY_TARGET = { kind: "category", id: "cat-1", name: "หมวดที่ 1" } as const;
 
@@ -103,8 +116,8 @@ describe("deleting something that holds documents", () => {
 
     renderDialog(GROUP_TARGET, 3);
     await user.click(screen.getByLabelText("ลบ กลุ่มใน 1"));
-    await user.click(await screen.findByRole("combobox"));
-    await user.click(await screen.findByRole("option", { name: /หมวดที่ 2/ }));
+    await openSelect(user);
+    await user.click(await screen.findByRole("option", { name: /หมวดที่ 2/ }, POPUP));
     await user.click(screen.getByRole("button", { name: /ย้าย 3 ไฟล์แล้วลบ/ }));
 
     await waitFor(() => {
@@ -176,7 +189,7 @@ describe("destinations inside the thing being deleted", () => {
     const user = userEvent.setup();
     renderDialog(CATEGORY_TARGET, 5);
     await user.click(screen.getByLabelText("ลบ หมวดที่ 1"));
-    await user.click(await screen.findByRole("combobox"));
+    await openSelect(user);
 
     expect(screen.queryByRole("option", { name: /หมวดที่ 1/ })).not.toBeInTheDocument();
     expect(screen.getByRole("option", { name: /หมวดที่ 2/ })).toBeInTheDocument();

@@ -309,7 +309,13 @@ export function DocList({
     });
   }
 
-  if (optimisticDocuments.length === 0) {
+  // The empty state is only correct when there is genuinely nothing to show —
+  // no documents AND no sub-groups. Before specs/040 those were the same
+  // condition, because a group could not exist without a document; now a
+  // category can be laid out in advance, and returning early on document count
+  // alone would hide every one of its topics. That is exactly the case
+  // หมวดที่ 4 ความปลอดภัย is in: 25 topics, no files yet.
+  if (optimisticDocuments.length === 0 && documentGroups.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-border bg-card/40 p-12 text-center text-muted-foreground">
         <FileText className="h-8 w-8 opacity-50" />
