@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { Upload } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { notFound } from "next/navigation";
 import {
   getDocumentCategories,
@@ -65,7 +67,13 @@ export default async function DocumentCategoryPage({
           </h1>
           <p className="text-sm text-muted-foreground">รายการเอกสาร · {documents.length} ไฟล์</p>
         </div>
-        <div className="ml-auto">
+        <div className="ml-auto flex items-center gap-2">
+          {!USE_MOCK_DATA && userCanEdit && (
+            <Button render={<Link href="/documents/upload" />} variant="outline" size="sm">
+              <Upload className="h-4 w-4" />
+              อัปโหลดหลายไฟล์
+            </Button>
+          )}
           <ManageModeToggle />
         </div>
       </div>
