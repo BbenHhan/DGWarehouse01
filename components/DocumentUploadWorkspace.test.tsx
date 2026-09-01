@@ -11,6 +11,12 @@ vi.mock("@/app/actions/documents", () => ({ uploadDoc: (...a: unknown[]) => uplo
 
 const toastError = vi.fn();
 const toastSuccess = vi.fn();
+// pdf.js is imported on demand and needs a worker; the scan itself is covered
+// by lib/document-suggest.test.ts, so here it is stubbed to whatever the test
+// wants the file to "contain".
+const extractPdfText = vi.fn(async () => "");
+vi.mock("@/lib/pdf-text", () => ({ extractPdfText: () => extractPdfText() }));
+
 vi.mock("sonner", () => ({
   toast: { error: (...a: unknown[]) => toastError(...a), success: (...a: unknown[]) => toastSuccess(...a) },
 }));
@@ -59,6 +65,7 @@ function dragChipToBin(chipIndex: number, binId: string) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  extractPdfText.mockResolvedValue("");
   // jsdom has no blob URL support; the tray creates one per file.
   if (!URL.createObjectURL) {
     Object.defineProperty(URL, "createObjectURL", { writable: true, value: () => "blob:mock" });
@@ -268,5 +275,62 @@ describe("looking inside a file before filing it", () => {
     dragChipToBin(0, "g-plan");
 
     await waitFor(() => expect(uploadDoc).toHaveBeenCalled());
+  });
+});
+
+describe("suggesting where a file belongs", () => {
+  it("offers the matching sub-group for a file whose name says what it is", async () => {
+    renderWorkspace();
+    dropIntoTray([file("แปลนห้องที่3.pdf")]);
+
+    expect(await screen.findByRole("button", { name: /แปลนและแบบก่อสร้าง/ })).toBeInTheDocument();
+  });
+
+  it("files the document straight into a suggestion when it is clicked", async () => {
+    const user = userEvent.setup();
+    renderWorkspace();
+    dropIntoTray([file("แปลนห้องที่3.pdf")]);
+
+    await user.click(await screen.findByRole("button", { name: /แปลนและแบบก่อสร้าง/ }));
+
+    await waitFor(() => expect(uploadDoc).toHaveBeenCalled());
+    expect(uploadDoc.mock.calls[0][1]).toBe("0. แปลนและแบบก่อสร้าง");
+  });
+
+  it("says nothing at all for a camera file name, instead of guessing", async () => {
+    renderWorkspace();
+    dropIntoTray([new File(["x"], "IMG_9769.JPG", { type: "image/jpeg" })]);
+
+    await waitFor(() => expect(screen.getAllByTestId("tray-file")).toHaveLength(1));
+    expect(screen.queryByText("น่าจะเป็น:")).not.toBeInTheDocument();
+  });
+
+  it("uses text read out of a PDF when the name gives nothing", async () => {
+    extractPdfText.mockResolvedValue("รายงานผลการตรวจสอบถังดับเพลิงประจำปี 2569");
+    renderWorkspace();
+    dropIntoTray([file("imgw-210162523.pdf")]);
+
+    // "imgw-210162523.pdf" says nothing; the content is what places it.
+    expect(await screen.findByRole("button", { name: /อุปกรณ์ดับเพลิง/ })).toBeInTheDocument();
+  });
+
+  it("says it is reading while the scan is still running", async () => {
+    let release: (text: string) => void = () => {};
+    extractPdfText.mockImplementation(() => new Promise((resolve) => { release = resolve; }));
+
+    renderWorkspace();
+    dropIntoTray([file("scan.pdf")]);
+
+    expect(await screen.findByText("กำลังอ่านเนื้อหาไฟล์...")).toBeInTheDocument();
+    release("");
+    await waitFor(() => expect(screen.queryByText("กำลังอ่านเนื้อหาไฟล์...")).not.toBeInTheDocument());
+  });
+
+  it("does not try to read anything out of an image", async () => {
+    renderWorkspace();
+    dropIntoTray([new File(["x"], "photo.jpg", { type: "image/jpeg" })]);
+
+    await waitFor(() => expect(screen.getAllByTestId("tray-file")).toHaveLength(1));
+    expect(extractPdfText).not.toHaveBeenCalled();
   });
 });

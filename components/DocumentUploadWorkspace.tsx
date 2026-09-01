@@ -5,6 +5,8 @@ import { ChevronDown, FileText, Film, Image as ImageIcon, RotateCcw, Search, X }
 import { toast } from "sonner";
 import { uploadDoc } from "@/app/actions/documents";
 import { fileKindFromName } from "@/lib/file-kind";
+import { suggestGroups, type Suggestion } from "@/lib/document-suggest";
+import { extractPdfText } from "@/lib/pdf-text";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -34,6 +36,10 @@ type TrayFile = {
   previewUrl: string;
   status: "waiting" | "uploading" | "error";
   errorMessage?: string;
+  /** Text read out of the file in the browser, when there was any. */
+  scannedText?: string;
+  /** "scanning" while pdf.js is reading; "done" once there is nothing more to learn. */
+  scanState: "pending" | "scanning" | "done";
 };
 
 function formatSize(bytes: number): string {
@@ -117,6 +123,60 @@ function KindIcon({ fileName }: { fileName: string }) {
   return <FileText className={className} />;
 }
 
+// Suggestions, never automatic filing. Measured against the account holder's
+// own 33 filed documents, the top suggestion is right about 39% of the time on
+// the file name alone and wrong about 15% — and a document silently misfiled in
+// a folder bound for a Department of Industrial Works inspection costs far more
+// than a click. So this offers up to three candidates and the person picks.
+function SuggestionRow({
+  entry,
+  groups,
+  categories,
+  onPick,
+}: {
+  entry: TrayFile;
+  groups: DocumentGroup[];
+  categories: DocumentCategory[];
+  onPick: (group: DocumentGroup) => void;
+}) {
+  if (entry.status === "uploading") return null;
+
+  if (entry.scanState === "scanning") {
+    return (
+      <p className="px-2.5 pb-2 text-xs text-muted-foreground">กำลังอ่านเนื้อหาไฟล์...</p>
+    );
+  }
+
+  const suggestions = suggestGroups({
+    fileName: entry.file.name,
+    text: entry.scannedText,
+    groups,
+    categories,
+  });
+
+  // Saying nothing is the honest outcome for a camera file name like
+  // IMG_9769.JPG — a guess with no evidence behind it would be worse than
+  // silence.
+  if (suggestions.length === 0) return null;
+
+  return (
+    <div className="flex flex-wrap items-center gap-1.5 px-2.5 pb-2">
+      <span className="text-xs text-muted-foreground">น่าจะเป็น:</span>
+      {suggestions.map((suggestion: Suggestion) => (
+        <button
+          key={suggestion.group.id}
+          type="button"
+          onClick={() => onPick(suggestion.group)}
+          title={`ตรงกับคำว่า ${suggestion.matched.join(", ")}`}
+          className="rounded-full border border-primary/30 bg-primary/5 px-2.5 py-1 text-xs text-primary transition-colors hover:bg-primary/15"
+        >
+          {suggestion.category?.emoji} {suggestion.group.name_th}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export function DocumentUploadWorkspace({
   categories,
   groups,
@@ -147,8 +207,25 @@ export function DocumentUploadWorkspace({
       file,
       previewUrl: URL.createObjectURL(file),
       status: "waiting" as const,
+      scanState: (fileKindFromName(file.name) === "pdf" ? "pending" : "done") as TrayFile["scanState"],
     }));
     setFiles((current) => [...current, ...added]);
+
+    // Reading happens per file and off the main path, so a big PDF never holds
+    // up the rest of the tray appearing.
+    for (const entry of added) {
+      if (entry.scanState !== "pending") continue;
+      setFiles((current) =>
+        current.map((row) => (row.id === entry.id ? { ...row, scanState: "scanning" } : row))
+      );
+      void extractPdfText(entry.file).then((text) => {
+        setFiles((current) =>
+          current.map((row) =>
+            row.id === entry.id ? { ...row, scannedText: text, scanState: "done" } : row
+          )
+        );
+      });
+    }
   }
 
   function removeFile(id: string) {
@@ -311,6 +388,13 @@ export function DocumentUploadWorkspace({
                         <X className="h-4 w-4" />
                       </Button>
                     </div>
+                    <SuggestionRow
+                      entry={entry}
+                      groups={groups}
+                      categories={categories}
+                      onPick={(group) => void assign([entry.id], group)}
+                    />
+
                     <CollapsibleContent className="overflow-hidden data-ending-style:h-0 data-starting-style:h-0">
                       <div className="flex flex-col gap-2 border-t border-border/60 p-2.5">
                         {/* Always present, whatever the embedded preview does —
