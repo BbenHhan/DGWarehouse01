@@ -37,6 +37,7 @@ export function DocUploader({
   // (specs/040-editable-document-taxonomy, FR-023).
   const groupNames = groups.map((group) => group.name_th);
   const [isPending, startTransition] = useTransition();
+  const [isDragging, setIsDragging] = useState(false);
 
   function handleFiles(fileList: FileList | null) {
     if (!fileList || fileList.length === 0) return;
@@ -58,6 +59,7 @@ export function DocUploader({
       }
       failed.forEach((f) => toast.error(`${f.fileName}: ${f.error}`));
 
+      // Clearing it means picking the same file again still fires onChange.
       if (inputRef.current) inputRef.current.value = "";
     });
   }
@@ -104,14 +106,41 @@ export function DocUploader({
           onChange={(e) => handleFiles(e.target.files)}
           disabled={isPending}
         />
-        <Button
-          type="button"
-          variant="outline"
-          disabled={isPending}
-          onClick={() => inputRef.current?.click()}
+        {/* Same drop-zone shape the photo bulk uploader already uses
+            (components/BulkUploadWorkspace.tsx) rather than a second pattern —
+            dragging files in works the same way in both modules, and the button
+            stays for phones, where there is nothing to drag from. */}
+        <div
+          data-testid="doc-drop-zone"
+          onDragOver={(event) => {
+            if (!event.dataTransfer.types.includes("Files")) return;
+            // Without preventDefault the browser navigates to the dropped file
+            // instead of letting the page handle it.
+            event.preventDefault();
+            if (!isPending) setIsDragging(true);
+          }}
+          onDragLeave={() => setIsDragging(false)}
+          onDrop={(event) => {
+            if (event.dataTransfer.files.length === 0) return;
+            event.preventDefault();
+            setIsDragging(false);
+            handleFiles(event.dataTransfer.files);
+          }}
+          className={[
+            "flex flex-col items-center gap-2 rounded-xl border border-dashed p-5 text-center text-sm transition-colors",
+            isDragging ? "border-primary bg-primary/5 text-foreground" : "border-border bg-card/30 text-muted-foreground",
+          ].join(" ")}
         >
-          {isPending ? "กำลังอัปโหลด..." : "+ เพิ่มไฟล์"}
-        </Button>
+          <p>{isDragging ? "วางไฟล์เพื่ออัปโหลด" : "ลากไฟล์มาวางที่นี่ หรือ"}</p>
+          <Button
+            type="button"
+            variant="outline"
+            disabled={isPending}
+            onClick={() => inputRef.current?.click()}
+          >
+            {isPending ? "กำลังอัปโหลด..." : "+ เพิ่มไฟล์"}
+          </Button>
+        </div>
       </div>
     </div>
   );
