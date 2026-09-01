@@ -59,6 +59,13 @@ function dragChipToBin(chipIndex: number, binId: string) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // jsdom has no blob URL support; the tray creates one per file.
+  if (!URL.createObjectURL) {
+    Object.defineProperty(URL, "createObjectURL", { writable: true, value: () => "blob:mock" });
+  }
+  if (!URL.revokeObjectURL) {
+    Object.defineProperty(URL, "revokeObjectURL", { writable: true, value: () => {} });
+  }
   uploadDoc.mockResolvedValue({ ok: true, data: { results: [{ fileName: "แปลนอาคาร.pdf", success: true }] } });
 });
 
@@ -177,5 +184,66 @@ describe("filtering the bins", () => {
     // g-plan (12 files, sort_order 1) before g-floor (1 file, sort_order 2).
     expect(names[0]).toContain("0. แปลนและแบบก่อสร้าง");
     expect(names[1]).toContain("1.1 งานพื้นอาคาร");
+  });
+});
+
+describe("looking inside a file before filing it", () => {
+  it("offers each tray file an expander, since the name alone often is not enough", () => {
+    renderWorkspace();
+    dropIntoTray([file("scan_0142.pdf")]);
+
+    expect(screen.getByLabelText("ดูเนื้อหา scan_0142.pdf")).toBeInTheDocument();
+  });
+
+  it("shows the file size next to the name", () => {
+    renderWorkspace();
+    dropIntoTray([new File(["x".repeat(2048)], "big.pdf", { type: "application/pdf" })]);
+
+    expect(screen.getByText("2 KB")).toBeInTheDocument();
+  });
+
+  it("renders a PDF in a frame when expanded", async () => {
+    const user = userEvent.setup();
+    renderWorkspace();
+    dropIntoTray([file("plan.pdf")]);
+
+    await user.click(screen.getByLabelText("ดูเนื้อหา plan.pdf"));
+
+    await waitFor(() => {
+      expect(document.querySelector('iframe[title="plan.pdf"]')).not.toBeNull();
+    });
+  });
+
+  it("renders an image when the file is one", async () => {
+    const user = userEvent.setup();
+    renderWorkspace();
+    dropIntoTray([new File(["x"], "photo.jpg", { type: "image/jpeg" })]);
+
+    await user.click(screen.getByLabelText("ดูเนื้อหา photo.jpg"));
+
+    await waitFor(() => {
+      expect(screen.getByAltText("photo.jpg")).toBeInTheDocument();
+    });
+  });
+
+  it("says plainly that a Word file cannot be previewed, rather than showing an empty panel", async () => {
+    const user = userEvent.setup();
+    renderWorkspace();
+    dropIntoTray([new File(["x"], "รายงาน.docx", { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" })]);
+
+    await user.click(screen.getByLabelText("ดูเนื้อหา รายงาน.docx"));
+
+    expect(await screen.findByText("ไฟล์ชนิดนี้ดูตัวอย่างในหน้าเว็บไม่ได้")).toBeInTheDocument();
+  });
+
+  it("still drags to a bin with the row expanded", async () => {
+    const user = userEvent.setup();
+    renderWorkspace();
+    dropIntoTray([file()]);
+    await user.click(screen.getByLabelText("ดูเนื้อหา แปลนอาคาร.pdf"));
+
+    dragChipToBin(0, "g-plan");
+
+    await waitFor(() => expect(uploadDoc).toHaveBeenCalled());
   });
 });

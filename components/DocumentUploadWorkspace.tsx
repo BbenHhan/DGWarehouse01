@@ -1,12 +1,13 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
-import { FileText, Film, Image as ImageIcon, RotateCcw, Search, X } from "lucide-react";
+import { ChevronDown, FileText, Film, Image as ImageIcon, RotateCcw, Search, X } from "lucide-react";
 import { toast } from "sonner";
 import { uploadDoc } from "@/app/actions/documents";
 import { fileKindFromName } from "@/lib/file-kind";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import type { DocumentCategory, DocumentGroup } from "@/lib/types";
 
 // The same sort-into-bins workflow the photo bulk uploader has: drop a pile of
@@ -28,9 +29,68 @@ import type { DocumentCategory, DocumentGroup } from "@/lib/types";
 type TrayFile = {
   id: string;
   file: File;
+  // A blob URL for the file sitting in the browser. Created when the file
+  // enters the tray and revoked when it leaves, so nothing is left dangling.
+  previewUrl: string;
   status: "waiting" | "uploading" | "error";
   errorMessage?: string;
 };
+
+function formatSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+// Files here have not been uploaded, so there is no backend URL to point
+// next/image at (Constitution III's rule is about rendering stored files) —
+// these render straight from the blob the browser already holds.
+function TrayPreview({ entry }: { entry: TrayFile }) {
+  const kind = fileKindFromName(entry.file.name);
+
+  if (kind === "image") {
+    return (
+      // A blob: URL for a file that has not been uploaded; next/image cannot
+      // load one, which is why this is a plain img.
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={entry.previewUrl}
+        alt={entry.file.name}
+        className="max-h-72 w-full rounded-lg bg-secondary/50 object-contain"
+      />
+    );
+  }
+
+  if (kind === "video") {
+    return <video src={entry.previewUrl} controls className="max-h-72 w-full rounded-lg bg-black" />;
+  }
+
+  if (kind === "pdf") {
+    return (
+      <iframe
+        src={entry.previewUrl}
+        title={entry.file.name}
+        className="h-[60vh] w-full rounded-lg border border-border/60"
+      />
+    );
+  }
+
+  // Word and Excel files cannot be shown inline. Saying so, with the details
+  // that are actually known, beats an empty panel that looks broken.
+  return (
+    <div className="flex flex-col items-center gap-2 rounded-lg bg-secondary/50 p-6 text-center text-sm text-muted-foreground">
+      <FileText className="h-8 w-8 opacity-60" />
+      <p>ไฟล์ชนิดนี้ดูตัวอย่างในหน้าเว็บไม่ได้</p>
+      <a
+        href={entry.previewUrl}
+        download={entry.file.name}
+        className="text-primary underline underline-offset-2"
+      >
+        เปิดด้วยโปรแกรมในเครื่อง
+      </a>
+    </div>
+  );
+}
 
 function KindIcon({ fileName }: { fileName: string }) {
   const kind = fileKindFromName(fileName);
@@ -68,13 +128,18 @@ export function DocumentUploadWorkspace({
     const added = Array.from(incoming).map((file) => ({
       id: `${file.name}-${file.size}-${crypto.randomUUID()}`,
       file,
+      previewUrl: URL.createObjectURL(file),
       status: "waiting" as const,
     }));
     setFiles((current) => [...current, ...added]);
   }
 
   function removeFile(id: string) {
-    setFiles((current) => current.filter((entry) => entry.id !== id));
+    setFiles((current) => {
+      const removed = current.find((entry) => entry.id === id);
+      if (removed) URL.revokeObjectURL(removed.previewUrl);
+      return current.filter((entry) => entry.id !== id);
+    });
   }
 
   // Uploading straight on drop, rather than collecting assignments and sending
@@ -119,6 +184,7 @@ export function DocumentUploadWorkspace({
 
     // A file that failed stays in the tray carrying its reason, so it can be
     // dropped again once the problem is fixed rather than silently vanishing.
+    for (const entry of succeeded) URL.revokeObjectURL(entry.previewUrl);
     setFiles((current) =>
       current
         .filter((entry) => !(ids.includes(entry.id) && !failed.has(entry.file.name)))
@@ -187,31 +253,53 @@ export function DocumentUploadWorkspace({
                   onDragStart={(event) => event.dataTransfer.setData("text/plain", entry.id)}
                   data-testid="tray-file"
                   className={[
-                    "flex items-center gap-2 rounded-xl border p-2.5 text-sm",
+                    "rounded-xl border text-sm",
                     entry.status === "error" ? "border-destructive/50 bg-destructive/5" : "border-border bg-card",
                     entry.status === "uploading" ? "opacity-60" : "cursor-grab",
                   ].join(" ")}
                 >
-                  <KindIcon fileName={entry.file.name} />
-                  <span className="min-w-0 flex-1 truncate">{entry.file.name}</span>
-                  {entry.status === "uploading" && (
-                    <span className="shrink-0 text-xs text-muted-foreground">กำลังอัปโหลด...</span>
-                  )}
-                  {entry.status === "error" && (
-                    <>
-                      <span className="shrink-0 text-xs text-destructive">{entry.errorMessage}</span>
-                      <RotateCcw className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
-                    </>
-                  )}
-                  <Button
-                    type="button"
-                    size="icon-sm"
-                    variant="ghost"
-                    aria-label={`เอา ${entry.file.name} ออกจากถาด`}
-                    onClick={() => removeFile(entry.id)}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
+                  {/* A file name alone often is not enough to know where it
+                      belongs — "scan_0142.pdf" tells you nothing. Expanding
+                      shows the file itself, straight from the browser, before
+                      it is filed anywhere. */}
+                  <Collapsible>
+                    <div className="flex items-center gap-2 p-2.5">
+                      <KindIcon fileName={entry.file.name} />
+                      <CollapsibleTrigger
+                        className="group flex min-w-0 flex-1 items-center gap-2 text-left"
+                        aria-label={`ดูเนื้อหา ${entry.file.name}`}
+                      >
+                        <span className="min-w-0 flex-1 truncate">{entry.file.name}</span>
+                        <span className="shrink-0 text-xs text-muted-foreground">
+                          {formatSize(entry.file.size)}
+                        </span>
+                        <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-data-panel-open:rotate-180" />
+                      </CollapsibleTrigger>
+                      {entry.status === "uploading" && (
+                        <span className="shrink-0 text-xs text-muted-foreground">กำลังอัปโหลด...</span>
+                      )}
+                      {entry.status === "error" && (
+                        <>
+                          <span className="shrink-0 text-xs text-destructive">{entry.errorMessage}</span>
+                          <RotateCcw className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+                        </>
+                      )}
+                      <Button
+                        type="button"
+                        size="icon-sm"
+                        variant="ghost"
+                        aria-label={`เอา ${entry.file.name} ออกจากถาด`}
+                        onClick={() => removeFile(entry.id)}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    <CollapsibleContent className="overflow-hidden data-ending-style:h-0 data-starting-style:h-0">
+                      <div className="border-t border-border/60 p-2.5">
+                        <TrayPreview entry={entry} />
+                      </div>
+                    </CollapsibleContent>
+                  </Collapsible>
                 </li>
               ))}
             </ul>
