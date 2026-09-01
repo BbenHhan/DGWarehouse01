@@ -67,11 +67,28 @@ function TrayPreview({ entry }: { entry: TrayFile }) {
 
   if (kind === "pdf") {
     return (
-      <iframe
-        src={entry.previewUrl}
-        title={entry.file.name}
+      // See the matching note in components/DocList.tsx: an <iframe> gives a
+      // blank rectangle and no escape when the browser would rather download a
+      // PDF than display it, which is a setting many people have on.
+      <object
+        data={entry.previewUrl}
+        type="application/pdf"
+        aria-label={entry.file.name}
         className="h-[60vh] w-full rounded-lg border border-border/60"
-      />
+      >
+        <div className="flex h-full flex-col items-center justify-center gap-2 rounded-lg bg-secondary/50 p-8 text-center text-sm text-muted-foreground">
+          <FileText className="h-8 w-8 opacity-60" />
+          <p>เบราว์เซอร์นี้แสดง PDF ในหน้าเว็บไม่ได้</p>
+          <a
+            href={entry.previewUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-primary underline underline-offset-2"
+          >
+            เปิดในแท็บใหม่
+          </a>
+        </div>
+      </object>
     );
   }
 
@@ -295,7 +312,18 @@ export function DocumentUploadWorkspace({
                       </Button>
                     </div>
                     <CollapsibleContent className="overflow-hidden data-ending-style:h-0 data-starting-style:h-0">
-                      <div className="border-t border-border/60 p-2.5">
+                      <div className="flex flex-col gap-2 border-t border-border/60 p-2.5">
+                        {/* Always present, whatever the embedded preview does —
+                            so a browser that refuses to render inline never
+                            leaves the file unviewable. */}
+                        <a
+                          href={entry.previewUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="self-start text-xs text-primary underline underline-offset-2"
+                        >
+                          เปิดไฟล์ในแท็บใหม่
+                        </a>
                         <TrayPreview entry={entry} />
                       </div>
                     </CollapsibleContent>

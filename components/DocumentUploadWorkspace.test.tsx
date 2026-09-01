@@ -202,7 +202,7 @@ describe("looking inside a file before filing it", () => {
     expect(screen.getByText("2 KB")).toBeInTheDocument();
   });
 
-  it("renders a PDF in a frame when expanded", async () => {
+  it("embeds a PDF when expanded", async () => {
     const user = userEvent.setup();
     renderWorkspace();
     dropIntoTray([file("plan.pdf")]);
@@ -210,8 +210,31 @@ describe("looking inside a file before filing it", () => {
     await user.click(screen.getByLabelText("ดูเนื้อหา plan.pdf"));
 
     await waitFor(() => {
-      expect(document.querySelector('iframe[title="plan.pdf"]')).not.toBeNull();
+      expect(document.querySelector('object[type="application/pdf"]')).not.toBeNull();
     });
+  });
+
+  it("carries a way out for browsers that will not render a PDF inline", async () => {
+    const user = userEvent.setup();
+    renderWorkspace();
+    dropIntoTray([file("plan.pdf")]);
+
+    await user.click(screen.getByLabelText("ดูเนื้อหา plan.pdf"));
+
+    // Inside the object tag, shown only when the browser declines to render.
+    expect(await screen.findByText("เบราว์เซอร์นี้แสดง PDF ในหน้าเว็บไม่ได้")).toBeInTheDocument();
+    // And one that is always visible, whatever the embed does.
+    expect(screen.getByText("เปิดไฟล์ในแท็บใหม่")).toBeInTheDocument();
+  });
+
+  it("gives every expanded file the open-in-new-tab escape, not just PDFs", async () => {
+    const user = userEvent.setup();
+    renderWorkspace();
+    dropIntoTray([new File(["x"], "รายงาน.docx", { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" })]);
+
+    await user.click(screen.getByLabelText("ดูเนื้อหา รายงาน.docx"));
+
+    expect(screen.getByText("เปิดไฟล์ในแท็บใหม่")).toBeInTheDocument();
   });
 
   it("renders an image when the file is one", async () => {

@@ -141,11 +141,30 @@ function DocumentPreview({ doc }: { doc: Document }) {
       )}
 
       {kind === "pdf" && (
-        <iframe
-          src={src}
-          title={doc.file_name}
+        // <object> rather than <iframe> so there is something to fall back to.
+        // A browser set to download PDFs instead of displaying them — a common
+        // Chrome setting, and Safari's behaviour for some embeds — renders an
+        // iframe as a blank rectangle with no way out. Everything inside the
+        // object tag shows only when the browser declines to render the PDF.
+        <object
+          data={src}
+          type="application/pdf"
+          aria-label={doc.file_name}
           className="h-[85vh] w-full rounded-lg border border-border/60"
-        />
+        >
+          <div className="flex h-full flex-col items-center justify-center gap-2 rounded-lg bg-secondary/50 p-8 text-center text-sm text-muted-foreground">
+            <FileText className="h-8 w-8 opacity-60" />
+            <p>เบราว์เซอร์นี้แสดง PDF ในหน้าเว็บไม่ได้</p>
+            <a
+              href={src}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-primary underline underline-offset-2"
+            >
+              เปิดในแท็บใหม่
+            </a>
+          </div>
+        </object>
       )}
 
       {kind === "other" && (
