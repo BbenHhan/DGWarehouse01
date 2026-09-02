@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/autocomplete";
 import { uploadDoc } from "@/app/actions/documents";
 import type { DocumentCategory, DocumentGroup } from "@/lib/types";
+import { useManageMode } from "@/components/ManageModeProvider";
 import { groupLabel } from "@/lib/taxonomy-label";
 
 // Group (note) selection at upload time (specs/025-document-upload-
@@ -33,6 +34,7 @@ export function DocUploader({
   groups: DocumentGroup[];
   category: DocumentCategory;
 }) {
+  const { managing } = useManageMode();
   const inputRef = useRef<HTMLInputElement>(null);
   const [note, setNote] = useState("");
   // Every group in THIS category, whether or not it holds files — the two
@@ -69,6 +71,11 @@ export function DocUploader({
       if (inputRef.current) inputRef.current.value = "";
     });
   }
+
+  // Adding files and reshaping the taxonomy are different jobs, and the upload
+  // box sitting between the tabs and the sub-group list was noise during the
+  // second one.
+  if (managing) return null;
 
   return (
     <div className="flex flex-col gap-2 rounded-2xl border border-border bg-card/40 p-3">

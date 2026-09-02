@@ -357,15 +357,21 @@ export function DocList({
 
   return (
     <div className="flex flex-col gap-3">
-      {isEmpty && (
+      {/* In management mode the add field comes first, under a heading, so it
+          is reachable without scrolling past every existing topic — หมวดที่ 4
+          has twenty-six of them. */}
+      {managing && (
+        <div className="flex flex-col gap-2 rounded-xl border border-primary/30 bg-card/40 p-3">
+          <p className="text-xs text-muted-foreground">หมวดย่อยของหมวดนี้</p>
+          <AddGroupForm categoryId={categoryId} />
+        </div>
+      )}
+
+      {isEmpty && !managing && (
         <div className="flex flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-border bg-card/40 p-12 text-center text-muted-foreground">
           <FileText className="h-8 w-8 opacity-50" />
-          <p className="font-medium">
-            {managing ? "หมวดนี้ยังว่าง เพิ่มหมวดย่อยแรกด้านล่าง" : "ยังไม่มีเอกสารในหมวดนี้"}
-          </p>
-          {!managing && !USE_MOCK_DATA && canEdit && (
-            <p className="text-sm">อัปโหลดเอกสารแรกของคุณด้านล่าง</p>
-          )}
+          <p className="font-medium">ยังไม่มีเอกสารในหมวดนี้</p>
+          {!USE_MOCK_DATA && canEdit && <p className="text-sm">อัปโหลดเอกสารแรกของคุณด้านล่าง</p>}
         </div>
       )}
 
@@ -442,8 +448,6 @@ export function DocList({
           </CollapsibleContent>
         </Collapsible>
       ))}
-
-      {managing && <AddGroupForm categoryId={categoryId} />}
     </div>
   );
 }

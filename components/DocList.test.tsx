@@ -161,7 +161,54 @@ describe("a category that is completely empty", () => {
     expect(screen.getByPlaceholderText(/เพิ่มหมวดย่อย/)).toBeInTheDocument();
   });
 
-  it("tells an editor in management mode what to do next", async () => {
+  it("puts the add field above the topics, not below all of them", async () => {
+    const user = userEvent.setup();
+    render(
+      <ManageModeProvider canManage>
+        <ManageModeToggle />
+        <DocList
+          documents={[]}
+          documentGroups={[group(1, "หนึ่ง"), group(2, "สอง"), group(3, "สาม")]}
+          allGroups={[]}
+          categories={CATEGORIES}
+          categoryId={CATEGORY_ID}
+          categoryMoveOptions={[]}
+          canEdit
+        />
+      </ManageModeProvider>
+    );
+    await user.click(screen.getByRole("button", { name: /จัดการหมวด/ }));
+
+    // Reaching it must not mean scrolling past every existing topic.
+    const field = screen.getByPlaceholderText(/เพิ่มหมวดย่อย/);
+    // In management mode a group's name is an editable input, so it is found by
+    // its label rather than by its text.
+    const firstGroup = screen.getByLabelText("ชื่อหมวดย่อย หนึ่ง");
+    expect(field.compareDocumentPosition(firstGroup) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("heads the management section so it reads as one thing", async () => {
+    const user = userEvent.setup();
+    render(
+      <ManageModeProvider canManage>
+        <ManageModeToggle />
+        <DocList
+          documents={[]}
+          documentGroups={[]}
+          allGroups={[]}
+          categories={CATEGORIES}
+          categoryId={CATEGORY_ID}
+          categoryMoveOptions={[]}
+          canEdit
+        />
+      </ManageModeProvider>
+    );
+    await user.click(screen.getByRole("button", { name: /จัดการหมวด/ }));
+
+    expect(screen.getByText("หมวดย่อยของหมวดนี้")).toBeInTheDocument();
+  });
+
+  it("drops the browse empty state while managing, since the form says it all", async () => {
     const user = userEvent.setup();
     render(
       <ManageModeProvider canManage>
@@ -180,7 +227,8 @@ describe("a category that is completely empty", () => {
 
     expect(screen.getByText("ยังไม่มีเอกสารในหมวดนี้")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: /จัดการหมวด/ }));
-    expect(screen.getByText("หมวดนี้ยังว่าง เพิ่มหมวดย่อยแรกด้านล่าง")).toBeInTheDocument();
+    expect(screen.queryByText("ยังไม่มีเอกสารในหมวดนี้")).not.toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/เพิ่มหมวดย่อย/)).toBeInTheDocument();
   });
 
   it("keeps the plain empty state for someone not managing", () => {
