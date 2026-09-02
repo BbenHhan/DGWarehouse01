@@ -3,6 +3,7 @@
 import { useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import {
   Autocomplete,
   AutocompleteInput,
@@ -151,7 +152,14 @@ export function DocUploader({
             disabled={isPending}
             onClick={() => inputRef.current?.click()}
           >
-            {isPending ? "กำลังอัปโหลด..." : "+ เพิ่มไฟล์"}
+            {isPending ? (
+          <>
+            <Spinner />
+            กำลังอัปโหลด...
+          </>
+        ) : (
+          "+ เพิ่มไฟล์"
+        )}
           </Button>
         </div>
       </div>

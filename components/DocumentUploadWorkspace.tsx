@@ -9,6 +9,7 @@ import { suggestGroups, type Suggestion } from "@/lib/document-suggest";
 import { categoryNumber, groupNumber } from "@/lib/taxonomy-label";
 import { extractPdfText } from "@/lib/pdf-text";
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import { Input } from "@/components/ui/input";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import type { DocumentCategory, DocumentGroup } from "@/lib/types";
@@ -144,7 +145,10 @@ function SuggestionRow({
 
   if (entry.scanState === "scanning") {
     return (
-      <p className="px-2.5 pb-2 text-xs text-muted-foreground">กำลังอ่านเนื้อหาไฟล์...</p>
+      <p className="flex items-center gap-1.5 px-2.5 pb-2 text-xs text-muted-foreground">
+        <Spinner className="h-3.5 w-3.5" />
+        กำลังอ่านเนื้อหาไฟล์...
+      </p>
     );
   }
 
@@ -371,7 +375,10 @@ export function DocumentUploadWorkspace({
                         <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-data-panel-open:rotate-180" />
                       </CollapsibleTrigger>
                       {entry.status === "uploading" && (
-                        <span className="shrink-0 text-xs text-muted-foreground">กำลังอัปโหลด...</span>
+                        <span className="flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground">
+                          <Spinner className="h-3.5 w-3.5" />
+                          กำลังอัปโหลด...
+                        </span>
                       )}
                       {entry.status === "error" && (
                         <>

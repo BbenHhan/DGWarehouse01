@@ -10,6 +10,7 @@ import { useManageMode } from "@/components/ManageModeProvider";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import { Input } from "@/components/ui/input";
 import type { DocumentCategory, DocumentGroup } from "@/lib/types";
 
@@ -61,7 +62,14 @@ function AddCategoryForm() {
         className="h-9 text-sm"
       />
       <Button type="submit" size="sm" disabled={isPending || !value.trim()}>
-        {isPending ? "กำลังเพิ่ม..." : "เพิ่ม"}
+        {isPending ? (
+          <>
+            <Spinner />
+            กำลังเพิ่ม...
+          </>
+        ) : (
+          "เพิ่ม"
+        )}
       </Button>
     </form>
   );

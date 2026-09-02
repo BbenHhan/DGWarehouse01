@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { Pencil } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -218,7 +219,14 @@ export function EditModal({ kind, item, moveOptions, moveLabel, groups, categori
             ยกเลิก
           </Button>
           <Button type="button" onClick={handleSave} disabled={isPending}>
-            {isPending ? "กำลังบันทึก..." : "บันทึก"}
+            {isPending ? (
+          <>
+            <Spinner />
+            กำลังบันทึก...
+          </>
+        ) : (
+          "บันทึก"
+        )}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -5,6 +5,7 @@ import { Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { deleteCategory, deleteGroup } from "@/app/actions/document-taxonomy";
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import {
   Dialog,
   DialogContent,
@@ -118,7 +119,14 @@ export function DeleteTaxonomyDialog({
                 ยกเลิก
               </Button>
               <Button type="button" onClick={() => run({ kind: "none" })} disabled={isPending}>
-                {isPending ? "กำลังลบ..." : "ลบ"}
+                {isPending ? (
+                  <>
+                    <Spinner />
+                    กำลังลบ...
+                  </>
+                ) : (
+                  "ลบ"
+                )}
               </Button>
             </DialogFooter>
           </>
@@ -137,7 +145,14 @@ export function DeleteTaxonomyDialog({
                 disabled={isPending}
                 onClick={() => run({ kind: "delete", confirmedCount: documentCount })}
               >
-                {isPending ? "กำลังลบ..." : `ลบ ${documentCount} ไฟล์`}
+                {isPending ? (
+                  <>
+                    <Spinner />
+                    กำลังลบ...
+                  </>
+                ) : (
+                  `ลบ ${documentCount} ไฟล์`
+                )}
               </Button>
             </DialogFooter>
           </>
@@ -211,7 +226,14 @@ export function DeleteTaxonomyDialog({
                   })
                 }
               >
-                {isPending ? "กำลังย้าย..." : `ย้าย ${documentCount} ไฟล์แล้วลบ`}
+                {isPending ? (
+                  <>
+                    <Spinner />
+                    กำลังย้าย...
+                  </>
+                ) : (
+                  `ย้าย ${documentCount} ไฟล์แล้วลบ`
+                )}
               </Button>
             </DialogFooter>
           </>

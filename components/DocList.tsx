@@ -14,6 +14,7 @@ import { groupNumber } from "@/lib/taxonomy-label";
 import { publicFileUrl } from "@/lib/storage";
 import { fileKindFromName } from "@/lib/file-kind";
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import { Input } from "@/components/ui/input";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
@@ -291,7 +292,14 @@ function AddGroupForm({ categoryId }: { categoryId: string }) {
         className="h-9 text-sm"
       />
       <Button type="submit" size="sm" disabled={isPending || !value.trim()}>
-        {isPending ? "กำลังเพิ่ม..." : "เพิ่ม"}
+        {isPending ? (
+          <>
+            <Spinner />
+            กำลังเพิ่ม...
+          </>
+        ) : (
+          "เพิ่ม"
+        )}
       </Button>
     </form>
   );
