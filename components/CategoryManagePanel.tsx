@@ -4,8 +4,9 @@ import { createCategory, moveCategory, renameCategory } from "@/app/actions/docu
 import { ReorderButtons } from "@/components/ReorderButtons";
 import { DeleteTaxonomyDialog } from "@/components/DeleteTaxonomyDialog";
 import { EditableName } from "@/components/EditableName";
+import { CATEGORY_EMOJI, EmojiPicker } from "@/components/EmojiPicker";
 import { useManageMode } from "@/components/ManageModeProvider";
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,6 +29,9 @@ const NEW_CATEGORY_DRAFT = "__new-category__";
 function AddCategoryForm() {
   const { draft, setDraft, clearDraft } = useManageMode();
   const [isPending, startTransition] = useTransition();
+  // Starts on a different icon each time rather than always the same folder, so
+  // a run of new categories does not end up looking identical in the tab bar.
+  const [emoji, setEmoji] = useState(CATEGORY_EMOJI[0]);
   const value = draft(NEW_CATEGORY_DRAFT);
 
   function handleAdd(event: React.FormEvent<HTMLFormElement>) {
@@ -36,7 +40,7 @@ function AddCategoryForm() {
     if (!trimmed) return;
 
     startTransition(async () => {
-      const result = await createCategory({ nameTh: trimmed });
+      const result = await createCategory({ nameTh: trimmed, emoji });
       if (!result.ok) {
         toast.error(result.error);
         return;
@@ -47,6 +51,7 @@ function AddCategoryForm() {
 
   return (
     <form onSubmit={handleAdd} className="flex gap-2 pt-2">
+      <EmojiPicker value={emoji} onChange={setEmoji} ariaLabel="เลือกไอคอนของหมวดใหม่" />
       <Input
         placeholder="เพิ่มหมวดใหญ่ เช่น หมวดที่ 5 ..."
         value={value}
@@ -82,7 +87,11 @@ export function CategoryManagePanel({
             key={category.id}
             className="flex items-center gap-2 border-b border-border/60 py-1.5 last:border-b-0"
           >
-            <span className="shrink-0 text-base leading-none">{category.emoji}</span>
+            <EmojiPicker
+              value={category.emoji}
+              ariaLabel={`เปลี่ยนไอคอนของ ${category.name_th}`}
+              onChange={(emoji) => void renameCategory({ id: category.id, emoji })}
+            />
             <EditableName
               value={category.name_th}
               ariaLabel={`ชื่อหมวด ${category.name_th}`}

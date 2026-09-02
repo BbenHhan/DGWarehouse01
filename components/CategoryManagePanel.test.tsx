@@ -7,9 +7,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { DocumentCategory, DocumentGroup } from "@/lib/types";
 
 const createCategory = vi.fn();
+const renameCategory = vi.fn();
 vi.mock("@/app/actions/document-taxonomy", () => ({
   createCategory: (...a: unknown[]) => createCategory(...a),
-  renameCategory: vi.fn(),
+  renameCategory: (...a: unknown[]) => renameCategory(...a),
   moveCategory: vi.fn(),
   deleteCategory: vi.fn(),
   deleteGroup: vi.fn(),
@@ -72,7 +73,7 @@ describe("finding the add-category control", () => {
     expect(screen.getByRole("button", { name: "เพิ่ม" })).toBeEnabled();
   });
 
-  it("creates the category with the typed name", async () => {
+  it("creates the category with the typed name and the chosen icon", async () => {
     const user = userEvent.setup();
     renderPanel();
     await user.click(screen.getByRole("button", { name: /จัดการหมวด/ }));
@@ -80,7 +81,44 @@ describe("finding the add-category control", () => {
     await user.type(screen.getByPlaceholderText(/เพิ่มหมวดใหญ่/), "หมวดที่ 6 เอกสารอื่น");
     await user.click(screen.getByRole("button", { name: "เพิ่ม" }));
 
-    expect(createCategory).toHaveBeenCalledWith({ nameTh: "หมวดที่ 6 เอกสารอื่น" });
+    expect(createCategory).toHaveBeenCalledWith({
+      nameTh: "หมวดที่ 6 เอกสารอื่น",
+      emoji: expect.any(String),
+    });
+  });
+
+  it("offers an icon to pick for a new category, instead of one default for all", async () => {
+    const user = userEvent.setup();
+    renderPanel();
+    await user.click(screen.getByRole("button", { name: /จัดการหมวด/ }));
+
+    await user.click(screen.getByLabelText("เลือกไอคอนของหมวดใหม่"));
+    expect(await screen.findByLabelText("🦺")).toBeInTheDocument();
+    expect(screen.getByLabelText("🧯")).toBeInTheDocument();
+  });
+
+  it("creates with whichever icon was picked", async () => {
+    const user = userEvent.setup();
+    renderPanel();
+    await user.click(screen.getByRole("button", { name: /จัดการหมวด/ }));
+
+    await user.click(screen.getByLabelText("เลือกไอคอนของหมวดใหม่"));
+    await user.click(await screen.findByLabelText("🧯"));
+    await user.type(screen.getByPlaceholderText(/เพิ่มหมวดใหญ่/), "หมวดดับเพลิง");
+    await user.click(screen.getByRole("button", { name: "เพิ่ม" }));
+
+    expect(createCategory).toHaveBeenCalledWith({ nameTh: "หมวดดับเพลิง", emoji: "🧯" });
+  });
+
+  it("lets an existing category's icon be changed on the spot", async () => {
+    const user = userEvent.setup();
+    renderPanel();
+    await user.click(screen.getByRole("button", { name: /จัดการหมวด/ }));
+
+    await user.click(screen.getByLabelText("เปลี่ยนไอคอนของ หมวดที่ 1 โครงสร้างอาคาร"));
+    await user.click(await screen.findByLabelText("🧱"));
+
+    expect(renameCategory).toHaveBeenCalledWith({ id: "c1", emoji: "🧱" });
   });
 
   it("shows each category's file count, so a delete can be judged", async () => {
