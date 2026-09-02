@@ -2,6 +2,7 @@
 import "../vitest.setup.dom";
 
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import type { Document, DocumentCategory, DocumentGroup } from "@/lib/types";
 
@@ -17,6 +18,7 @@ vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 vi.mock("@/lib/storage", () => ({ publicFileUrl: () => "https://example.test/file" }));
 
 const { DocList } = await import("@/components/DocList");
+const { ManageModeProvider, ManageModeToggle } = await import("@/components/ManageModeProvider");
 
 const CATEGORY_ID = "cat-safety";
 const CATEGORIES: DocumentCategory[] = [
@@ -131,5 +133,59 @@ describe("every sub-group reaches the page, files or not", () => {
 
     expect(screen.getByText("2 ไฟล์")).toBeInTheDocument();
     expect(screen.getByText("1 ไฟล์")).toBeInTheDocument();
+  });
+});
+
+describe("a category that is completely empty", () => {
+  it("still offers the add-sub-group form once management mode is on", async () => {
+    const user = userEvent.setup();
+    render(
+      <ManageModeProvider canManage>
+        <ManageModeToggle />
+        <DocList
+          documents={[]}
+          documentGroups={[]}
+          allGroups={[]}
+          categories={CATEGORIES}
+          categoryId={CATEGORY_ID}
+          categoryMoveOptions={[]}
+          canEdit
+        />
+      </ManageModeProvider>
+    );
+
+    await user.click(screen.getByRole("button", { name: /จัดการหมวด/ }));
+
+    // A category has no documents and no groups the moment it is created —
+    // if the empty state short-circuits, it can never be given a first topic.
+    expect(screen.getByPlaceholderText(/เพิ่มหมวดย่อย/)).toBeInTheDocument();
+  });
+
+  it("tells an editor in management mode what to do next", async () => {
+    const user = userEvent.setup();
+    render(
+      <ManageModeProvider canManage>
+        <ManageModeToggle />
+        <DocList
+          documents={[]}
+          documentGroups={[]}
+          allGroups={[]}
+          categories={CATEGORIES}
+          categoryId={CATEGORY_ID}
+          categoryMoveOptions={[]}
+          canEdit
+        />
+      </ManageModeProvider>
+    );
+
+    expect(screen.getByText("ยังไม่มีเอกสารในหมวดนี้")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /จัดการหมวด/ }));
+    expect(screen.getByText("หมวดนี้ยังว่าง เพิ่มหมวดย่อยแรกด้านล่าง")).toBeInTheDocument();
+  });
+
+  it("keeps the plain empty state for someone not managing", () => {
+    renderList([], []);
+    expect(screen.getByText("ยังไม่มีเอกสารในหมวดนี้")).toBeInTheDocument();
+    expect(screen.queryByPlaceholderText(/เพิ่มหมวดย่อย/)).not.toBeInTheDocument();
   });
 });

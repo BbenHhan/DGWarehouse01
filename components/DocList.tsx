@@ -332,21 +332,12 @@ export function DocList({
     });
   }
 
-  // The empty state is only correct when there is genuinely nothing to show —
-  // no documents AND no sub-groups. Before specs/040 those were the same
-  // condition, because a group could not exist without a document; now a
-  // category can be laid out in advance, and returning early on document count
-  // alone would hide every one of its topics. That is exactly the case
-  // หมวดที่ 4 ความปลอดภัย is in: 25 topics, no files yet.
-  if (optimisticDocuments.length === 0 && documentGroups.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-border bg-card/40 p-12 text-center text-muted-foreground">
-        <FileText className="h-8 w-8 opacity-50" />
-        <p className="font-medium">ยังไม่มีเอกสารในหมวดนี้</p>
-        {!USE_MOCK_DATA && canEdit && <p className="text-sm">อัปโหลดเอกสารแรกของคุณด้านล่าง</p>}
-      </div>
-    );
-  }
+  // Nothing to show at all: no documents and no sub-groups. Deliberately not an
+  // early return — the add-sub-group form lives at the end of this component,
+  // and returning here meant a brand-new category could never be given its
+  // first topic, which is exactly the state a category is in the moment it is
+  // created.
+  const isEmpty = optimisticDocuments.length === 0 && documentGroups.length === 0;
 
   // Groups come from the taxonomy now, not from scanning the documents
   // (specs/040-editable-document-taxonomy). That is what lets a group with no
@@ -366,6 +357,18 @@ export function DocList({
 
   return (
     <div className="flex flex-col gap-3">
+      {isEmpty && (
+        <div className="flex flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-border bg-card/40 p-12 text-center text-muted-foreground">
+          <FileText className="h-8 w-8 opacity-50" />
+          <p className="font-medium">
+            {managing ? "หมวดนี้ยังว่าง เพิ่มหมวดย่อยแรกด้านล่าง" : "ยังไม่มีเอกสารในหมวดนี้"}
+          </p>
+          {!managing && !USE_MOCK_DATA && canEdit && (
+            <p className="text-sm">อัปโหลดเอกสารแรกของคุณด้านล่าง</p>
+          )}
+        </div>
+      )}
+
       {ungrouped.length > 0 && (
         <div className="space-y-2">
           {ungrouped.map((doc) => (
