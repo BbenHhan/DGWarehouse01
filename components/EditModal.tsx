@@ -17,13 +17,29 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { editPhoto } from "@/app/actions/photos";
 import { editDoc } from "@/app/actions/documents";
-import type { Document, DocumentGroup, Photo } from "@/lib/types";
+import type { Document, DocumentCategory, DocumentGroup, Photo } from "@/lib/types";
+import { groupNumber } from "@/lib/taxonomy-label";
 
 type MoveOption = { value: string; label: string };
 
 type EditModalProps =
-  | { kind: "photo"; item: Photo; moveOptions: MoveOption[]; moveLabel: string; groups?: undefined }
-  | { kind: "document"; item: Document; moveOptions: MoveOption[]; moveLabel: string; groups: DocumentGroup[] };
+  | {
+      kind: "photo";
+      item: Photo;
+      moveOptions: MoveOption[];
+      moveLabel: string;
+      groups?: undefined;
+      categories?: undefined;
+    }
+  | {
+      kind: "document";
+      item: Document;
+      moveOptions: MoveOption[];
+      moveLabel: string;
+      groups: DocumentGroup[];
+      /** Needed only to number the groups the way the rest of the app does. */
+      categories: DocumentCategory[];
+    };
 
 // A photo's `note` is a free-text caption and stays exactly as it was. A
 // document's grouping is no longer text at all — it is a reference to a real
@@ -31,7 +47,7 @@ type EditModalProps =
 // a picker over this category's groups instead of a textarea.
 const NO_GROUP = "__none__";
 
-export function EditModal({ kind, item, moveOptions, moveLabel, groups }: EditModalProps) {
+export function EditModal({ kind, item, moveOptions, moveLabel, groups, categories }: EditModalProps) {
   const [open, setOpen] = useState(false);
   const [fileName, setFileName] = useState(item.file_name);
   const [note, setNote] = useState(kind === "photo" ? item.note ?? "" : "");
@@ -50,6 +66,8 @@ export function EditModal({ kind, item, moveOptions, moveLabel, groups }: EditMo
   // useState that creates it is a temporal-dead-zone crash, which is exactly
   // what this line did until a render test caught it.
   const groupsForDestination = groups?.filter((group) => group.category_id === moveTo) ?? [];
+  const destinationOrder = categories?.find((category) => category.id === moveTo)?.sort_order;
+  const labelFor = (group: DocumentGroup) => `${groupNumber(group, destinationOrder)} ${group.name_th}`;
 
   function handleSave() {
     const trimmedName = fileName.trim();
@@ -145,7 +163,10 @@ export function EditModal({ kind, item, moveOptions, moveLabel, groups }: EditMo
                 <SelectTrigger className="w-full">
                   <SelectValue>
                     {(value: string | null) =>
-                      groupsForDestination.find((group) => group.id === value)?.name_th ?? "ไม่มีหมวดย่อย"
+                      (() => {
+                        const found = groupsForDestination.find((group) => group.id === value);
+                        return found ? labelFor(found) : "ไม่มีหมวดย่อย";
+                      })()
                     }
                   </SelectValue>
                 </SelectTrigger>
@@ -153,7 +174,7 @@ export function EditModal({ kind, item, moveOptions, moveLabel, groups }: EditMo
                   <SelectItem value={NO_GROUP}>ไม่มีหมวดย่อย</SelectItem>
                   {groupsForDestination.map((group) => (
                     <SelectItem key={group.id} value={group.id}>
-                      {group.name_th}
+                      {labelFor(group)}
                     </SelectItem>
                   ))}
                 </SelectContent>

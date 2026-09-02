@@ -10,6 +10,7 @@ import { createGroup, moveGroup, renameGroup } from "@/app/actions/document-taxo
 import { ReorderButtons } from "@/components/ReorderButtons";
 import { DeleteTaxonomyDialog } from "@/components/DeleteTaxonomyDialog";
 import { EditableName } from "@/components/EditableName";
+import { groupNumber } from "@/lib/taxonomy-label";
 import { publicFileUrl } from "@/lib/storage";
 import { fileKindFromName } from "@/lib/file-kind";
 import { Button } from "@/components/ui/button";
@@ -181,12 +182,14 @@ function DocumentRow({
   doc,
   canEdit,
   documentGroups,
+  categories,
   categoryMoveOptions,
   onDelete,
 }: {
   doc: Document;
   canEdit: boolean;
   documentGroups: DocumentGroup[];
+  categories: DocumentCategory[];
   categoryMoveOptions: CategoryMoveOption[];
   onDelete: (documentId: string) => void;
 }) {
@@ -212,6 +215,7 @@ function DocumentRow({
               item={doc}
               moveOptions={categoryMoveOptions}
               groups={documentGroups}
+              categories={categories}
               moveLabel="ย้ายไปหมวด"
             />
 
@@ -352,9 +356,11 @@ export function DocList({
   // Documents belonging to no group still show directly above the groups,
   // exactly as a document with an empty note did before.
   const ungrouped = optimisticDocuments.filter((doc) => !doc.group_id);
+  const categorySortOrder = categories.find((category) => category.id === categoryId)?.sort_order;
   const groups = documentGroups.map((group) => ({
     id: group.id,
     name: group.name_th,
+    number: groupNumber(group, categorySortOrder),
     docs: optimisticDocuments.filter((doc) => doc.group_id === group.id),
   }));
 
@@ -368,6 +374,7 @@ export function DocList({
               doc={doc}
               canEdit={canEdit}
               documentGroups={allGroups}
+              categories={categories}
               categoryMoveOptions={categoryMoveOptions}
               onDelete={handleDelete}
             />
@@ -383,6 +390,7 @@ export function DocList({
               now an editable field. */}
           {managing ? (
             <div className="flex w-full items-center justify-between gap-3 p-3">
+              <span className="shrink-0 text-xs text-muted-foreground">{group.number}</span>
               <EditableName
                 value={group.name}
                 ariaLabel={`ชื่อหมวดย่อย ${group.name}`}
@@ -405,7 +413,9 @@ export function DocList({
             </div>
           ) : (
             <CollapsibleTrigger className="group flex w-full items-center justify-between gap-3 p-3 text-left">
-              <span className="min-w-0 truncate text-sm font-medium text-foreground">{group.name}</span>
+              <span className="min-w-0 truncate text-sm font-medium text-foreground">
+                {group.number} {group.name}
+              </span>
               <span className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
                 {group.docs.length} ไฟล์
                 <ChevronDown className="h-4 w-4 transition-transform group-data-panel-open:rotate-180" />
@@ -420,6 +430,7 @@ export function DocList({
                   doc={doc}
                   canEdit={canEdit}
                   documentGroups={allGroups}
+                  categories={categories}
                   categoryMoveOptions={categoryMoveOptions}
                   onDelete={handleDelete}
                 />

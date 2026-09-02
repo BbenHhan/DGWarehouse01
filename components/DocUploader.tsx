@@ -12,7 +12,8 @@ import {
   AutocompleteTrigger,
 } from "@/components/ui/autocomplete";
 import { uploadDoc } from "@/app/actions/documents";
-import type { DocumentGroup } from "@/lib/types";
+import type { DocumentCategory, DocumentGroup } from "@/lib/types";
+import { groupLabel } from "@/lib/taxonomy-label";
 
 // Group (note) selection at upload time (specs/025-document-upload-
 // categorization) — previously every upload silently went to whichever
@@ -26,16 +27,21 @@ import type { DocumentGroup } from "@/lib/types";
 export function DocUploader({
   categoryId,
   groups,
+  category,
 }: {
   categoryId: string;
   groups: DocumentGroup[];
+  category: DocumentCategory;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [note, setNote] = useState("");
   // Every group in THIS category, whether or not it holds files — the two
   // things the old note-scanning suggestion list could not do
   // (specs/040-editable-document-taxonomy, FR-023).
-  const groupNames = groups.map((group) => group.name_th);
+  // Numbered for reading; uploadDoc strips the number back off before it
+  // resolves the group, so picking "1.2 งานผนัง" lands in "งานผนัง" rather than
+  // creating a second group under the numbered name.
+  const groupNames = groups.map((group) => groupLabel(group, category.sort_order));
   const [isPending, startTransition] = useTransition();
   const [isDragging, setIsDragging] = useState(false);
 

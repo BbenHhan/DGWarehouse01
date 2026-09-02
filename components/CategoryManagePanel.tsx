@@ -5,6 +5,7 @@ import { ReorderButtons } from "@/components/ReorderButtons";
 import { DeleteTaxonomyDialog } from "@/components/DeleteTaxonomyDialog";
 import { EditableName } from "@/components/EditableName";
 import { CATEGORY_EMOJI, EmojiPicker } from "@/components/EmojiPicker";
+import { categoryNumber } from "@/lib/taxonomy-label";
 import { useManageMode } from "@/components/ManageModeProvider";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
@@ -92,6 +93,7 @@ export function CategoryManagePanel({
               ariaLabel={`เปลี่ยนไอคอนของ ${category.name_th}`}
               onChange={(emoji) => void renameCategory({ id: category.id, emoji })}
             />
+            <span className="shrink-0 text-xs text-muted-foreground">{categoryNumber(category)}</span>
             <EditableName
               value={category.name_th}
               ariaLabel={`ชื่อหมวด ${category.name_th}`}

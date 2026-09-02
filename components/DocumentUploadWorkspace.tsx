@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { uploadDoc } from "@/app/actions/documents";
 import { fileKindFromName } from "@/lib/file-kind";
 import { suggestGroups, type Suggestion } from "@/lib/document-suggest";
+import { categoryNumber, groupNumber } from "@/lib/taxonomy-label";
 import { extractPdfText } from "@/lib/pdf-text";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -433,7 +434,7 @@ export function DocumentUploadWorkspace({
                 ].join(" ")}
               >
                 <span className="text-base leading-none">{category.emoji}</span>
-                {category.name_th}
+                {categoryNumber(category)} {category.name_th}
               </button>
             ))}
           </nav>
@@ -468,6 +469,9 @@ export function DocumentUploadWorkspace({
                   }}
                   className="flex items-center gap-2 rounded-xl border border-border bg-background p-2.5 text-sm transition-colors hover:border-primary/50"
                 >
+                  <span className="shrink-0 text-xs text-muted-foreground">
+                    {groupNumber(group, categories.find((c) => c.id === group.category_id)?.sort_order)}
+                  </span>
                   <span className="min-w-0 flex-1 truncate">{group.name_th}</span>
                   <span className="shrink-0 text-xs text-primary">
                     {group.document_count + (uploadedCounts[group.id] ?? 0)} ไฟล์

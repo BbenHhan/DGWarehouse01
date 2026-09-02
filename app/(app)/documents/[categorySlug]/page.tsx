@@ -16,6 +16,7 @@ import { DocList } from "@/components/DocList";
 import { DocUploader } from "@/components/DocUploader";
 import { ManageModeToggle } from "@/components/ManageModeProvider";
 import { CategoryManagePanel } from "@/components/CategoryManagePanel";
+import { categoryLabel, categoryNumber } from "@/lib/taxonomy-label";
 
 function tabClass(active: boolean) {
   return [
@@ -52,7 +53,7 @@ export default async function DocumentCategoryPage({
     ? []
     : categories.map((category) => ({
         value: category.id,
-        label: `${category.emoji} ${category.name_th}`,
+        label: `${category.emoji} ${categoryLabel(category)}`,
       }));
 
   return (
@@ -63,7 +64,7 @@ export default async function DocumentCategoryPage({
         </span>
         <div>
           <h1 className="text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
-            {currentCategory.name_th}
+            {categoryLabel(currentCategory)}
           </h1>
           <p className="text-sm text-muted-foreground">รายการเอกสาร · {documents.length} ไฟล์</p>
         </div>
@@ -102,13 +103,17 @@ export default async function DocumentCategoryPage({
             className={tabClass(category.slug === categorySlug)}
           >
             <span className="text-base leading-none">{category.emoji}</span>
-            {category.name_th}
+            {categoryNumber(category)} {category.name_th}
           </Link>
         ))}
       </nav>
 
       {!USE_MOCK_DATA && userCanEdit && (
-        <DocUploader categoryId={currentCategory.id} groups={documentGroups} />
+        <DocUploader
+          categoryId={currentCategory.id}
+          groups={documentGroups}
+          category={currentCategory}
+        />
       )}
 
       <div className="border-t border-border/70 pt-4">

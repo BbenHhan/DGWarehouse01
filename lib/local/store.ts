@@ -5,6 +5,7 @@ import { existsSync } from "node:fs";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { ChecklistItem, Document, DocumentCategory, DocumentGroup, Photo } from "@/lib/types";
+import { stripGroupNumber } from "@/lib/taxonomy-label";
 import type { ChecklistStatus } from "@/lib/checklist-status";
 import { rollupChecklistStatus } from "@/lib/checklist-status";
 import type { DateFilter } from "@/lib/date-filter";
@@ -548,7 +549,7 @@ export async function localDeleteDocumentCategory(id: string): Promise<{ id: str
 }
 
 export async function localResolveDocumentGroup(categoryId: string, nameTh: string | null): Promise<string | null> {
-  const trimmed = nameTh?.trim();
+  const trimmed = stripGroupNumber(nameTh ?? "");
   if (!trimmed) return null;
   const db = await loadDb();
   const existing = db.documentGroups.find(

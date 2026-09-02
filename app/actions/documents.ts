@@ -12,6 +12,7 @@ import {
 } from "@/lib/validation";
 import { DATA_SOURCE } from "@/lib/data-config";
 import { storageKeyFileName } from "@/lib/storage-key";
+import { stripGroupNumber } from "@/lib/taxonomy-label";
 import {
   localDeleteDocument,
   localSaveDocumentFile,
@@ -40,7 +41,8 @@ async function resolveDocumentGroupId(
   categoryId: string,
   nameTh: string | null
 ): Promise<string | null> {
-  const trimmed = nameTh?.trim();
+  // The picker shows "1.2 งานผนัง"; the stored name is "งานผนัง".
+  const trimmed = stripGroupNumber(nameTh ?? "");
   if (!trimmed) return null;
 
   const { data: existing } = await supabase

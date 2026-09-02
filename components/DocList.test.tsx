@@ -55,9 +55,12 @@ function renderList(groups: DocumentGroup[], documents: Document[] = []) {
 
 describe("every sub-group reaches the page, files or not", () => {
   it("renders a group that holds no documents at all", () => {
-    renderList([group(1, "4.1 ระบบสัญญาณเตือนภัยและอุปกรณ์ตรวจจับ")]);
+    renderList([group(1, "ระบบสัญญาณเตือนภัยและอุปกรณ์ตรวจจับ")]);
 
-    expect(screen.getByText("4.1 ระบบสัญญาณเตือนภัยและอุปกรณ์ตรวจจับ")).toBeInTheDocument();
+    // The number is derived from position now, so the row reads "4.1 …" for the
+    // first group of the category sitting fourth.
+    expect(screen.getByText(/ระบบสัญญาณเตือนภัยและอุปกรณ์ตรวจจับ/)).toBeInTheDocument();
+    expect(screen.getByText(/4\.1/)).toBeInTheDocument();
   });
 
   it("shows all 25 safety topics, none of which has a file yet", () => {
@@ -65,36 +68,36 @@ describe("every sub-group reaches the page, files or not", () => {
     // Before specs/040 a group could not exist without a document, so this
     // whole category rendered as nothing at all.
     const names = [
-      "4.1 ระบบสัญญาณเตือนภัยและอุปกรณ์ตรวจจับ",
-      "4.2 อุปกรณ์ดับเพลิงและผังตำแหน่งถังดับเพลิง",
-      "4.3 ระบบน้ำดับเพลิง (สปริงเกลอร์ หัวรับน้ำ สายส่ง)",
-      "4.4 บัญชีสารเคมีและการจำแนกประเภท",
-      "4.5 ตารางการจัดเก็บร่วมและผังการจัดเก็บ",
-      "4.6 ข้อมูลความปลอดภัย (SDS/MSDS)",
-      "4.7 การตรวจรับและตรวจสภาพหีบห่อ",
-      "4.8 อุปกรณ์ป้องกันอันตรายส่วนบุคคล (PPE)",
-      "4.9 สุขศาสตร์และผลตรวจสุขภาพพนักงาน",
+      "ระบบสัญญาณเตือนภัยและอุปกรณ์ตรวจจับ",
+      "อุปกรณ์ดับเพลิงและผังตำแหน่งถังดับเพลิง",
+      "ระบบน้ำดับเพลิง (สปริงเกลอร์ หัวรับน้ำ สายส่ง)",
+      "บัญชีสารเคมีและการจำแนกประเภท",
+      "ตารางการจัดเก็บร่วมและผังการจัดเก็บ",
+      "ข้อมูลความปลอดภัย (SDS/MSDS)",
+      "การตรวจรับและตรวจสภาพหีบห่อ",
+      "อุปกรณ์ป้องกันอันตรายส่วนบุคคล (PPE)",
+      "สุขศาสตร์และผลตรวจสุขภาพพนักงาน",
       "4.10 การปฐมพยาบาลเบื้องต้น",
-      "4.11 ป้ายและเครื่องหมายความปลอดภัย",
-      "4.12 เส้นทางจราจรและพื้นที่รับส่งสินค้า",
-      "4.13 รถยกและการเคลื่อนย้าย",
-      "4.14 พื้นที่แบ่งถ่ายสารเคมี",
-      "4.15 แผนฉุกเฉินและการซ้อมแผน",
-      "4.16 ข้อมูลสำหรับหน่วยกู้ภัยฉุกเฉิน",
-      "4.17 แผนบำรุงรักษาอุปกรณ์ความปลอดภัย",
-      "4.18 คำแนะนำวิธีปฏิบัติงาน (SOP)",
-      "4.19 บันทึกการฝึกอบรม",
-      "4.20 ใบอนุญาตทำงานเสี่ยง",
-      "4.21 รายงานการสำรวจตรวจตราประจำวัน",
-      "4.22 ข้อกำหนดพิเศษ: วัตถุระเบิด (ประเภท 1)",
-      "4.23 ข้อกำหนดพิเศษ: ก๊าซ (ประเภท 2)",
-      "4.24 ข้อกำหนดพิเศษ: สารไวไฟ (ประเภท 3A, 5.2)",
-      "4.25 ข้อกำหนดพิเศษ: สารออกซิไดซ์ (ประเภท 5.1)",
+      "ป้ายและเครื่องหมายความปลอดภัย",
+      "เส้นทางจราจรและพื้นที่รับส่งสินค้า",
+      "รถยกและการเคลื่อนย้าย",
+      "พื้นที่แบ่งถ่ายสารเคมี",
+      "แผนฉุกเฉินและการซ้อมแผน",
+      "ข้อมูลสำหรับหน่วยกู้ภัยฉุกเฉิน",
+      "แผนบำรุงรักษาอุปกรณ์ความปลอดภัย",
+      "คำแนะนำวิธีปฏิบัติงาน (SOP)",
+      "บันทึกการฝึกอบรม",
+      "ใบอนุญาตทำงานเสี่ยง",
+      "รายงานการสำรวจตรวจตราประจำวัน",
+      "ข้อกำหนดพิเศษ: วัตถุระเบิด (ประเภท 1)",
+      "ข้อกำหนดพิเศษ: ก๊าซ (ประเภท 2)",
+      "ข้อกำหนดพิเศษ: สารไวไฟ (ประเภท 3A, 5.2)",
+      "ข้อกำหนดพิเศษ: สารออกซิไดซ์ (ประเภท 5.1)",
     ];
     renderList(names.map((name, i) => group(i + 1, name)));
 
     for (const name of names) {
-      expect(screen.getByText(name)).toBeInTheDocument();
+      expect(screen.getByText(new RegExp(name.replace(/[.()]/g, "\\$&")))).toBeInTheDocument();
     }
   });
 
@@ -102,8 +105,8 @@ describe("every sub-group reaches the page, files or not", () => {
     renderList([group(1, "หนึ่ง"), group(2, "สอง"), group(3, "สาม")]);
 
     const rendered = screen
-      .getAllByText(/^(หนึ่ง|สอง|สาม)$/)
-      .map((node) => node.textContent);
+      .getAllByText(/(หนึ่ง|สอง|สาม)/)
+      .map((node) => node.textContent?.replace(/[\d.\s]+/g, ""));
     expect(rendered).toEqual(["หนึ่ง", "สอง", "สาม"]);
   });
 
@@ -117,7 +120,7 @@ describe("every sub-group reaches the page, files or not", () => {
     renderList([group(1, "มีกลุ่ม")], [doc("ungrouped", null)]);
 
     expect(screen.getByText("ungrouped.pdf")).toBeInTheDocument();
-    expect(screen.getByText("มีกลุ่ม")).toBeInTheDocument();
+    expect(screen.getByText(/มีกลุ่ม/)).toBeInTheDocument();
   });
 
   it("counts each group's own documents", () => {
