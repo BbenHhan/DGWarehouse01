@@ -269,3 +269,49 @@ describe("RoomChecklistBox optimistic status changes", () => {
     });
   });
 });
+
+// specs/041-complete-loading-states FR-004: the box used to share one
+// transition across every row, so writing any row's status disabled all of
+// them. That is worse than showing nothing — it says something is happening
+// to rows that nothing is happening to.
+describe("RoomChecklistBox busy scoping", () => {
+  it("marks only the row being written", async () => {
+    const user = userEvent.setup();
+    let finishWrite: (result: { ok: true }) => void = () => {};
+    setChecklistItemRoomStatus.mockReturnValue(
+      new Promise<{ ok: true }>((resolve) => {
+        finishWrite = resolve;
+      })
+    );
+
+    renderBox([makeItem(), makeItem({ id: "item-2", text: "ตรวจถังดับเพลิง" })]);
+
+    await user.click(screen.getByLabelText("สถานะของ ติดป้ายทางออกฉุกเฉิน"));
+    await user.click(await screen.findByRole("option", { name: "กำลังทำ" }));
+
+    await waitFor(() =>
+      expect(screen.getByLabelText("สถานะของ ติดป้ายทางออกฉุกเฉิน")).toBeDisabled()
+    );
+    expect(screen.getByLabelText("สถานะของ ตรวจถังดับเพลิง")).toBeEnabled();
+
+    finishWrite({ ok: true });
+    await waitFor(() =>
+      expect(screen.getByLabelText("สถานะของ ติดป้ายทางออกฉุกเฉิน")).toBeEnabled()
+    );
+  });
+
+  it("leaves the quick-add form usable while a status is being written", async () => {
+    const user = userEvent.setup();
+    setChecklistItemRoomStatus.mockReturnValue(new Promise(() => {}));
+
+    renderBox([makeItem()]);
+
+    await user.click(screen.getByLabelText("สถานะของ ติดป้ายทางออกฉุกเฉิน"));
+    await user.click(await screen.findByRole("option", { name: "กำลังทำ" }));
+
+    await waitFor(() =>
+      expect(screen.getByLabelText("สถานะของ ติดป้ายทางออกฉุกเฉิน")).toBeDisabled()
+    );
+    expect(screen.getByPlaceholderText("เพิ่มรายการด่วน...")).toBeEnabled();
+  });
+});

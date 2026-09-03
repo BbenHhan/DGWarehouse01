@@ -1,6 +1,8 @@
 "use client";
 
 import { useOptimistic, useState, useTransition } from "react";
+import { useDelayedBusy } from "@/lib/use-delayed-busy";
+import { Spinner } from "@/components/ui/spinner";
 import { CheckSquare, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import type { ChecklistItem, Room } from "@/lib/types";
@@ -166,23 +168,28 @@ function StatusSelect({
   status,
   onChange,
   disabled,
+  busy,
   roomColorSelect,
   label,
 }: {
   status: ChecklistStatus;
   onChange: (status: ChecklistStatus) => void;
   disabled?: boolean;
+  busy?: boolean;
   roomColorSelect?: string;
   label: string;
 }) {
+  const showBusy = useDelayedBusy(Boolean(busy));
+
   return (
     <Select
       value={status}
       onValueChange={(value) => value && onChange(value as ChecklistStatus)}
-      disabled={disabled}
+      disabled={disabled || busy}
     >
       <SelectTrigger
         size="sm"
+        busy={showBusy}
         aria-label={label}
         className={["h-8 gap-1 text-xs font-medium", roomColorSelect ?? STATUS_COLORS[status].select].join(" ")}
       >
@@ -332,6 +339,7 @@ function AddChecklistForm({
       </div>
       <RoomChipPicker rooms={rooms} selected={roomIds} onToggle={toggleRoom} />
       <Button type="submit" size="sm" className="self-start" disabled={isPending || !text.trim()}>
+        {isPending && <Spinner className="h-3.5 w-3.5" />}
         {parentId ? "เพิ่ม sub" : "เพิ่มรายการ"}
       </Button>
     </form>
@@ -445,7 +453,8 @@ function EditChecklistDialog({
         </div>
         <DialogFooter>
           <Button type="button" onClick={handleSave} disabled={isPending || !text.trim()}>
-            บันทึก
+            {isPending && <Spinner className="h-4 w-4" />}
+            {isPending ? "กำลังบันทึก..." : "บันทึก"}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -463,11 +472,13 @@ function ChecklistRow({
   onSetRoomStatus,
   onSaved,
   onDelete,
+  busyKey,
 }: {
   item: ChecklistItem;
   rooms: Room[];
   canEdit: boolean;
   nested?: boolean;
+  busyKey: string | null;
   onAdded: (item: ChecklistItem) => void;
   onSetStatus: (id: string, status: ChecklistStatus) => void;
   onSetRoomStatus: (id: string, roomId: string, status: ChecklistStatus) => void;
@@ -495,6 +506,7 @@ function ChecklistRow({
                   status={item.status}
                   onChange={(status) => onSetStatus(item.id, status)}
                   disabled={!canEdit}
+                  busy={busyKey === item.id}
                   label={`สถานะของ ${item.text}`}
                 />
               ) : item.room_ids.length === 1 ? (
@@ -502,6 +514,7 @@ function ChecklistRow({
                   status={item.status}
                   onChange={(status) => onSetRoomStatus(item.id, item.room_ids[0], status)}
                   disabled={!canEdit}
+                  busy={busyKey === `${item.id}:${item.room_ids[0]}`}
                   roomColorSelect={getRoomColor(rooms.find((r) => r.id === item.room_ids[0])?.slug ?? "").select}
                   label={`สถานะของ ${item.text}`}
                 />
@@ -531,6 +544,7 @@ function ChecklistRow({
                       status={rs.status}
                       onChange={(status) => onSetRoomStatus(item.id, rs.room_id, status)}
                       disabled={!canEdit}
+                      busy={busyKey === `${item.id}:${rs.room_id}`}
                       roomColorSelect={colors.select}
                       label={`สถานะของ ${room?.name_th ?? rs.room_id}`}
                     />
@@ -611,6 +625,7 @@ function ChecklistRow({
               onSetRoomStatus={onSetRoomStatus}
               onSaved={onSaved}
               onDelete={onDelete}
+              busyKey={busyKey}
             />
           ))}
         </div>
@@ -629,6 +644,10 @@ export function ChecklistList({
   canEdit: boolean;
 }) {
   const [, startTransition] = useTransition();
+  // Identifies the single control being written, not merely that something is.
+  // An item's own status is keyed by its id; a per-room status by both, since
+  // one item can show a separate control for each of its rooms.
+  const [busyKey, setBusyKey] = useState<string | null>(null);
   const [optimisticItems, applyOptimistic] = useOptimistic(items, reduceOptimistic);
 
   function handleAdded(item: ChecklistItem) {
@@ -638,22 +657,26 @@ export function ChecklistList({
   }
 
   function handleSetStatus(id: string, status: ChecklistStatus) {
+    setBusyKey(id);
     startTransition(async () => {
       applyOptimistic({ type: "setStatus", id, status });
       const result = await setChecklistItemStatus(id, status);
       if (!result.ok) {
         toast.error(result.error);
       }
+      setBusyKey(null);
     });
   }
 
   function handleSetRoomStatus(id: string, roomId: string, status: ChecklistStatus) {
+    setBusyKey(`${id}:${roomId}`);
     startTransition(async () => {
       applyOptimistic({ type: "setRoomStatus", id, roomId, status });
       const result = await setChecklistItemRoomStatus(id, roomId, status);
       if (!result.ok) {
         toast.error(result.error);
       }
+      setBusyKey(null);
     });
   }
 
@@ -699,6 +722,7 @@ export function ChecklistList({
               onSetRoomStatus={handleSetRoomStatus}
               onSaved={handleSaved}
               onDelete={handleDelete}
+              busyKey={busyKey}
             />
           ))}
         </div>

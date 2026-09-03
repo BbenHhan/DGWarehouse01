@@ -18,6 +18,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { signOut } from "@/app/actions/auth";
 import { requestEditorAccess } from "@/app/actions/users";
+import { useDelayedBusy } from "@/lib/use-delayed-busy";
+import { Spinner } from "@/components/ui/spinner";
 
 function initialsFor(name: string | null, email: string): string {
   const source = name?.trim() || email.split("@")[0];
@@ -44,6 +46,8 @@ export function AccountMenu({
   const [isPending, startTransition] = useTransition();
   const [isRequesting, startRequestTransition] = useTransition();
   const [pending, setPending] = useState(hasPendingRequest);
+  const showSigningOut = useDelayedBusy(isPending);
+  const showRequesting = useDelayedBusy(isRequesting);
 
   function handleSignOut() {
     startTransition(async () => {
@@ -126,17 +130,19 @@ export function AccountMenu({
                 </DropdownMenuItem>
               ) : (
                 <DropdownMenuItem disabled={isRequesting} onClick={handleRequestEditorAccess}>
-                  <UserPlus className="h-4 w-4" />
-                  {isRequesting ? "กำลังส่งคำขอ..." : "ขอสิทธิ์แก้ไข"}
+                  {showRequesting ? <Spinner className="h-4 w-4" /> : <UserPlus className="h-4 w-4" />}
+                  {showRequesting ? "กำลังส่งคำขอ..." : "ขอสิทธิ์แก้ไข"}
                 </DropdownMenuItem>
               )}
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
           </>
         )}
+        {/* Signing out ends in a navigation, so this stays busy until the menu
+            goes away with the page rather than reopening mid-redirect. */}
         <DropdownMenuItem variant="destructive" disabled={isPending} onClick={handleSignOut}>
-          <LogOut className="h-4 w-4" />
-          {isPending ? "กำลังออกจากระบบ..." : "ออกจากระบบ"}
+          {showSigningOut ? <Spinner className="h-4 w-4" /> : <LogOut className="h-4 w-4" />}
+          {showSigningOut ? "กำลังออกจากระบบ..." : "ออกจากระบบ"}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

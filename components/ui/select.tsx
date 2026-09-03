@@ -6,6 +6,8 @@ import { Select as SelectPrimitive } from "@base-ui/react/select"
 import { cn } from "@/lib/utils"
 import { ChevronDownIcon, CheckIcon, ChevronUpIcon } from "lucide-react"
 
+import { Spinner } from "@/components/ui/spinner"
+
 const Select = SelectPrimitive.Root
 
 function SelectGroup({ className, ...props }: SelectPrimitive.Group.Props) {
@@ -31,10 +33,20 @@ function SelectValue({ className, ...props }: SelectPrimitive.Value.Props) {
 function SelectTrigger({
   className,
   size = "default",
+  busy,
   children,
   ...props
 }: SelectPrimitive.Trigger.Props & {
   size?: "sm" | "default"
+  /**
+   * Shows that the choice just made is being saved. The spinner takes the
+   * chevron's own slot rather than sitting beside it, so the trigger keeps its
+   * width and the row does not reflow — which matters most at 375px, where
+   * there is no spare width to grow into.
+   *
+   * This does not imply `disabled`; pass both.
+   */
+  busy?: boolean
 }) {
   return (
     <SelectPrimitive.Trigger
@@ -49,7 +61,11 @@ function SelectTrigger({
       {children}
       <SelectPrimitive.Icon
         render={
-          <ChevronDownIcon className="pointer-events-none size-4 text-muted-foreground" />
+          busy ? (
+            <Spinner className="pointer-events-none size-4 text-muted-foreground" />
+          ) : (
+            <ChevronDownIcon className="pointer-events-none size-4 text-muted-foreground" />
+          )
         }
       />
     </SelectPrimitive.Trigger>

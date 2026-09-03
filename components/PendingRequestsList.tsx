@@ -5,6 +5,8 @@ import { toast } from "sonner";
 import type { RoleRequest } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { approveRoleRequest, denyRoleRequest } from "@/app/actions/users";
+import { useDelayedBusy } from "@/lib/use-delayed-busy";
+import { Spinner } from "@/components/ui/spinner";
 
 export function PendingRequestsList({ requests }: { requests: RoleRequest[] }) {
   const [resolvedIds, setResolvedIds] = useState<Set<string>>(new Set());
@@ -39,43 +41,70 @@ export function PendingRequestsList({ requests }: { requests: RoleRequest[] }) {
   return (
     <ul className="space-y-2">
       {visibleRequests.map((request) => (
-        <li
+        <RequestRow
           key={request.id}
-          className="flex items-center justify-between gap-3 rounded-xl border border-border/60 bg-card p-3 shadow-sm"
-        >
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-medium text-foreground">
-              {request.requesterFullName ?? request.requesterEmail}
-            </p>
-            {request.requesterFullName && (
-              <p className="truncate text-xs text-muted-foreground">{request.requesterEmail}</p>
-            )}
-            <p className="text-xs text-muted-foreground">
-              ขอเมื่อ {new Date(request.requestedAt).toLocaleDateString("th-TH")}
-            </p>
-          </div>
-
-          <div className="flex shrink-0 gap-2">
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              disabled={pendingActionId === request.id}
-              onClick={() => handleResolve(request.id, "deny")}
-            >
-              ปฏิเสธ
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              disabled={pendingActionId === request.id}
-              onClick={() => handleResolve(request.id, "approve")}
-            >
-              {pendingActionId === request.id ? "กำลังดำเนินการ..." : "อนุมัติ"}
-            </Button>
-          </div>
-        </li>
+          request={request}
+          busy={pendingActionId === request.id}
+          onResolve={handleResolve}
+        />
       ))}
     </ul>
+  );
+}
+
+// Extracted so each row owns its delayed indicator — a hook cannot be called
+// inside the map callback above.
+function RequestRow({
+  request,
+  busy,
+  onResolve,
+}: {
+  request: RoleRequest;
+  busy: boolean;
+  onResolve: (requestId: string, action: "approve" | "deny") => void;
+}) {
+  const showBusy = useDelayedBusy(busy);
+
+  return (
+    <li
+      className="flex items-center justify-between gap-3 rounded-xl border border-border/60 bg-card p-3 shadow-sm"
+    >
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-medium text-foreground">
+          {request.requesterFullName ?? request.requesterEmail}
+        </p>
+        {request.requesterFullName && (
+          <p className="truncate text-xs text-muted-foreground">{request.requesterEmail}</p>
+        )}
+        <p className="text-xs text-muted-foreground">
+          ขอเมื่อ {new Date(request.requestedAt).toLocaleDateString("th-TH")}
+        </p>
+      </div>
+
+      <div className="flex shrink-0 gap-2">
+        {/* Both buttons carry the row's state: whichever one was pressed,
+            neither is available until the request is resolved, and the
+            deny button used to show nothing at all while that happened. */}
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          disabled={busy}
+          onClick={() => onResolve(request.id, "deny")}
+        >
+          {showBusy && <Spinner className="h-3.5 w-3.5" />}
+          ปฏิเสธ
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          disabled={busy}
+          onClick={() => onResolve(request.id, "approve")}
+        >
+          {showBusy && <Spinner className="h-3.5 w-3.5" />}
+          {showBusy ? "กำลังดำเนินการ..." : "อนุมัติ"}
+        </Button>
+      </div>
+    </li>
   );
 }
