@@ -1,6 +1,6 @@
 "use client";
 
-import { useOptimistic, useTransition } from "react";
+import { useEffect, useOptimistic, useRef, useState, useTransition } from "react";
 import Image from "next/image";
 import { ChevronDown, Download, ExternalLink, FileText, Share2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -15,6 +15,8 @@ import { publicFileUrl } from "@/lib/storage";
 import { fileKindFromName } from "@/lib/file-kind";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
+import { Skeleton } from "@/components/ui/skeleton";
+import { fetchWithProgress, formatBytes } from "@/lib/fetch-with-progress";
 import { Input } from "@/components/ui/input";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
@@ -124,6 +126,201 @@ function DocumentActions({ src, fileName }: { src: string; fileName: string }) {
 // direct file URL (an iframe, not forced into an <img>), everything else
 // falls back to the action bar's download/open link since browsers can't
 // render it inline.
+// How far along a download is, in words and as a bar. Announced politely so a
+// screen-reader user learns of the wait too, rather than meeting silence
+// (FR-010).
+function MediaProgress({
+  label,
+  received,
+  total,
+}: {
+  label: string;
+  received: number;
+  total: number | null;
+}) {
+  const share = total ? Math.min(1, received / total) : null;
+
+  return (
+    <div role="status" aria-live="polite" className="flex flex-col gap-2">
+      <p className="text-sm text-muted-foreground">
+        {label}
+        {share !== null
+          ? ` ${Math.round(share * 100)}% · ${formatBytes(received)} จาก ${formatBytes(total!)}`
+          : ` ${formatBytes(received)}`}
+      </p>
+      <div className="h-1.5 w-full overflow-hidden rounded-full bg-secondary">
+        {/* Indeterminate when the server declares no length: a bar that cannot
+            know its end still shows the file is moving (FR-014a). */}
+        <div
+          className={[
+            "h-full rounded-full bg-primary transition-[width] duration-200",
+            share === null ? "w-1/3 animate-pulse" : "",
+          ].join(" ")}
+          style={share === null ? undefined : { width: `${share * 100}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
+// The document is downloaded here rather than handed straight to the <object>,
+// because that is the only way to say how much of a 5-30MB file has arrived
+// (FR-014). The bytes counted are the bytes displayed, so this costs no second
+// download (FR-014b), and if the fetch fails the <object> falls back to the
+// direct URL — a preview must never end up less capable than it was.
+function PdfPreview({ src, fileName }: { src: string; fileName: string }) {
+  const [ready, setReady] = useState(false);
+  const [data, setData] = useState(src);
+  const [received, setReceived] = useState(0);
+  const [total, setTotal] = useState<number | null>(null);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    let objectUrl: string | null = null;
+
+    setReady(false);
+    setReceived(0);
+    setTotal(null);
+
+    fetchWithProgress(
+      src,
+      (bytes, size) => {
+        setReceived(bytes);
+        setTotal(size);
+      },
+      controller.signal
+    )
+      .then((blob) => {
+        objectUrl = URL.createObjectURL(blob);
+        setData(objectUrl);
+        setReady(true);
+      })
+      .catch(() => {
+        if (controller.signal.aborted) return;
+        setData(src);
+        setReady(true);
+      });
+
+    return () => {
+      controller.abort();
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [src]);
+
+  if (!ready) {
+    return (
+      <div className="flex h-64 w-full flex-col justify-center gap-3 rounded-lg border border-border/60 bg-secondary/40 p-6">
+        <MediaProgress label="กำลังเปิดไฟล์" received={received} total={total} />
+      </div>
+    );
+  }
+
+  return (
+    // <object> rather than <iframe> so there is something to fall back to.
+    // A browser set to download PDFs instead of displaying them — a common
+    // Chrome setting, and Safari's behaviour for some embeds — renders an
+    // iframe as a blank rectangle with no way out. Everything inside the
+    // object tag shows only when the browser declines to render the PDF.
+    <object
+      data={data}
+      type="application/pdf"
+      aria-label={fileName}
+      className="h-[85vh] w-full rounded-lg border border-border/60"
+    >
+      <div className="flex h-full flex-col items-center justify-center gap-2 rounded-lg bg-secondary/50 p-8 text-center text-sm text-muted-foreground">
+        <FileText className="h-8 w-8 opacity-60" />
+        <p>เบราว์เซอร์นี้แสดง PDF ในหน้าเว็บไม่ได้</p>
+        <a
+          href={src}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-primary underline underline-offset-2"
+        >
+          เปิดในแท็บใหม่
+        </a>
+      </div>
+    </object>
+  );
+}
+
+// Progress comes from the player's own buffered ranges, and the element keeps
+// pointing at the direct URL. Downloading the video first would report a
+// tidier percentage and take away both starting early and seeking (FR-014d).
+function VideoPreview({ src }: { src: string }) {
+  const ref = useRef<HTMLVideoElement>(null);
+  const [buffered, setBuffered] = useState(0);
+  const [started, setStarted] = useState(false);
+
+  function readBuffered() {
+    const video = ref.current;
+    if (!video || !video.duration || Number.isNaN(video.duration)) return;
+    const ranges = video.buffered;
+    if (ranges.length === 0) return;
+    setBuffered(Math.min(1, ranges.end(ranges.length - 1) / video.duration));
+  }
+
+  return (
+    <div className="flex flex-col gap-2">
+      {!started && <Skeleton className="h-64 w-full rounded-lg" />}
+      <video
+        ref={ref}
+        src={src}
+        controls
+        onProgress={readBuffered}
+        onLoadedMetadata={() => setStarted(true)}
+        className={["max-h-96 w-full rounded-lg bg-black", started ? "" : "hidden"].join(" ")}
+      />
+      {started && buffered < 1 && (
+        <p role="status" aria-live="polite" className="text-xs text-muted-foreground">
+          กำลังโหลดวิดีโอ {Math.round(buffered * 100)}% · เล่นได้เลยไม่ต้องรอจนครบ
+        </p>
+      )}
+    </div>
+  );
+}
+
+// Kept on next/image: measuring an image's arrival means fetching it directly,
+// which gives up the screen-sized version a phone would otherwise receive. The
+// account holder chose the smaller download over the percentage, so this shows
+// that it is loading without claiming how far along it is (FR-014c).
+function ImagePreview({ src, alt }: { src: string; alt: string }) {
+  const [state, setState] = useState<"loading" | "ready" | "error">("loading");
+
+  return (
+    <div className="relative h-64 w-full overflow-hidden rounded-lg bg-secondary/50 sm:h-96">
+      {state === "loading" && (
+        <div role="status" aria-live="polite" className="absolute inset-0">
+          <span className="sr-only">กำลังโหลดรูป</span>
+          <Skeleton className="h-full w-full rounded-lg" />
+        </div>
+      )}
+      {state === "error" ? (
+        <div className="flex h-full flex-col items-center justify-center gap-2 text-center text-sm text-muted-foreground">
+          <FileText className="h-8 w-8 opacity-60" />
+          <p>โหลดรูปไม่สำเร็จ ใช้ปุ่มด้านบนเพื่อดาวน์โหลดไฟล์</p>
+        </div>
+      ) : (
+        <Image
+          src={src}
+          alt={alt}
+          fill
+          sizes="100vw"
+          className="object-contain"
+          onLoad={() => setState("ready")}
+          onError={() => setState("error")}
+        />
+      )}
+    </div>
+  );
+}
+
+// Shown inline below a document's row when its dropdown is opened — never a
+// popup (the account holder explicitly asked for the preview to appear
+// inside the same box, not a modal/lightbox). Follows the same per-file-kind
+// rendering rules as components/Lightbox.tsx (Constitution III): images via
+// next/image, video via a native <video> element, PDFs embedded through a
+// direct file URL, everything else falls back to the action bar's
+// download/open link since browsers can't render it inline.
 function DocumentPreview({ doc }: { doc: Document }) {
   const src = publicFileUrl("documents", doc.storage_path);
   const kind = fileKindFromName(doc.file_name);
@@ -132,42 +329,11 @@ function DocumentPreview({ doc }: { doc: Document }) {
     <div className="flex flex-col gap-2">
       <DocumentActions src={src} fileName={doc.file_name} />
 
-      {kind === "image" && (
-        <div className="relative h-64 w-full overflow-hidden rounded-lg bg-secondary/50 sm:h-96">
-          <Image src={src} alt={doc.file_name} fill sizes="100vw" className="object-contain" />
-        </div>
-      )}
+      {kind === "image" && <ImagePreview src={src} alt={doc.file_name} />}
 
-      {kind === "video" && (
-        <video src={src} controls className="max-h-96 w-full rounded-lg bg-black" />
-      )}
+      {kind === "video" && <VideoPreview src={src} />}
 
-      {kind === "pdf" && (
-        // <object> rather than <iframe> so there is something to fall back to.
-        // A browser set to download PDFs instead of displaying them — a common
-        // Chrome setting, and Safari's behaviour for some embeds — renders an
-        // iframe as a blank rectangle with no way out. Everything inside the
-        // object tag shows only when the browser declines to render the PDF.
-        <object
-          data={src}
-          type="application/pdf"
-          aria-label={doc.file_name}
-          className="h-[85vh] w-full rounded-lg border border-border/60"
-        >
-          <div className="flex h-full flex-col items-center justify-center gap-2 rounded-lg bg-secondary/50 p-8 text-center text-sm text-muted-foreground">
-            <FileText className="h-8 w-8 opacity-60" />
-            <p>เบราว์เซอร์นี้แสดง PDF ในหน้าเว็บไม่ได้</p>
-            <a
-              href={src}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-primary underline underline-offset-2"
-            >
-              เปิดในแท็บใหม่
-            </a>
-          </div>
-        </object>
-      )}
+      {kind === "pdf" && <PdfPreview src={src} fileName={doc.file_name} />}
 
       {kind === "other" && (
         <div className="flex flex-col items-center justify-center gap-2 rounded-lg bg-secondary/50 p-8 text-center text-muted-foreground">

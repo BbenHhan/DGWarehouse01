@@ -1,6 +1,8 @@
 "use client";
 
 import { Suspense, useEffect, useState } from "react";
+import { useDelayedBusy } from "@/lib/use-delayed-busy";
+import { Spinner } from "@/components/ui/spinner";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { validatePassword } from "@/lib/password";
@@ -43,6 +45,16 @@ function LoginPageContent() {
 
   const [resetEmail, setResetEmail] = useState("");
   const [resetStatus, setResetStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
+  const [googleStatus, setGoogleStatus] = useState<"idle" | "loading">("idle");
+
+  // Sign-in and Google both end in a page load, so their state is deliberately
+  // never cleared on success — it dies with the component when the next screen
+  // renders. Clearing it would make the button look ready again during the
+  // redirect, which is the exact moment a user concludes nothing happened.
+  const showSigningIn = useDelayedBusy(status === "loading");
+  const showSigningUp = useDelayedBusy(signUpStatus === "loading");
+  const showSendingReset = useDelayedBusy(resetStatus === "sending");
+  const showGoogle = useDelayedBusy(googleStatus === "loading");
 
   // /auth/callback redirects here with ?error=auth when a magic-link/OAuth/
   // password-reset code exchange fails (expired or already-used link) —
@@ -136,6 +148,7 @@ function LoginPageContent() {
 
   async function handleGoogleSignIn() {
     setErrorMessage("");
+    setGoogleStatus("loading");
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
@@ -149,6 +162,7 @@ function LoginPageContent() {
     });
 
     if (error) {
+      setGoogleStatus("idle");
       setStatus("error");
       setErrorMessage(error.message);
     }
@@ -181,6 +195,7 @@ function LoginPageContent() {
                 onChange={(e) => setResetEmail(e.target.value)}
               />
               <Button type="submit" className="w-full" disabled={resetStatus === "sending"}>
+                {showSendingReset && <Spinner className="h-4 w-4" />}
                 {resetStatus === "sending" ? "กำลังส่งลิงก์..." : "ส่งลิงก์ตั้งรหัสผ่าน"}
               </Button>
               {resetStatus === "error" && (
@@ -217,6 +232,7 @@ function LoginPageContent() {
                 onChange={(e) => setSignUpPassword(e.target.value)}
               />
               <Button type="submit" className="w-full" disabled={signUpStatus === "loading"}>
+                {showSigningUp && <Spinner className="h-4 w-4" />}
                 {signUpStatus === "loading" ? "กำลังสมัคร..." : "สมัครสมาชิก"}
               </Button>
               {signUpStatus === "error" && (
@@ -248,6 +264,7 @@ function LoginPageContent() {
               onChange={(e) => setPassword(e.target.value)}
             />
             <Button type="submit" className="w-full" disabled={status === "loading"}>
+              {showSigningIn && <Spinner className="h-4 w-4" />}
               {status === "loading" ? "กำลังเข้าสู่ระบบ..." : "เข้าสู่ระบบ"}
             </Button>
             {status === "error" && (
@@ -286,7 +303,13 @@ function LoginPageContent() {
           <div className="h-px flex-1 bg-border" />
         </div>
 
-        <Button variant="outline" className="w-full" onClick={handleGoogleSignIn}>
+        <Button
+          variant="outline"
+          className="w-full"
+          onClick={handleGoogleSignIn}
+          disabled={googleStatus === "loading"}
+        >
+          {showGoogle && <Spinner className="h-4 w-4" />}
           เข้าสู่ระบบด้วย Google
         </Button>
       </div>

@@ -1,4 +1,6 @@
 /** @vitest-environment jsdom */
+import "../../vitest.setup.dom";
+
 import { render } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import {
@@ -49,5 +51,17 @@ describe("SelectTrigger busy", () => {
 
     rerender(<Fixture busy />);
     expect(triggerIn(container).querySelectorAll("svg")).toHaveLength(1);
+  });
+});
+
+describe("SelectTrigger busy announcement", () => {
+  it("marks itself busy for assistive technology", () => {
+    const { container } = render(<Fixture busy />);
+    expect(triggerIn(container)).toHaveAttribute("aria-busy", "true");
+  });
+
+  it("carries no busy attribute when idle", () => {
+    const { container } = render(<Fixture />);
+    expect(triggerIn(container)).not.toHaveAttribute("aria-busy");
   });
 });

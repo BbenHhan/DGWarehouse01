@@ -1,9 +1,9 @@
 /** @vitest-environment jsdom */
 import "../vitest.setup.dom";
 
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Document, DocumentCategory, DocumentGroup } from "@/lib/types";
 
 vi.mock("@/app/actions/documents", () => ({ deleteDoc: vi.fn(), editDoc: vi.fn() }));
@@ -235,5 +235,106 @@ describe("a category that is completely empty", () => {
     renderList([], []);
     expect(screen.getByText("ยังไม่มีเอกสารในหมวดนี้")).toBeInTheDocument();
     expect(screen.queryByPlaceholderText(/เพิ่มหมวดย่อย/)).not.toBeInTheDocument();
+  });
+});
+
+// specs/041-complete-loading-states US3. Documents here run 5-30MB, so the
+// preview area used to be a blank rectangle for many seconds with nothing to
+// say a download was under way.
+// Sub-groups are collapsed until opened, so reaching a document's preview
+// means expanding its group first.
+async function openDocument(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByText(/ระบบดับเพลิง/));
+  await user.click(await screen.findByText("doc-1.pdf"));
+}
+
+describe("document preview reports its download", () => {
+  beforeEach(() => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response(new Uint8Array([1, 2, 3, 4]), {
+            status: 200,
+            headers: { "Content-Length": "4", "Content-Type": "application/pdf" },
+          })
+      )
+    );
+  });
+
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("shows how much has arrived while the file is still coming", async () => {
+    const user = userEvent.setup();
+    // Never settles, so the preview stays in its loading state for the assertion.
+    vi.stubGlobal("fetch", vi.fn(() => new Promise(() => {})));
+
+    renderList([group(1, "ระบบดับเพลิง", 1)], [doc("doc-1", "grp-1")]);
+    await openDocument(user);
+
+    expect(await screen.findByText(/กำลังเปิดไฟล์/)).toBeInTheDocument();
+  });
+
+  // FR-007: nothing of the indicator may remain once the wait is over.
+  it("leaves no placeholder behind once the file is ready", async () => {
+    const user = userEvent.setup();
+
+    renderList([group(1, "ระบบดับเพลิง", 1)], [doc("doc-1", "grp-1")]);
+    await openDocument(user);
+
+    await waitFor(() =>
+      expect(screen.queryByText(/กำลังเปิดไฟล์/)).not.toBeInTheDocument()
+    );
+    expect(screen.getByLabelText("doc-1.pdf")).toBeInTheDocument();
+  });
+
+  // FR-014b / research §4: a failed fetch must not cost the preview its
+  // existing behaviour — the object falls back to the direct URL.
+  it("still renders the file when progress cannot be measured", async () => {
+    const user = userEvent.setup();
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("", { status: 500 })));
+
+    renderList([group(1, "ระบบดับเพลิง", 1)], [doc("doc-1", "grp-1")]);
+    await openDocument(user);
+
+    const embed = await screen.findByLabelText("doc-1.pdf");
+    expect(embed).toHaveAttribute("data", "https://example.test/file");
+  });
+});
+
+// FR-008: an image that never arrives must say so, rather than leaving a
+// placeholder in place indefinitely.
+describe("image preview failure", () => {
+  function imageDoc(): Document {
+    return { ...doc("doc-1", "grp-1"), file_name: "doc-1.jpg", storage_path: "cat/doc-1.jpg" };
+  }
+
+  it("shows a Thai message when the image cannot be loaded", async () => {
+    const user = userEvent.setup();
+    renderList([group(1, "ระบบดับเพลิง", 1)], [imageDoc()]);
+
+    await user.click(screen.getByText(/ระบบดับเพลิง/));
+    await user.click(await screen.findByText("doc-1.jpg"));
+
+    const image = await screen.findByAltText("doc-1.jpg");
+    expect(screen.getByText("กำลังโหลดรูป")).toBeInTheDocument();
+
+    fireEvent.error(image);
+
+    expect(await screen.findByText(/โหลดรูปไม่สำเร็จ/)).toBeInTheDocument();
+    expect(screen.queryByText("กำลังโหลดรูป")).not.toBeInTheDocument();
+  });
+
+  it("clears the placeholder once the image arrives", async () => {
+    const user = userEvent.setup();
+    renderList([group(1, "ระบบดับเพลิง", 1)], [imageDoc()]);
+
+    await user.click(screen.getByText(/ระบบดับเพลิง/));
+    await user.click(await screen.findByText("doc-1.jpg"));
+
+    const image = await screen.findByAltText("doc-1.jpg");
+    fireEvent.load(image);
+
+    await waitFor(() => expect(screen.queryByText("กำลังโหลดรูป")).not.toBeInTheDocument());
   });
 });

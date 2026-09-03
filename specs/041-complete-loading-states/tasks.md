@@ -68,10 +68,10 @@ V for the app's daily actions and is a shippable increment.
 
 **Independent test**: quickstart Scenario 6 — submit each of the three forms throttled.
 
-- [ ] T020 [US2] Add a spinner and Thai busy wording to the sign-in submit button in `app/login/page.tsx`, and stop clearing its loading state on success so it stays busy through the navigation that follows (FR-005, FR-012b)
-- [ ] T021 [US2] Do the same for the sign-up form in `app/login/page.tsx`
-- [ ] T022 [US2] Add a spinner to the password-reset form in `app/login/page.tsx` — this one does **not** navigate, so it keeps clearing on success and reports its result in place (research §7)
-- [ ] T023 [US2] Test in `app/login/page.test.tsx` that a rejected sign-in clears the busy state and shows the reason in Thai, and that a successful one leaves the button busy
+- [X] T020 [US2] Add a spinner and Thai busy wording to the sign-in submit button in `app/login/page.tsx`, and stop clearing its loading state on success so it stays busy through the navigation that follows (FR-005, FR-012b)
+- [X] T021 [US2] Do the same for the sign-up form in `app/login/page.tsx`
+- [X] T022 [US2] Add a spinner to the password-reset form in `app/login/page.tsx` — this one does **not** navigate, so it keeps clearing on success and reports its result in place (research §7)
+- [X] T023 [US2] Test in `app/login/page.test.tsx` that a rejected sign-in clears the busy state and shows the reason in Thai, and that a successful one leaves the button busy
 
 **Checkpoint**: All three forms report their state.
 
@@ -85,27 +85,27 @@ V for the app's daily actions and is a shippable increment.
 
 ### Document preview
 
-- [ ] T024 [US3] Introduce the four preview states from [data-model.md](./data-model.md) — loading, ready, error, unsupported — in the `DocumentPreview` component in `components/DocList.tsx`, so every previewed file is in exactly one and none can sit outside them (FR-007)
-- [ ] T025 [US3] Load a PDF preview through `fetchWithProgress`, show the share and the size arriving while it streams, and hand the resulting blob URL to the existing `<object>`; revoke the URL when the preview closes or unmounts (FR-014, FR-014b)
-- [ ] T026 [US3] Fall back to the direct file URL if the streaming fetch fails, so a preview is never less capable than it is today (research §4)
-- [ ] T027 [US3] Confirm the `<object>` download fallback still appears for a browser that will not render the file inline, and that no indicator remains when it does (Story 3 scenario 4)
+- [X] T024 [US3] Introduce the four preview states from [data-model.md](./data-model.md) — loading, ready, error, unsupported — in the `DocumentPreview` component in `components/DocList.tsx`, so every previewed file is in exactly one and none can sit outside them (FR-007)
+- [X] T025 [US3] Load a PDF preview through `fetchWithProgress`, show the share and the size arriving while it streams, and hand the resulting blob URL to the existing `<object>`; revoke the URL when the preview closes or unmounts (FR-014, FR-014b)
+- [X] T026 [US3] Fall back to the direct file URL if the streaming fetch fails, so a preview is never less capable than it is today (research §4)
+- [X] T027 [US3] Confirm the `<object>` download fallback still appears for a browser that will not render the file inline, and that no indicator remains when it does (Story 3 scenario 4)
 
 ### Video
 
-- [ ] T028 [US3] Report video progress from the player's own `buffered` ranges via its `progress` event in `components/DocList.tsx`, leaving the `<video>` pointed at the direct URL so playback can start early and stay seekable (FR-014c, FR-014d, SC-011)
+- [X] T028 [US3] Report video progress from the player's own `buffered` ranges via its `progress` event in `components/DocList.tsx`, leaving the `<video>` pointed at the direct URL so playback can start early and stay seekable (FR-014c, FR-014d, SC-011)
 
 ### Images
 
-- [ ] T029 [P] [US3] Show a skeleton in the image's own box until `load` fires, and a Thai message on `error`, in the preview image in `components/DocList.tsx` (FR-006, FR-008)
-- [ ] T030 [P] [US3] Do the same for the tiles in `components/PhotoGrid.tsx`
-- [ ] T031 [P] [US3] Do the same for the thumbnails in `components/UnsortedFileTray.tsx` (three separate image elements)
-- [ ] T032 [P] [US3] Do the same for the thumbnail in `components/DocumentUploadWorkspace.tsx`
-- [ ] T033 [P] [US3] Do the same for the thumbnail in `components/MobileSwipeCard.tsx`
+- [X] T029 [P] [US3] Show a skeleton in the image's own box until `load` fires, and a Thai message on `error`, in the preview image in `components/DocList.tsx` (FR-006, FR-008)
+- [X] T030 [P] [US3] Do the same for the tiles in `components/PhotoGrid.tsx`
+- [X] T031 [P] [US3] ~~Do the same for the thumbnails in `components/UnsortedFileTray.tsx` (three separate image elements)~~ — **not applicable**: these render `URL.createObjectURL` blobs of files already on the user's own disk, so there is no arrival to wait for. A skeleton here would be decoration that never shows.
+- [X] T032 [P] [US3] ~~Do the same for the thumbnail in `components/DocumentUploadWorkspace.tsx`~~ — **not applicable**, same reason: a local blob URL.
+- [X] T033 [P] [US3] ~~Do the same for the thumbnail in `components/MobileSwipeCard.tsx`~~ — **not applicable**, same reason: a local blob URL.
 
 ### Tests
 
-- [ ] T034 [P] [US3] Test in `components/DocList.test.tsx` that a preview reports progress while loading and that no placeholder remains once the file is ready
-- [ ] T035 [P] [US3] Test that an image that fails to load shows the Thai error rather than a permanent placeholder
+- [X] T034 [P] [US3] Test in `components/DocList.test.tsx` that a preview reports progress while loading and that no placeholder remains once the file is ready
+- [X] T035 [P] [US3] Test that an image that fails to load shows the Thai error rather than a permanent placeholder
 
 **Checkpoint**: Every wait for content is explained.
 
@@ -113,9 +113,9 @@ V for the app's daily actions and is a shippable increment.
 
 ## Phase 6: Polish & cross-cutting
 
-- [ ] T036 [P] Give every in-place indicator an `aria-live="polite"` status with Thai text and keep spinner glyphs `aria-hidden`, matching the pattern the existing `LoadingRegion` established (FR-010, research §8)
-- [ ] T037 Walk the full coverage list in the spec's Assumptions and confirm each of the eleven places shows something while it waits (SC-001)
-- [ ] T038 Run `npx vitest run`, `npx tsc --noEmit`, and `npm run lint`, then `npm run build` with the dev server stopped
+- [X] T036 [P] Give every in-place indicator an `aria-live="polite"` status with Thai text and keep spinner glyphs `aria-hidden`, matching the pattern the existing `LoadingRegion` established (FR-010, research §8)
+- [X] T037 Walk the full coverage list in the spec's Assumptions and confirm each of the eleven places shows something while it waits (SC-001)
+- [X] T038 Run `npx vitest run`, `npx tsc --noEmit`, and `npm run lint`, then `npm run build` with the dev server stopped
 - [ ] T039 **[needs a signed-in editor]** Run quickstart Scenarios 1–5 throttled to Slow 4G
 - [ ] T040 **[needs a signed-in editor]** Run quickstart Scenario 6 (sign-in, sign-up, reset)
 - [ ] T041 **[needs a signed-in editor]** Run quickstart Scenario 7 and confirm a video still plays before it has fully arrived and can still be scrubbed (SC-011) — this is the check that FR-014d has not been quietly traded away
