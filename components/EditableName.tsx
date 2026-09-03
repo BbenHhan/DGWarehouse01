@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
+import { Spinner } from "@/components/ui/spinner";
 
 // Click the name, type, click away. Used for both category and sub-group names
 // (specs/040-editable-document-taxonomy FR-009).
@@ -52,7 +53,8 @@ export function EditableName({
   }
 
   return (
-    <input
+    <span className="flex min-w-0 flex-1 items-center gap-1.5">
+      <input
       ref={inputRef}
       aria-label={ariaLabel}
       value={draft}
@@ -72,6 +74,10 @@ export function EditableName({
         "disabled:opacity-60",
         className ?? "",
       ].join(" ")}
-    />
+      />
+      {/* A rename is one small write, but without this the only feedback was
+          the field dimming, which reads as "broken" rather than "saving". */}
+      {isPending && <Spinner className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
+    </span>
   );
 }

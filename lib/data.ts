@@ -1,6 +1,7 @@
 import "server-only";
 
 import { createServiceClient, requireUser } from "@/lib/supabase/server";
+import { cache } from "react";
 import { DATA_SOURCE } from "@/lib/data-config";
 import {
   mockGetChecklistItems,
@@ -85,7 +86,7 @@ export async function getPhotos(
   return data;
 }
 
-export async function getDocumentCategories(): Promise<DocumentCategory[]> {
+export const getDocumentCategories = cache(async (): Promise<DocumentCategory[]> => {
   if (DATA_SOURCE === "mock") return mockGetDocumentCategories();
   // The local backend owns its categories now that they are editable
   // (specs/040-editable-document-taxonomy) rather than borrowing the mock's
@@ -100,7 +101,7 @@ export async function getDocumentCategories(): Promise<DocumentCategory[]> {
     .order("sort_order");
   if (error) throw error;
   return data;
-}
+});
 
 export async function getDocuments(categoryId: string): Promise<Document[]> {
   if (DATA_SOURCE === "mock") return mockGetDocuments(categoryId);
@@ -127,7 +128,7 @@ export async function getDocuments(categoryId: string): Promise<Document[]> {
 // reading real records scoped to the category being viewed (FR-023).
 // How many documents each category holds, for the management panel's rows
 // (FR-020) — so the effect of a deletion is visible before it is attempted.
-export async function getDocumentCountsByCategory(): Promise<Record<string, number>> {
+export const getDocumentCountsByCategory = cache(async (): Promise<Record<string, number>> => {
   if (DATA_SOURCE === "mock") return {};
   if (DATA_SOURCE === "local") return localGetDocumentCountsByCategory();
 
@@ -141,13 +142,13 @@ export async function getDocumentCountsByCategory(): Promise<Record<string, numb
     counts[row.category_id] = (counts[row.category_id] ?? 0) + 1;
   }
   return counts;
-}
+});
 
 // Every category's groups at once. The per-document move control needs this:
 // a document can be moved to any category and any group inside it (FR-026), so
 // once a different category is chosen the picker has to be able to offer that
 // category's groups, not the ones belonging to the page you happen to be on.
-export async function getAllDocumentGroups(): Promise<DocumentGroup[]> {
+export const getAllDocumentGroups = cache(async (): Promise<DocumentGroup[]> => {
   if (DATA_SOURCE === "mock") return [];
   if (DATA_SOURCE === "local") return localGetAllDocumentGroups();
 
@@ -165,7 +166,7 @@ export async function getAllDocumentGroups(): Promise<DocumentGroup[]> {
     if (row.group_id) counts.set(row.group_id, (counts.get(row.group_id) ?? 0) + 1);
   }
   return groups.map((group) => ({ ...group, document_count: counts.get(group.id) ?? 0 }));
-}
+});
 
 export async function getDocumentGroups(categoryId: string): Promise<DocumentGroup[]> {
   if (DATA_SOURCE === "mock") return mockGetDocumentGroups();

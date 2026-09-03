@@ -2,7 +2,9 @@
 
 import { ArrowDown, ArrowUp } from "lucide-react";
 import { toast } from "sonner";
+import { useState } from "react";
 import { useManageMode } from "@/components/ManageModeProvider";
+import { Spinner } from "@/components/ui/spinner";
 import { Button } from "@/components/ui/button";
 
 // Up/down buttons rather than drag-and-drop (spec FR-021). The team uses this
@@ -22,16 +24,22 @@ export function ReorderButtons({
   onMove: (direction: "up" | "down") => Promise<{ ok: true } | { ok: false; error: string }>;
 }) {
   const { enqueue } = useManageMode();
+  const [inFlight, setInFlight] = useState(0);
 
   function move(direction: "up" | "down") {
+    // Counted rather than a boolean: clicks queue up, so a burst of four taps
+    // should keep showing progress until the last one lands.
+    setInFlight((count) => count + 1);
     enqueue(async () => {
       const result = await onMove(direction);
       if (!result.ok) toast.error(result.error);
+      setInFlight((count) => count - 1);
     });
   }
 
   return (
     <span className="flex shrink-0 items-center">
+      {inFlight > 0 && <Spinner className="h-3.5 w-3.5 text-muted-foreground" />}
       <Button
         type="button"
         size="icon-sm"

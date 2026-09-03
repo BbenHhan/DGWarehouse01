@@ -1,11 +1,7 @@
-import Link from "next/link";
-import { Upload } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { notFound } from "next/navigation";
 import {
-  getDocumentCategories,
-  getDocumentCountsByCategory,
   getAllDocumentGroups,
+  getDocumentCategories,
   getDocumentGroups,
   getDocuments,
 } from "@/lib/data";
@@ -14,19 +10,10 @@ import { canEdit as roleCanEdit } from "@/lib/roles";
 import { getCurrentUser } from "@/lib/supabase/server";
 import { DocList } from "@/components/DocList";
 import { DocUploader } from "@/components/DocUploader";
-import { ManageModeToggle } from "@/components/ManageModeProvider";
-import { CategoryManagePanel } from "@/components/CategoryManagePanel";
-import { categoryLabel, categoryNumber } from "@/lib/taxonomy-label";
+import { categoryLabel } from "@/lib/taxonomy-label";
 
-function tabClass(active: boolean) {
-  return [
-    "flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium whitespace-nowrap transition-all",
-    active
-      ? "border-transparent bg-gradient-to-br from-primary to-primary-2 text-primary-foreground shadow-[0_3px_14px_rgba(155,94,40,.35)]"
-      : "border-border bg-card text-foreground hover:border-primary/40 hover:bg-accent",
-  ].join(" ");
-}
-
+// Only the part that changes per category. The header, management panel and
+// tab bar are in layout.tsx so they stay put while this reloads.
 export default async function DocumentCategoryPage({
   params,
 }: {
@@ -36,18 +23,17 @@ export default async function DocumentCategoryPage({
 
   const categories = await getDocumentCategories();
   const currentCategory = categories.find((category) => category.slug === categorySlug);
-
   if (!currentCategory) {
     notFound();
   }
 
-  const [documents, currentUser, documentGroups, allGroups, documentCounts] = await Promise.all([
+  const [documents, currentUser, documentGroups, allGroups] = await Promise.all([
     getDocuments(currentCategory.id),
     getCurrentUser(),
     getDocumentGroups(currentCategory.id),
     getAllDocumentGroups(),
-    getDocumentCountsByCategory(),
   ]);
+
   const userCanEdit = currentUser ? roleCanEdit(currentUser.role) : false;
   const categoryMoveOptions = USE_MOCK_DATA
     ? []
@@ -57,57 +43,7 @@ export default async function DocumentCategoryPage({
       }));
 
   return (
-    <div className="flex flex-col gap-5">
-      <div className="flex items-center gap-3">
-        <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-primary-2 text-xl shadow-[0_4px_18px_rgba(155,94,40,.3)]">
-          {currentCategory.emoji}
-        </span>
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
-            {categoryLabel(currentCategory)}
-          </h1>
-          <p className="text-sm text-muted-foreground">รายการเอกสาร · {documents.length} ไฟล์</p>
-        </div>
-        <div className="ml-auto flex items-center gap-2">
-          {/* nativeButton={false} because this renders as a link rather than a
-              <button> — without it Base UI warns that native button semantics
-              have been removed. Same shape as DocList's "เปิดในแท็บใหม่". */}
-          {!USE_MOCK_DATA && userCanEdit && (
-            <Button
-              variant="outline"
-              size="sm"
-              nativeButton={false}
-              render={
-                <Link href="/documents/upload">
-                  <Upload className="h-4 w-4" />
-                  อัปโหลดหลายไฟล์
-                </Link>
-              }
-            />
-          )}
-          <ManageModeToggle />
-        </div>
-      </div>
-
-      <CategoryManagePanel
-        categories={categories}
-        documentCounts={documentCounts}
-        allGroups={allGroups}
-      />
-
-      <nav className="scroll-thin flex gap-2 overflow-x-auto pb-2">
-        {categories.map((category) => (
-          <Link
-            key={category.id}
-            href={`/documents/${category.slug}`}
-            className={tabClass(category.slug === categorySlug)}
-          >
-            <span className="text-base leading-none">{category.emoji}</span>
-            {categoryNumber(category)} {category.name_th}
-          </Link>
-        ))}
-      </nav>
-
+    <>
       {!USE_MOCK_DATA && userCanEdit && (
         <DocUploader
           categoryId={currentCategory.id}
@@ -127,6 +63,6 @@ export default async function DocumentCategoryPage({
           canEdit={userCanEdit}
         />
       </div>
-    </div>
+    </>
   );
 }
