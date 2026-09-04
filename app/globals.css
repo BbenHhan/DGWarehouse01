@@ -105,12 +105,17 @@
 
   /* Room/status colors (specs/032, theme-scoped by specs/034) — identical
      to the original hardcoded values every non-Pixel theme keeps. */
-  --room-1-bg: #f0f9ff; --room-1-fg: #0369a1; --room-1-border: #bae6fd;
-  --room-2-bg: #ecfdf5; --room-2-fg: #047857; --room-2-border: #a7f3d0;
-  --room-3-bg: #f5f3ff; --room-3-fg: #6d28d9; --room-3-border: #ddd6fe;
-  --room-4-bg: #fff1f2; --room-4-fg: #be123c; --room-4-border: #fecdd3;
-  --room-5-bg: #fffbeb; --room-5-fg: #92400e; --room-5-border: #fde68a;
-  --room-6-bg: #fff7ed; --room-6-fg: #c2410c; --room-6-border: #fed7aa;
+  /* Dusty, greyed-down room tints (specs/034 slots, repigmented). The former
+     values were Tailwind's -50 tints: so pale that the rose and peach rooms
+     were near enough to white to be told apart only by their text. These carry
+     real pigment while staying muted, which also suits the warm cream ground
+     the app sits on better than a set of clean pastels did. */
+  --room-1-bg: #d6e2ea; --room-1-fg: #2f4d61; --room-1-border: #b6c9d8;
+  --room-2-bg: #d8e5d9; --room-2-fg: #38553d; --room-2-border: #b6cdb9;
+  --room-3-bg: #dfd9e7; --room-3-fg: #4d3f5e; --room-3-border: #c4bad2;
+  --room-4-bg: #ebdbdc; --room-4-fg: #6b3b40; --room-4-border: #d6bec0;
+  --room-5-bg: #ebdfc7; --room-5-fg: #6a5327; --room-5-border: #d7c7a3;
+  --room-6-bg: #ecdbcf; --room-6-fg: #6d4530; --room-6-border: #d8bfad;
   --status-todo-bg: var(--secondary); --status-todo-fg: var(--muted-foreground); --status-todo-border: var(--border);
   --status-progress-bg: #fffbeb; --status-progress-fg: #92400e; --status-progress-border: #fde68a;
   --status-done-bg: #ecfdf5; --status-done-fg: #047857; --status-done-border: #a7f3d0;
@@ -154,12 +159,17 @@
   --primary-2: #6366f1;
   --gold: #eab308;
 
-  --room-1-bg: #f0f9ff; --room-1-fg: #0369a1; --room-1-border: #bae6fd;
-  --room-2-bg: #ecfdf5; --room-2-fg: #047857; --room-2-border: #a7f3d0;
-  --room-3-bg: #f5f3ff; --room-3-fg: #6d28d9; --room-3-border: #ddd6fe;
-  --room-4-bg: #fff1f2; --room-4-fg: #be123c; --room-4-border: #fecdd3;
-  --room-5-bg: #fffbeb; --room-5-fg: #92400e; --room-5-border: #fde68a;
-  --room-6-bg: #fff7ed; --room-6-fg: #c2410c; --room-6-border: #fed7aa;
+  /* Dusty, greyed-down room tints (specs/034 slots, repigmented). The former
+     values were Tailwind's -50 tints: so pale that the rose and peach rooms
+     were near enough to white to be told apart only by their text. These carry
+     real pigment while staying muted, which also suits the warm cream ground
+     the app sits on better than a set of clean pastels did. */
+  --room-1-bg: #d6e2ea; --room-1-fg: #2f4d61; --room-1-border: #b6c9d8;
+  --room-2-bg: #d8e5d9; --room-2-fg: #38553d; --room-2-border: #b6cdb9;
+  --room-3-bg: #dfd9e7; --room-3-fg: #4d3f5e; --room-3-border: #c4bad2;
+  --room-4-bg: #ebdbdc; --room-4-fg: #6b3b40; --room-4-border: #d6bec0;
+  --room-5-bg: #ebdfc7; --room-5-fg: #6a5327; --room-5-border: #d7c7a3;
+  --room-6-bg: #ecdbcf; --room-6-fg: #6d4530; --room-6-border: #d8bfad;
   --status-todo-bg: var(--secondary); --status-todo-fg: var(--muted-foreground); --status-todo-border: var(--border);
   --status-progress-bg: #fffbeb; --status-progress-fg: #92400e; --status-progress-border: #fde68a;
   --status-done-bg: #ecfdf5; --status-done-fg: #047857; --status-done-border: #a7f3d0;
