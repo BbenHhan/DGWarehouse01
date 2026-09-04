@@ -354,3 +354,42 @@ describe("RoomChecklistBox names its room", () => {
     expect(screen.getAllByText(ROOM_NAME)).toHaveLength(2);
   });
 });
+
+// specs/043: an entry can now reach this page through a sub-item rather than a
+// tag of its own. It has no per-room record here, so a control would write
+// nowhere — its status is shown instead.
+describe("RoomChecklistBox: an entry reached through its sub-items", () => {
+  function untaggedParent() {
+    return makeItem({
+      text: "ตรวจระบบดับเพลิงทั้งโกดัง",
+      room_ids: [],
+      room_statuses: [],
+      status: "in_progress" as ChecklistStatus,
+      sub_items: [
+        { ...makeItem({ id: "sub-1", text: "ตรวจถังดับเพลิง" }), parent_id: "item-1" },
+      ],
+    });
+  }
+
+  it("shows its status", () => {
+    renderBox([untaggedParent()]);
+    expect(screen.getByText("กำลังทำ")).toBeInTheDocument();
+  });
+
+  it("offers no status control for it, since there is none to write here", () => {
+    renderBox([untaggedParent()]);
+    expect(
+      screen.queryByLabelText("สถานะของ ตรวจระบบดับเพลิงทั้งโกดัง")
+    ).not.toBeInTheDocument();
+  });
+
+  it("still offers the control for an entry tagged to this room", () => {
+    renderBox([makeItem()]);
+    expect(screen.getByLabelText("สถานะของ ติดป้ายทางออกฉุกเฉิน")).toBeInTheDocument();
+  });
+
+  it("still offers a control for the sub-item beneath it", () => {
+    renderBox([untaggedParent()]);
+    expect(screen.getByLabelText("สถานะของ ตรวจถังดับเพลิง")).toBeInTheDocument();
+  });
+});

@@ -306,15 +306,52 @@ export async function getRoomChecklistItems(roomId: string): Promise<ChecklistIt
   await requireUser();
   const supabase = createServiceClient();
 
-  const { data: topLevel, error: topLevelError } = await supabase
+  // An entry belongs on this room's page when it carries the room's own tag, or
+  // when any of its sub-items does. Asking only the first question left an entry
+  // that covers several rooms through its sub-items — and so carries no room tag
+  // of its own — unreachable from every room page in the app, taking its
+  // sub-items with it (specs/043 FR-001).
+  const { data: taggedSubs, error: taggedSubsError } = await supabase
     .from("checklist_items")
-    .select("*, checklist_item_rooms!inner(room_id, status)")
+    .select("parent_id, checklist_item_rooms!inner(room_id, status)")
     .eq("checklist_item_rooms.room_id", roomId)
     .neq("checklist_item_rooms.status", "done")
+    .neq("status", "done")
+    .not("parent_id", "is", null);
+  if (taggedSubsError) throw taggedSubsError;
+
+  const { data: ownTagged, error: ownTaggedError } = await supabase
+    .from("checklist_items")
+    .select("id, checklist_item_rooms!inner(room_id, status)")
+    .eq("checklist_item_rooms.room_id", roomId)
+    .neq("checklist_item_rooms.status", "done")
+    .is("parent_id", null);
+  if (ownTaggedError) throw ownTaggedError;
+
+  const topLevelIds = [
+    ...new Set([
+      ...ownTagged.map((row) => row.id as string),
+      ...taggedSubs.map((row) => row.parent_id as string).filter(Boolean),
+    ]),
+  ];
+  if (topLevelIds.length === 0) return [];
+
+  const { data: topLevelRows, error: topLevelError } = await supabase
+    .from("checklist_items")
+    .select("*, checklist_item_rooms(room_id, status)")
+    .in("id", topLevelIds)
     .is("parent_id", null)
     .order("created_at", { ascending: false });
   if (topLevelError) throw topLevelError;
-  if (topLevel.length === 0) return [];
+  if (topLevelRows.length === 0) return [];
+
+  // Narrowed to this room's own tag, which is what the filtered join used to
+  // produce. An entry reached only through a sub-item has none, and the room
+  // box reads that as "no status of mine to set here" (FR-010).
+  const topLevel = topLevelRows.map((row) => ({
+    ...row,
+    checklist_item_rooms: row.checklist_item_rooms.filter((tag) => tag.room_id === roomId),
+  }));
 
   const { data: subs, error: subsError } = await supabase
     .from("checklist_items")

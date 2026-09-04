@@ -650,7 +650,20 @@ export async function localGetRoomChecklistItems(roomId: string): Promise<Checkl
     return item.room_ids.includes(roomId) && !!roomStatus && roomStatus.status !== "done";
   }
 
-  const topLevel = db.checklistItems.filter((item) => !item.parent_id && roomNotDone(item)).sort(byCreatedDesc);
+  // An entry belongs on this room's page when it carries the room's own tag,
+  // or when any of its sub-items does. Asking only the first question made an
+  // entry that covers several rooms through its sub-items — and so carries no
+  // room of its own — unreachable from every room page, taking its sub-items
+  // with it (specs/043 FR-001).
+  const parentsReachedByASub = new Set(
+    db.checklistItems
+      .filter((sub) => sub.parent_id && sub.status !== "done" && roomNotDone(sub))
+      .map((sub) => sub.parent_id as string)
+  );
+
+  const topLevel = db.checklistItems
+    .filter((item) => !item.parent_id && (roomNotDone(item) || parentsReachedByASub.has(item.id)))
+    .sort(byCreatedDesc);
 
   return topLevel.map((item) => ({
     ...item,

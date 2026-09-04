@@ -7,7 +7,7 @@ import { CheckSquare } from "lucide-react";
 import { toast } from "sonner";
 import type { ChecklistItem } from "@/lib/types";
 import type { ChecklistStatus } from "@/lib/checklist-status";
-import { getRoomColor, STATUS_LABELS } from "@/lib/room-colors";
+import { getRoomColor, STATUS_COLORS, STATUS_LABELS } from "@/lib/room-colors";
 import { formatThaiDate } from "@/lib/date-format";
 import { addChecklistItem, setChecklistItemRoomStatus, setChecklistItemStatus } from "@/app/actions/checklist";
 import { Button } from "@/components/ui/button";
@@ -268,14 +268,30 @@ export function RoomChecklistBox({
                     <p className="text-xs text-muted-foreground">ครบกำหนด {formatThaiDate(item.due_date) ?? item.due_date}</p>
                   )}
                 </div>
-                <StatusSelect
-                  status={item.status}
-                  onChange={(status) => handleStatusTop(item.id, status)}
-                  disabled={!canEdit}
-                  busy={busyItemId === item.id}
-                  selectClass={colors.select}
-                  label={`สถานะของ ${item.text}`}
-                />
+                {item.room_ids.includes(roomId) ? (
+                  <StatusSelect
+                    status={item.status}
+                    onChange={(status) => handleStatusTop(item.id, status)}
+                    disabled={!canEdit}
+                    busy={busyItemId === item.id}
+                    selectClass={colors.select}
+                    label={`สถานะของ ${item.text}`}
+                  />
+                ) : (
+                  // Reached this page through a sub-item rather than a tag of
+                  // its own, so there is no per-room record here to write to.
+                  // Its status is what the sub-items beneath it add up to —
+                  // shown, not set, exactly as the sitewide checklist shows an
+                  // entry that has sub-items (specs/043 FR-010).
+                  <span
+                    className={[
+                      "shrink-0 rounded-full px-2.5 py-1 text-xs font-medium",
+                      STATUS_COLORS[item.status].badge,
+                    ].join(" ")}
+                  >
+                    {STATUS_LABELS[item.status]}
+                  </span>
+                )}
               </div>
 
               {item.sub_items.length > 0 && (
