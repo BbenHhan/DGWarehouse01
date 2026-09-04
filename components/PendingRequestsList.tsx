@@ -90,6 +90,7 @@ function RequestRow({
           size="sm"
           variant="outline"
           disabled={busy}
+          aria-busy={busy || undefined}
           onClick={() => onResolve(request.id, "deny")}
         >
           {showBusy && <Spinner className="h-3.5 w-3.5" />}
@@ -99,6 +100,7 @@ function RequestRow({
           type="button"
           size="sm"
           disabled={busy}
+          aria-busy={busy || undefined}
           onClick={() => onResolve(request.id, "approve")}
         >
           {showBusy && <Spinner className="h-3.5 w-3.5" />}

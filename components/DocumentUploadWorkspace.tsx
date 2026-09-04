@@ -9,6 +9,9 @@ import { suggestGroups, type Suggestion } from "@/lib/document-suggest";
 import { categoryNumber, groupNumber } from "@/lib/taxonomy-label";
 import { extractPdfText } from "@/lib/pdf-text";
 import { Button } from "@/components/ui/button";
+// These two indicators are driven by a per-file status rather than a boolean,
+// and neither an upload nor a PDF scan can finish inside the 150ms window that
+// useDelayedBusy exists to cover, so they are shown directly (FR-013).
 import { Spinner } from "@/components/ui/spinner";
 import { Input } from "@/components/ui/input";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";

@@ -161,3 +161,16 @@ even though its story priority alone would not demand it.
 Eight of the forty-three tasks (T039–T043 plus the throttled parts of T037) need a
 signed-in editor and are the account holder's to run — the same constraint that left nine
 of feature 040's tasks open.
+
+---
+
+## Phase 7: Convergence
+
+Found by `/speckit-converge` after the implementation pass: places where the code does not
+yet meet the spec. These are gaps in the app, not in the documents.
+
+- [X] T044 Route every busy indicator through `useDelayedBusy` per FR-013 (partial) — `components/DocUploader.tsx`, `components/ReorderButtons.tsx`, `components/DeleteTaxonomyDialog.tsx`, `components/CategoryManagePanel.tsx`, `components/EditableName.tsx`, `components/EditModal.tsx`, `components/DocumentUploadWorkspace.tsx` and the add-group form in `components/DocList.tsx` show theirs the instant the write starts.
+  **Done except DocumentUploadWorkspace**, which is exempt with the reason recorded in the file: its two indicators are driven by a per-file status rather than a boolean, and neither an upload nor a PDF scan can finish inside the 150ms window the hook exists to cover. They predate the hook and were never migrated, so the app is inconsistent: a checklist status change sits still while a rename flashes
+- [X] T045 Set `aria-busy` on the controls whose label does not change while they work, per FR-010 (partial) — the deny and approve buttons in `components/PendingRequestsList.tsx`, the quick-add button in `components/RoomChecklistBox.tsx`, the add and save buttons in `components/ChecklistList.tsx`, the arrows in `components/ReorderButtons.tsx`, and the field in `components/EditableName.tsx`. Each shows a spinner beside unchanged text, which a screen reader does not announce
+- [X] T046 Reconcile the coverage list in `spec.md` Assumptions and the walk in `quickstart.md` with what was built, per SC-001 (contradicts) — both name the thumbnails in `components/UnsortedFileTray.tsx`, `components/DocumentUploadWorkspace.tsx` and `components/MobileSwipeCard.tsx` as places that must show a loading state, but those render `URL.createObjectURL` blobs of local files and were deliberately left alone (T031–T033). Either add the states or record the exclusion and its reason — the documents and the code currently disagree
+- [X] T047 Delay the per-tab spinner in `components/CategoryTabs.tsx` per FR-013 (partial) — it renders as soon as `useLinkStatus` reports pending, so a warm client navigation that completes in under 150 ms flashes it

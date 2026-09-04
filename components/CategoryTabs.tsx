@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useLinkStatus } from "next/link";
 import { categoryNumber } from "@/lib/taxonomy-label";
 import { Spinner } from "@/components/ui/spinner";
+import { useDelayedBusy } from "@/lib/use-delayed-busy";
 import type { DocumentCategory } from "@/lib/types";
 
 // Each category is its own route, so switching tabs is a navigation with a
@@ -12,7 +13,10 @@ import type { DocumentCategory } from "@/lib/types";
 // a slow connection.
 function TabPending() {
   const { pending } = useLinkStatus();
-  return pending ? <Spinner className="h-3.5 w-3.5" /> : null;
+  // Same rule as every other indicator: a warm client navigation can finish
+  // inside the delay, and a spinner that flashes reads as a glitch.
+  const showBusy = useDelayedBusy(pending);
+  return showBusy ? <Spinner className="h-3.5 w-3.5" /> : null;
 }
 
 export function CategoryTabs({

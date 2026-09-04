@@ -11,6 +11,7 @@ import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
+import { useDelayedBusy } from "@/lib/use-delayed-busy";
 import { Input } from "@/components/ui/input";
 import type { DocumentCategory, DocumentGroup } from "@/lib/types";
 
@@ -31,6 +32,7 @@ const NEW_CATEGORY_DRAFT = "__new-category__";
 function AddCategoryForm() {
   const { draft, setDraft, clearDraft } = useManageMode();
   const [isPending, startTransition] = useTransition();
+  const showBusy = useDelayedBusy(isPending);
   // Starts on a different icon each time rather than always the same folder, so
   // a run of new categories does not end up looking identical in the tab bar.
   const [emoji, setEmoji] = useState(CATEGORY_EMOJI[0]);
@@ -62,7 +64,7 @@ function AddCategoryForm() {
         className="h-9 text-sm"
       />
       <Button type="submit" size="sm" disabled={isPending || !value.trim()}>
-        {isPending ? (
+        {showBusy ? (
           <>
             <Spinner />
             กำลังเพิ่ม...

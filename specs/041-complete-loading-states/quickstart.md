@@ -92,5 +92,8 @@ npx tsc --noEmit && npm run lint
 
 Walk the list in the spec's Assumptions — the checklist controls, room checklist controls,
 account menu, user role table, pending access requests, photo grid, the three login-screen
-forms, the document preview, and the image thumbnails in the upload workspace, unsorted
-file tray, and mobile swipe card. Every one must show something while it waits.
+forms, and the document preview. Every one must show something while it waits.
+
+The upload workspace, unsorted file tray and mobile swipe card thumbnails are deliberately
+not on this list: they show local files by object URL, so nothing about them is ever
+pending. Do not treat their lack of a loading state as a miss.

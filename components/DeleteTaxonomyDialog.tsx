@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { deleteCategory, deleteGroup } from "@/app/actions/document-taxonomy";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
+import { useDelayedBusy } from "@/lib/use-delayed-busy";
 import {
   Dialog,
   DialogContent,
@@ -51,6 +52,7 @@ export function DeleteTaxonomyDialog({
   const [toCategoryId, setToCategoryId] = useState("");
   const [toGroupId, setToGroupId] = useState(NO_GROUP);
   const [isPending, startTransition] = useTransition();
+  const showBusy = useDelayedBusy(isPending);
 
   // A destination inside the thing being deleted is never offered — the
   // documents would be destroyed a moment after arriving (spec Edge Cases).
@@ -119,7 +121,7 @@ export function DeleteTaxonomyDialog({
                 ยกเลิก
               </Button>
               <Button type="button" onClick={() => run({ kind: "none" })} disabled={isPending}>
-                {isPending ? (
+                {showBusy ? (
                   <>
                     <Spinner />
                     กำลังลบ...
@@ -145,7 +147,7 @@ export function DeleteTaxonomyDialog({
                 disabled={isPending}
                 onClick={() => run({ kind: "delete", confirmedCount: documentCount })}
               >
-                {isPending ? (
+                {showBusy ? (
                   <>
                     <Spinner />
                     กำลังลบ...
@@ -226,7 +228,7 @@ export function DeleteTaxonomyDialog({
                   })
                 }
               >
-                {isPending ? (
+                {showBusy ? (
                   <>
                     <Spinner />
                     กำลังย้าย...

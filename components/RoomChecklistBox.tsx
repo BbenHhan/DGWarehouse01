@@ -305,7 +305,7 @@ export function RoomChecklistBox({
             disabled={isAdding}
             className="h-8 text-sm"
           />
-          <Button type="submit" size="sm" disabled={isAdding || !text.trim()}>
+          <Button type="submit" size="sm" disabled={isAdding || !text.trim()} aria-busy={isAdding || undefined}>
             {isAdding && <Spinner className="h-3.5 w-3.5" />}
             เพิ่ม
           </Button>

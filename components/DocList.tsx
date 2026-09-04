@@ -15,6 +15,7 @@ import { publicFileUrl } from "@/lib/storage";
 import { fileKindFromName } from "@/lib/file-kind";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
+import { useDelayedBusy } from "@/lib/use-delayed-busy";
 import { Skeleton } from "@/components/ui/skeleton";
 import { fetchWithProgress, formatBytes } from "@/lib/fetch-with-progress";
 import { Input } from "@/components/ui/input";
@@ -431,6 +432,7 @@ function DocumentRow({
 function AddGroupForm({ categoryId }: { categoryId: string }) {
   const { draft, setDraft, clearDraft } = useManageMode();
   const [isPending, startTransition] = useTransition();
+  const showBusy = useDelayedBusy(isPending);
   const value = draft(categoryId);
 
   function handleAdd(event: React.FormEvent<HTMLFormElement>) {
@@ -458,7 +460,7 @@ function AddGroupForm({ categoryId }: { categoryId: string }) {
         className="h-9 text-sm"
       />
       <Button type="submit" size="sm" disabled={isPending || !value.trim()}>
-        {isPending ? (
+        {showBusy ? (
           <>
             <Spinner />
             กำลังเพิ่ม...

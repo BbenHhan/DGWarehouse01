@@ -4,6 +4,7 @@ import { useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
+import { useDelayedBusy } from "@/lib/use-delayed-busy";
 import {
   Autocomplete,
   AutocompleteInput,
@@ -46,6 +47,7 @@ export function DocUploader({
   // creating a second group under the numbered name.
   const groupNames = groups.map((group) => groupLabel(group, category.sort_order));
   const [isPending, startTransition] = useTransition();
+  const showBusy = useDelayedBusy(isPending);
   const [isDragging, setIsDragging] = useState(false);
 
   function handleFiles(fileList: FileList | null) {
@@ -152,7 +154,7 @@ export function DocUploader({
             disabled={isPending}
             onClick={() => inputRef.current?.click()}
           >
-            {isPending ? (
+            {showBusy ? (
           <>
             <Spinner />
             กำลังอัปโหลด...

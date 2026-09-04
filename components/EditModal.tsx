@@ -5,6 +5,7 @@ import { Pencil } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
+import { useDelayedBusy } from "@/lib/use-delayed-busy";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -59,6 +60,7 @@ export function EditModal({ kind, item, moveOptions, moveLabel, groups, categori
   const initialMoveTo = kind === "photo" ? `${item.room_id}::${item.work_type_id}` : item.category_id;
   const [moveTo, setMoveTo] = useState(initialMoveTo);
   const [isPending, startTransition] = useTransition();
+  const showBusy = useDelayedBusy(isPending);
 
   // `groups` carries every category's groups; which ones are offered follows
   // whichever destination category is currently selected, so moving a document
@@ -219,7 +221,7 @@ export function EditModal({ kind, item, moveOptions, moveLabel, groups, categori
             ยกเลิก
           </Button>
           <Button type="button" onClick={handleSave} disabled={isPending}>
-            {isPending ? (
+            {showBusy ? (
           <>
             <Spinner />
             กำลังบันทึก...

@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { useState } from "react";
 import { useManageMode } from "@/components/ManageModeProvider";
 import { Spinner } from "@/components/ui/spinner";
+import { useDelayedBusy } from "@/lib/use-delayed-busy";
 import { Button } from "@/components/ui/button";
 
 // Up/down buttons rather than drag-and-drop (spec FR-021). The team uses this
@@ -25,6 +26,7 @@ export function ReorderButtons({
 }) {
   const { enqueue } = useManageMode();
   const [inFlight, setInFlight] = useState(0);
+  const showBusy = useDelayedBusy(inFlight > 0);
 
   function move(direction: "up" | "down") {
     // Counted rather than a boolean: clicks queue up, so a burst of four taps
@@ -38,8 +40,8 @@ export function ReorderButtons({
   }
 
   return (
-    <span className="flex shrink-0 items-center">
-      {inFlight > 0 && <Spinner className="h-3.5 w-3.5 text-muted-foreground" />}
+    <span className="flex shrink-0 items-center" aria-busy={inFlight > 0 || undefined}>
+      {showBusy && <Spinner className="h-3.5 w-3.5 text-muted-foreground" />}
       <Button
         type="button"
         size="icon-sm"

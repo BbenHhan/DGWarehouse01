@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Spinner } from "@/components/ui/spinner";
+import { useDelayedBusy } from "@/lib/use-delayed-busy";
 
 // Click the name, type, click away. Used for both category and sub-group names
 // (specs/040-editable-document-taxonomy FR-009).
@@ -24,6 +25,7 @@ export function EditableName({
 }) {
   const [draft, setDraft] = useState(value);
   const [isPending, startTransition] = useTransition();
+  const showBusy = useDelayedBusy(isPending);
   const inputRef = useRef<HTMLInputElement>(null);
 
   // A rename that lands elsewhere (another tab, another person) arrives as a
@@ -53,7 +55,7 @@ export function EditableName({
   }
 
   return (
-    <span className="flex min-w-0 flex-1 items-center gap-1.5">
+    <span className="flex min-w-0 flex-1 items-center gap-1.5" aria-busy={isPending || undefined}>
       <input
       ref={inputRef}
       aria-label={ariaLabel}
@@ -77,7 +79,7 @@ export function EditableName({
       />
       {/* A rename is one small write, but without this the only feedback was
           the field dimming, which reads as "broken" rather than "saving". */}
-      {isPending && <Spinner className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
+      {showBusy && <Spinner className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
     </span>
   );
 }

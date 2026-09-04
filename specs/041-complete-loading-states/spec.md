@@ -174,9 +174,17 @@ rectangle.
 - The page-level loading screens and the document-taxonomy controls already covered by the previous change are out of scope except where this feature's checks reveal a gap in them
 - No new dependency is needed; the work is applying the existing building blocks to the places that lack them
 - The 150 ms delay before an indicator appears, the progress reporting for previews, and
-  its extension to every previewed file type were decided by the account holder rather
-  than assumed
+  its extension to video alongside documents were decided by the account holder rather
+  than assumed. Images were then exempted from reporting a share, once it was clear that
+  measuring one costs the screen-sized version a phone would otherwise receive
 - Progress for video is read from how much the player has buffered rather than by
   downloading the file before playing it. Buffering the whole video first would satisfy
   "report progress" while taking away instant playback and seeking, which FR-014d forbids
-- The set of places needing work is the audit of the current code: the checklist controls, the room checklist controls, the account menu, the user role table, the pending access requests, the photo grid, the three login-screen forms, the document preview, and the image thumbnails in the upload workspace, the unsorted file tray, and the mobile swipe card
+- The set of places needing work is the audit of the current code: the checklist controls,
+  the room checklist controls, the account menu, the user role table, the pending access
+  requests, the photo grid, the three login-screen forms, and the document preview
+- The thumbnails in the upload workspace, the unsorted file tray, and the mobile swipe card
+  were in that list until implementation reached them. They render files already on the
+  user's own disk, addressed by object URLs, so there is no arrival to wait for and a
+  loading state there would be a placeholder that never appears. They are excluded, and
+  SC-001's walk excludes them too

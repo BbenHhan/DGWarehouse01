@@ -338,7 +338,7 @@ function AddChecklistForm({
         </label>
       </div>
       <RoomChipPicker rooms={rooms} selected={roomIds} onToggle={toggleRoom} />
-      <Button type="submit" size="sm" className="self-start" disabled={isPending || !text.trim()}>
+      <Button type="submit" size="sm" className="self-start" disabled={isPending || !text.trim()} aria-busy={isPending || undefined}>
         {isPending && <Spinner className="h-3.5 w-3.5" />}
         {parentId ? "เพิ่ม sub" : "เพิ่มรายการ"}
       </Button>
@@ -452,7 +452,7 @@ function EditChecklistDialog({
           <RoomChipPicker rooms={rooms} selected={roomIds} onToggle={toggleRoom} />
         </div>
         <DialogFooter>
-          <Button type="button" onClick={handleSave} disabled={isPending || !text.trim()}>
+          <Button type="button" onClick={handleSave} disabled={isPending || !text.trim()} aria-busy={isPending || undefined}>
             {isPending && <Spinner className="h-4 w-4" />}
             {isPending ? "กำลังบันทึก..." : "บันทึก"}
           </Button>
