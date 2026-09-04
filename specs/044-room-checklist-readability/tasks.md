@@ -21,14 +21,14 @@
 
 ---
 
-## Phase 3: Open — the account holder's decisions, not mine
+## Phase 3: Decided and done
 
-These two came out of the same report and are specified, but they change what is on screen
-rather than how it is arranged, so they are not being done on my own judgement. Both were
-put as questions and are unanswered.
+These two change what is on screen rather than how it is arranged, so they were put to the
+account holder as questions rather than settled by me. The answer was to handle them, so
+each records the choice made and why — both are one-line reversals if either is wrong.
 
-- [ ] T008 FR-005 — the room's name currently repeats on every row, parent and sub. It went in at the account holder's request in feature 042 and is half of the reported density. Options: name the room once in the box heading, or leave it on every row
-- [ ] T009 FR-006 — the add-a-sub field stands open under every entry, so four entries mean four input fields. Options: collapse it behind a small "+" on each entry, or leave it open
+- [X] T008 FR-005 — the room's name currently repeats on every row, parent and sub. It went in at the account holder's request in feature 042 and is half of the reported density. **Named once, in the box heading** (`เช็คลิสต์ห้องกลาง`). What the original requirement was for — a row never leaning on the page heading to say which room it concerns — is served by the heading itself, since every row in this box is that one room
+- [X] T009 FR-006 — the add-a-sub field stands open under every entry, so four entries mean four input fields. **Collapsed behind a quiet "＋ เพิ่มรายการย่อย" on each entry**, which opens the field and focuses it in one gesture, and closes again on blur if nothing was typed
 
 ---
 
