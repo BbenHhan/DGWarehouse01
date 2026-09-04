@@ -489,7 +489,11 @@ function ChecklistRow({
   // Status is only directly settable when nothing else derives it — no room
   // tags, no sub-items (specs/032-checklist-detail-status-colors FR-004).
   const directlyEditable = item.room_ids.length === 0 && item.sub_items.length === 0;
-  const multiRoom = item.room_ids.length >= 2;
+  // One rendering for every item that has rooms. This used to be split in two
+  // — a bare tinted control for exactly one room, a list of named rows for two
+  // or more — and the two drifted: the one-room case never named its room at
+  // all, leaving colour as the only clue (spec 042 FR-002, FR-006).
+  const hasRooms = item.room_ids.length > 0;
 
   return (
     <div className={["flex flex-col gap-2 rounded-xl border border-border/60 bg-card p-3", nested ? "bg-card/60" : ""].join(" ")}>
@@ -499,7 +503,7 @@ function ChecklistRow({
           {item.detail && <p className="mt-1 text-xs text-muted-foreground">{item.detail}</p>}
           <DateLine startDate={item.start_date} dueDate={item.due_date} />
 
-          {!multiRoom && (
+          {!hasRooms && (
             <div className="mt-2 flex items-center gap-2">
               {directlyEditable ? (
                 <StatusSelect
@@ -507,15 +511,6 @@ function ChecklistRow({
                   onChange={(status) => onSetStatus(item.id, status)}
                   disabled={!canEdit}
                   busy={busyKey === item.id}
-                  label={`สถานะของ ${item.text}`}
-                />
-              ) : item.room_ids.length === 1 ? (
-                <StatusSelect
-                  status={item.status}
-                  onChange={(status) => onSetRoomStatus(item.id, item.room_ids[0], status)}
-                  disabled={!canEdit}
-                  busy={busyKey === `${item.id}:${item.room_ids[0]}`}
-                  roomColorSelect={getRoomColor(rooms.find((r) => r.id === item.room_ids[0])?.slug ?? "").select}
                   label={`สถานะของ ${item.text}`}
                 />
               ) : (
@@ -526,7 +521,7 @@ function ChecklistRow({
             </div>
           )}
 
-          {multiRoom && (
+          {hasRooms && (
             <div className="mt-2 flex flex-col gap-1.5">
               <span className={["self-start rounded-full px-2.5 py-1 text-xs font-medium", STATUS_COLORS[item.status].badge].join(" ")}>
                 {STATUS_LABELS[item.status]}

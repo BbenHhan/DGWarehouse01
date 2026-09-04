@@ -60,6 +60,19 @@ function reduceOptimistic(state: ChecklistItem[], action: OptimisticAction): Che
 // is unstyleable OS chrome, which is why its color never actually showed
 // and it looked inconsistent with every other dropdown in the app
 // (specs/037-status-select-native-fix).
+// Every row here belongs to the page's own room, so this repeats down the
+// column. That was raised at clarification and the account holder chose to
+// have it anyway (spec 042 FR-009), so a row never depends on the page
+// heading to say what it is about.
+function RoomTag({ emoji, name }: { emoji: string; name: string }) {
+  return (
+    <span className="mt-0.5 flex items-center gap-1 text-xs font-medium text-muted-foreground">
+      <span className="leading-none">{emoji}</span>
+      <span className="truncate">{name}</span>
+    </span>
+  );
+}
+
 function StatusSelect({
   status,
   onChange,
@@ -159,11 +172,15 @@ function AddSubInput({
 export function RoomChecklistBox({
   roomId,
   roomSlug,
+  roomName,
+  roomEmoji,
   items,
   canEdit,
 }: {
   roomId: string;
   roomSlug: string;
+  roomName: string;
+  roomEmoji: string;
   items: ChecklistItem[];
   canEdit: boolean;
 }) {
@@ -246,6 +263,7 @@ export function RoomChecklistBox({
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0 flex-1">
                   <p className="text-sm text-foreground">{item.text}</p>
+                  <RoomTag emoji={roomEmoji} name={roomName} />
                   {item.due_date && (
                     <p className="text-xs text-muted-foreground">ครบกำหนด {formatThaiDate(item.due_date) ?? item.due_date}</p>
                   )}
@@ -266,6 +284,7 @@ export function RoomChecklistBox({
                     <div key={sub.id} className="flex items-start justify-between gap-2">
                       <div className="min-w-0 flex-1">
                         <p className="text-xs text-muted-foreground">{sub.text}</p>
+                        <RoomTag emoji={roomEmoji} name={roomName} />
                         {sub.due_date && (
                           <p className="text-xs text-muted-foreground">ครบกำหนด {formatThaiDate(sub.due_date) ?? sub.due_date}</p>
                         )}

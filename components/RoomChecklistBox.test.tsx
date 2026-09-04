@@ -28,6 +28,8 @@ const { RoomChecklistBox } = await import("@/components/RoomChecklistBox");
 
 const ROOM_ID = "room-uuid-1";
 const ROOM_SLUG = "hong-raek";
+const ROOM_NAME = "ห้องแรก";
+const ROOM_EMOJI = "🏠";
 
 function makeItem(overrides: Partial<ChecklistItem> = {}): ChecklistItem {
   return {
@@ -49,7 +51,14 @@ function makeItem(overrides: Partial<ChecklistItem> = {}): ChecklistItem {
 
 function renderBox(items: ChecklistItem[], canEdit = true) {
   return render(
-    <RoomChecklistBox roomId={ROOM_ID} roomSlug={ROOM_SLUG} items={items} canEdit={canEdit} />
+    <RoomChecklistBox
+      roomId={ROOM_ID}
+      roomSlug={ROOM_SLUG}
+      roomName={ROOM_NAME}
+      roomEmoji={ROOM_EMOJI}
+      items={items}
+      canEdit={canEdit}
+    />
   );
 }
 
@@ -313,5 +322,35 @@ describe("RoomChecklistBox busy scoping", () => {
       expect(screen.getByLabelText("สถานะของ ติดป้ายทางออกฉุกเฉิน")).toBeDisabled()
     );
     expect(screen.getByPlaceholderText("เพิ่มรายการด่วน...")).toBeEnabled();
+  });
+});
+
+// spec 042 FR-009: the account holder asked for the room to be named here too,
+// so a row never leans on the page heading to say what it is about.
+describe("RoomChecklistBox names its room", () => {
+  it("names the room on a top-level row", () => {
+    renderBox([makeItem()]);
+    expect(screen.getAllByText(ROOM_NAME).length).toBeGreaterThan(0);
+  });
+
+  it("names the room on a sub-item row too", () => {
+    renderBox([
+      makeItem({
+        sub_items: [
+          {
+            ...makeItem({ id: "sub-1", text: "ตรวจไฟฉุกเฉิน" }),
+            parent_id: "item-1",
+          },
+        ],
+      }),
+    ]);
+
+    // One for the parent row, one for the sub-item row.
+    expect(screen.getAllByText(ROOM_NAME)).toHaveLength(2);
+  });
+
+  it("names the room on every row when there are several", () => {
+    renderBox([makeItem(), makeItem({ id: "item-2", text: "ตรวจถังดับเพลิง" })]);
+    expect(screen.getAllByText(ROOM_NAME)).toHaveLength(2);
   });
 });

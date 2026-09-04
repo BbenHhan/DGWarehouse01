@@ -98,6 +98,8 @@ export default async function RoomWorkTypePage({
           <RoomChecklistBox
             roomId={currentRoom.id}
             roomSlug={currentRoom.slug}
+            roomName={currentRoom.name_th}
+            roomEmoji={currentRoom.emoji}
             items={roomChecklistItems}
             canEdit={userCanEdit}
           />
