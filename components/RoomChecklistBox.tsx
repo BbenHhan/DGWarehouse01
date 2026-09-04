@@ -113,12 +113,10 @@ function StatusSelect({
 function AddSubInput({
   parentId,
   roomId,
-  selectClass,
   onAdded,
 }: {
   parentId: string;
   roomId: string;
-  selectClass: string;
   onAdded: (item: ChecklistItem) => void;
 }) {
   const [text, setText] = useState("");
@@ -145,7 +143,7 @@ function AddSubInput({
   }
 
   return (
-    <form onSubmit={handleAdd} className={["flex gap-1.5 rounded-lg p-1.5 pl-6", selectClass].join(" ")}>
+    <form onSubmit={handleAdd} className="flex gap-1.5 rounded-lg border border-dashed border-border/70 p-1.5">
       <Input
         placeholder="เพิ่ม sub..."
         value={text}
@@ -257,9 +255,17 @@ export function RoomChecklistBox({
       {optimisticItems.length === 0 ? (
         <p className="text-xs text-muted-foreground">ไม่มีรายการค้างอยู่</p>
       ) : (
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-3.5">
           {optimisticItems.map((item) => (
-            <div key={item.id} className="flex flex-col gap-1.5">
+            // Each entry is enclosed, the way the sitewide checklist encloses
+            // its own. Before this the entry, its sub-items and its add-a-sub
+            // field were separated by about as much space as one entry was from
+            // the next, so there was nothing to tell the eye where an entry
+            // ended (spec 044 FR-001, FR-003).
+            <div
+              key={item.id}
+              className="flex flex-col gap-2 rounded-xl border border-border/70 bg-card p-3 shadow-sm"
+            >
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0 flex-1">
                   <p className="text-sm text-foreground">{item.text}</p>
@@ -295,9 +301,15 @@ export function RoomChecklistBox({
               </div>
 
               {item.sub_items.length > 0 && (
-                <div className="flex flex-col gap-1.5 pl-6">
+                // Sub-items sit inside their parent's card, each in a box of
+                // its own, so which entry a sub-item belongs to is a matter of
+                // containment rather than of counting indentation (FR-002).
+                <div className="flex flex-col gap-1.5 border-t border-border/60 pt-2">
                   {item.sub_items.map((sub) => (
-                    <div key={sub.id} className="flex items-start justify-between gap-2">
+                    <div
+                      key={sub.id}
+                      className="flex items-start justify-between gap-2 rounded-lg border border-border/50 bg-secondary/40 p-2"
+                    >
                       <div className="min-w-0 flex-1">
                         <p className="text-xs text-muted-foreground">{sub.text}</p>
                         <RoomTag emoji={roomEmoji} name={roomName} />
@@ -322,7 +334,6 @@ export function RoomChecklistBox({
                 <AddSubInput
                   parentId={item.id}
                   roomId={roomId}
-                  selectClass={colors.select}
                   onAdded={(subItem) => applyOptimistic({ type: "addSub", parentId: item.id, item: subItem })}
                 />
               )}
