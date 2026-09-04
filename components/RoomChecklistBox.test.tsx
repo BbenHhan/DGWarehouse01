@@ -67,9 +67,9 @@ beforeEach(() => {
 });
 
 describe("RoomChecklistBox rendering", () => {
-  it("always shows the box heading", () => {
+  it("always shows the box heading, naming the room", () => {
     renderBox([]);
-    expect(screen.getByText("เช็คลิสต์ห้องนี้")).toBeInTheDocument();
+    expect(screen.getByText(`เช็คลิสต์${ROOM_NAME}`)).toBeInTheDocument();
   });
 
   it("shows an empty-state line when the room has nothing outstanding", () => {
@@ -325,33 +325,20 @@ describe("RoomChecklistBox busy scoping", () => {
   });
 });
 
-// spec 042 FR-009: the account holder asked for the room to be named here too,
-// so a row never leans on the page heading to say what it is about.
-describe("RoomChecklistBox names its room", () => {
-  it("names the room on a top-level row", () => {
+// spec 044 FR-005: the room used to be named on every row, parent and sub.
+// That came in at the account holder's request and was half of what made the
+// box unreadable. What it was for — a row never leaning on the page heading to
+// say which room it concerns — is served by naming the room in the box's own
+// heading instead.
+describe("RoomChecklistBox names its room once", () => {
+  it("names the room in the heading", () => {
     renderBox([makeItem()]);
-    expect(screen.getAllByText(ROOM_NAME).length).toBeGreaterThan(0);
+    expect(screen.getByText(`เช็คลิสต์${ROOM_NAME}`)).toBeInTheDocument();
   });
 
-  it("names the room on a sub-item row too", () => {
-    renderBox([
-      makeItem({
-        sub_items: [
-          {
-            ...makeItem({ id: "sub-1", text: "ตรวจไฟฉุกเฉิน" }),
-            parent_id: "item-1",
-          },
-        ],
-      }),
-    ]);
-
-    // One for the parent row, one for the sub-item row.
-    expect(screen.getAllByText(ROOM_NAME)).toHaveLength(2);
-  });
-
-  it("names the room on every row when there are several", () => {
+  it("does not repeat the room on each row", () => {
     renderBox([makeItem(), makeItem({ id: "item-2", text: "ตรวจถังดับเพลิง" })]);
-    expect(screen.getAllByText(ROOM_NAME)).toHaveLength(2);
+    expect(screen.getAllByText(new RegExp(ROOM_NAME))).toHaveLength(1);
   });
 });
 
@@ -391,5 +378,37 @@ describe("RoomChecklistBox: an entry reached through its sub-items", () => {
   it("still offers a control for the sub-item beneath it", () => {
     renderBox([untaggedParent()]);
     expect(screen.getByLabelText("สถานะของ ตรวจถังดับเพลิง")).toBeInTheDocument();
+  });
+});
+
+// spec 044 FR-006: the add-a-sub field used to stand open under every entry,
+// so four entries put four input fields on a phone screen, each looking like
+// another row of the list.
+describe("RoomChecklistBox add-a-sub is folded away", () => {
+  it("offers a control rather than an open field", () => {
+    renderBox([makeItem()]);
+    expect(screen.getByRole("button", { name: /เพิ่มรายการย่อย/ })).toBeInTheDocument();
+    expect(screen.queryByPlaceholderText("เพิ่ม sub...")).not.toBeInTheDocument();
+  });
+
+  it("opens the field when asked, and focuses it", async () => {
+    const user = userEvent.setup();
+    renderBox([makeItem()]);
+
+    await user.click(screen.getByRole("button", { name: /เพิ่มรายการย่อย/ }));
+
+    const field = await screen.findByPlaceholderText("เพิ่ม sub...");
+    expect(field).toHaveFocus();
+  });
+
+  it("shows one control per entry, not one open field per entry", () => {
+    renderBox([makeItem(), makeItem({ id: "item-2", text: "ตรวจถังดับเพลิง" })]);
+    expect(screen.getAllByRole("button", { name: /เพิ่มรายการย่อย/ })).toHaveLength(2);
+    expect(screen.queryByPlaceholderText("เพิ่ม sub...")).not.toBeInTheDocument();
+  });
+
+  it("hides a viewer's control entirely", () => {
+    renderBox([makeItem()], false);
+    expect(screen.queryByRole("button", { name: /เพิ่มรายการย่อย/ })).not.toBeInTheDocument();
   });
 });

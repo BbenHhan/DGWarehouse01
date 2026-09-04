@@ -1,9 +1,9 @@
 "use client";
 
-import { useOptimistic, useState, useTransition } from "react";
+import { useEffect, useOptimistic, useRef, useState, useTransition } from "react";
 import { useDelayedBusy } from "@/lib/use-delayed-busy";
 import { Spinner } from "@/components/ui/spinner";
-import { CheckSquare } from "lucide-react";
+import { CheckSquare, Plus } from "lucide-react";
 import { toast } from "sonner";
 import type { ChecklistItem } from "@/lib/types";
 import type { ChecklistStatus } from "@/lib/checklist-status";
@@ -60,19 +60,6 @@ function reduceOptimistic(state: ChecklistItem[], action: OptimisticAction): Che
 // is unstyleable OS chrome, which is why its color never actually showed
 // and it looked inconsistent with every other dropdown in the app
 // (specs/037-status-select-native-fix).
-// Every row here belongs to the page's own room, so this repeats down the
-// column. That was raised at clarification and the account holder chose to
-// have it anyway (spec 042 FR-009), so a row never depends on the page
-// heading to say what it is about.
-function RoomTag({ emoji, name }: { emoji: string; name: string }) {
-  return (
-    <span className="mt-0.5 flex items-center gap-1 text-xs font-medium text-muted-foreground">
-      <span className="leading-none">{emoji}</span>
-      <span className="truncate">{name}</span>
-    </span>
-  );
-}
-
 function StatusSelect({
   status,
   onChange,
@@ -120,7 +107,13 @@ function AddSubInput({
   onAdded: (item: ChecklistItem) => void;
 }) {
   const [text, setText] = useState("");
+  const [open, setOpen] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
   const [isPending, startTransition] = useTransition();
+
+  useEffect(() => {
+    if (open) inputRef.current?.focus();
+  }, [open]);
 
   function handleAdd(event: React.FormEvent) {
     event.preventDefault();
@@ -142,12 +135,31 @@ function AddSubInput({
     });
   }
 
+  // Folded away until asked for. Standing open under every entry meant four
+  // entries put four input fields on a phone screen, each looking like another
+  // row of the list (spec 044 FR-006). Opening it focuses the field, so asking
+  // for it and typing stay one gesture.
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="flex items-center gap-1 self-start rounded-md px-1 py-0.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+      >
+        <Plus className="h-3.5 w-3.5" />
+        เพิ่มรายการย่อย
+      </button>
+    );
+  }
+
   return (
     <form onSubmit={handleAdd} className="flex gap-1.5 rounded-lg border border-dashed border-border/70 p-1.5">
       <Input
+        ref={inputRef}
         placeholder="เพิ่ม sub..."
         value={text}
         onChange={(event) => setText(event.target.value)}
+        onBlur={() => !text.trim() && setOpen(false)}
         disabled={isPending}
         className="h-7 text-xs"
       />
@@ -247,9 +259,16 @@ export function RoomChecklistBox({
 
   return (
     <div className={["checklist-box flex flex-col gap-3 rounded-xl border border-border/60 p-3", colors.row].join(" ")}>
+      {/* The room is named once here rather than on every row. It went on
+          every row at the account holder's request (spec 042 FR-009) and the
+          repetition it caused was half of what made this box unreadable
+          (spec 044 FR-005) — what that requirement was for, a row never
+          leaning on the page heading to say which room it concerns, is served
+          by naming the room in the box's own heading. */}
       <p className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
-        <CheckSquare className="h-4 w-4 text-primary" />
-        เช็คลิสต์ห้องนี้
+        <CheckSquare className="h-4 w-4 shrink-0 text-primary" />
+        <span className="leading-none">{roomEmoji}</span>
+        <span className="min-w-0 truncate">เช็คลิสต์{roomName}</span>
       </p>
 
       {optimisticItems.length === 0 ? (
@@ -269,7 +288,6 @@ export function RoomChecklistBox({
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0 flex-1">
                   <p className="text-sm text-foreground">{item.text}</p>
-                  <RoomTag emoji={roomEmoji} name={roomName} />
                   {item.due_date && (
                     <p className="text-xs text-muted-foreground">ครบกำหนด {formatThaiDate(item.due_date) ?? item.due_date}</p>
                   )}
@@ -312,7 +330,6 @@ export function RoomChecklistBox({
                     >
                       <div className="min-w-0 flex-1">
                         <p className="text-xs text-muted-foreground">{sub.text}</p>
-                        <RoomTag emoji={roomEmoji} name={roomName} />
                         {sub.due_date && (
                           <p className="text-xs text-muted-foreground">ครบกำหนด {formatThaiDate(sub.due_date) ?? sub.due_date}</p>
                         )}
