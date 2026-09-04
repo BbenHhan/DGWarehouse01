@@ -1,21 +1,19 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getDocumentCategories, getDocumentNotes, getDocuments } from "@/lib/data";
+import {
+  getAllDocumentGroups,
+  getDocumentCategories,
+  getDocumentGroups,
+  getDocuments,
+} from "@/lib/data";
 import { USE_MOCK_DATA } from "@/lib/data-config";
 import { canEdit as roleCanEdit } from "@/lib/roles";
 import { getCurrentUser } from "@/lib/supabase/server";
 import { DocList } from "@/components/DocList";
 import { DocUploader } from "@/components/DocUploader";
+import { categoryLabel } from "@/lib/taxonomy-label";
 
-function tabClass(active: boolean) {
-  return [
-    "flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium whitespace-nowrap transition-all",
-    active
-      ? "border-transparent bg-gradient-to-br from-primary to-primary-2 text-primary-foreground shadow-[0_3px_14px_rgba(155,94,40,.35)]"
-      : "border-border bg-card text-foreground hover:border-primary/40 hover:bg-accent",
-  ].join(" ");
-}
-
+// Only the part that changes per category. The header, management panel and
+// tab bar are in layout.tsx so they stay put while this reloads.
 export default async function DocumentCategoryPage({
   params,
 }: {
@@ -25,58 +23,46 @@ export default async function DocumentCategoryPage({
 
   const categories = await getDocumentCategories();
   const currentCategory = categories.find((category) => category.slug === categorySlug);
-
   if (!currentCategory) {
     notFound();
   }
 
-  const [documents, currentUser, documentNotes] = await Promise.all([
+  const [documents, currentUser, documentGroups, allGroups] = await Promise.all([
     getDocuments(currentCategory.id),
     getCurrentUser(),
-    USE_MOCK_DATA ? Promise.resolve([]) : getDocumentNotes(),
+    getDocumentGroups(currentCategory.id),
+    getAllDocumentGroups(),
   ]);
+
   const userCanEdit = currentUser ? roleCanEdit(currentUser.role) : false;
   const categoryMoveOptions = USE_MOCK_DATA
     ? []
     : categories.map((category) => ({
         value: category.id,
-        label: `${category.emoji} ${category.name_th}`,
+        label: `${category.emoji} ${categoryLabel(category)}`,
       }));
 
   return (
-    <div className="flex flex-col gap-5">
-      <div className="flex items-center gap-3">
-        <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-primary-2 text-xl shadow-[0_4px_18px_rgba(155,94,40,.3)]">
-          {currentCategory.emoji}
-        </span>
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
-            {currentCategory.name_th}
-          </h1>
-          <p className="text-sm text-muted-foreground">รายการเอกสาร · {documents.length} ไฟล์</p>
-        </div>
-      </div>
-
-      <nav className="scroll-thin flex gap-2 overflow-x-auto pb-2">
-        {categories.map((category) => (
-          <Link
-            key={category.id}
-            href={`/documents/${category.slug}`}
-            className={tabClass(category.slug === categorySlug)}
-          >
-            <span className="text-base leading-none">{category.emoji}</span>
-            {category.name_th}
-          </Link>
-        ))}
-      </nav>
-
+    <>
       {!USE_MOCK_DATA && userCanEdit && (
-        <DocUploader categoryId={currentCategory.id} existingNotes={documentNotes} />
+        <DocUploader
+          categoryId={currentCategory.id}
+          groups={documentGroups}
+          category={currentCategory}
+        />
       )}
 
       <div className="border-t border-border/70 pt-4">
-        <DocList documents={documents} categoryMoveOptions={categoryMoveOptions} canEdit={userCanEdit} />
+        <DocList
+          documents={documents}
+          documentGroups={documentGroups}
+          allGroups={allGroups}
+          categories={categories}
+          categoryId={currentCategory.id}
+          categoryMoveOptions={categoryMoveOptions}
+          canEdit={userCanEdit}
+        />
       </div>
-    </div>
+    </>
   );
 }

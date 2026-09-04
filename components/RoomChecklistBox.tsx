@@ -1,11 +1,13 @@
 "use client";
 
 import { useOptimistic, useState, useTransition } from "react";
+import { useDelayedBusy } from "@/lib/use-delayed-busy";
+import { Spinner } from "@/components/ui/spinner";
 import { CheckSquare } from "lucide-react";
 import { toast } from "sonner";
 import type { ChecklistItem } from "@/lib/types";
 import type { ChecklistStatus } from "@/lib/checklist-status";
-import { getRoomColor, STATUS_LABELS } from "@/lib/room-colors";
+import { getRoomColor, STATUS_COLORS, STATUS_LABELS } from "@/lib/room-colors";
 import { formatThaiDate } from "@/lib/date-format";
 import { addChecklistItem, setChecklistItemRoomStatus, setChecklistItemStatus } from "@/app/actions/checklist";
 import { Button } from "@/components/ui/button";
@@ -58,22 +60,45 @@ function reduceOptimistic(state: ChecklistItem[], action: OptimisticAction): Che
 // is unstyleable OS chrome, which is why its color never actually showed
 // and it looked inconsistent with every other dropdown in the app
 // (specs/037-status-select-native-fix).
+// Every row here belongs to the page's own room, so this repeats down the
+// column. That was raised at clarification and the account holder chose to
+// have it anyway (spec 042 FR-009), so a row never depends on the page
+// heading to say what it is about.
+function RoomTag({ emoji, name }: { emoji: string; name: string }) {
+  return (
+    <span className="mt-0.5 flex items-center gap-1 text-xs font-medium text-muted-foreground">
+      <span className="leading-none">{emoji}</span>
+      <span className="truncate">{name}</span>
+    </span>
+  );
+}
+
 function StatusSelect({
   status,
   onChange,
   disabled,
+  busy,
   selectClass,
   label,
 }: {
   status: ChecklistStatus;
   onChange: (status: ChecklistStatus) => void;
   disabled?: boolean;
+  busy?: boolean;
   selectClass: string;
   label: string;
 }) {
+  // Held back briefly so a status change that lands quickly — the common case
+  // on a good connection — does not flicker a spinner at the user.
+  const showBusy = useDelayedBusy(Boolean(busy));
+
   return (
-    <Select value={status} onValueChange={(value) => value && onChange(value as ChecklistStatus)} disabled={disabled}>
-      <SelectTrigger size="sm" aria-label={label} className={["h-7 shrink-0 gap-1 text-xs font-medium", selectClass].join(" ")}>
+    <Select
+      value={status}
+      onValueChange={(value) => value && onChange(value as ChecklistStatus)}
+      disabled={disabled || busy}
+    >
+      <SelectTrigger size="sm" busy={showBusy} aria-label={label} className={["h-7 shrink-0 gap-1 text-xs font-medium", selectClass].join(" ")}>
         <SelectValue>{STATUS_LABELS[status]}</SelectValue>
       </SelectTrigger>
       <SelectContent>
@@ -88,12 +113,10 @@ function StatusSelect({
 function AddSubInput({
   parentId,
   roomId,
-  selectClass,
   onAdded,
 }: {
   parentId: string;
   roomId: string;
-  selectClass: string;
   onAdded: (item: ChecklistItem) => void;
 }) {
   const [text, setText] = useState("");
@@ -120,7 +143,7 @@ function AddSubInput({
   }
 
   return (
-    <form onSubmit={handleAdd} className={["flex gap-1.5 rounded-lg p-1.5 pl-6", selectClass].join(" ")}>
+    <form onSubmit={handleAdd} className="flex gap-1.5 rounded-lg border border-dashed border-border/70 p-1.5">
       <Input
         placeholder="เพิ่ม sub..."
         value={text}
@@ -147,16 +170,26 @@ function AddSubInput({
 export function RoomChecklistBox({
   roomId,
   roomSlug,
+  roomName,
+  roomEmoji,
   items,
   canEdit,
 }: {
   roomId: string;
   roomSlug: string;
+  roomName: string;
+  roomEmoji: string;
   items: ChecklistItem[];
   canEdit: boolean;
 }) {
   const [text, setText] = useState("");
-  const [isPending, startTransition] = useTransition();
+  // The add form and the status controls used to share one transition, so
+  // changing any row's status also disabled the add form, and vice versa.
+  const [isAdding, startAddTransition] = useTransition();
+  const [, startStatusTransition] = useTransition();
+  // Which row is being written, not merely whether some row is: a bare
+  // boolean marked all twenty rows busy when one status changed.
+  const [busyItemId, setBusyItemId] = useState<string | null>(null);
   const [optimisticItems, applyOptimistic] = useOptimistic(items, reduceOptimistic);
   const colors = getRoomColor(roomSlug);
 
@@ -165,7 +198,7 @@ export function RoomChecklistBox({
     const trimmed = text.trim();
     if (!trimmed) return;
 
-    startTransition(async () => {
+    startAddTransition(async () => {
       const result = await addChecklistItem({ text: trimmed, roomIds: [roomId] });
       if (!result.ok) {
         toast.error(result.error);
@@ -182,12 +215,14 @@ export function RoomChecklistBox({
   // state, so a different room's page can never be affected from here
   // (spec FR-005).
   function handleStatusTop(id: string, status: ChecklistStatus) {
-    startTransition(async () => {
+    setBusyItemId(id);
+    startStatusTransition(async () => {
       applyOptimistic({ type: "updateTop", id, status });
       const result = await setChecklistItemRoomStatus(id, roomId, status);
       if (!result.ok) {
         toast.error(result.error);
       }
+      setBusyItemId(null);
     });
   }
 
@@ -196,7 +231,8 @@ export function RoomChecklistBox({
   // visibility from its parent (no room tag row of its own, so it falls
   // back to the plain item-level status, unchanged from specs/029).
   function handleStatusSub(parentId: string, sub: ChecklistItem, status: ChecklistStatus) {
-    startTransition(async () => {
+    setBusyItemId(sub.id);
+    startStatusTransition(async () => {
       applyOptimistic({ type: "updateSub", parentId, id: sub.id, status });
       const result =
         sub.room_ids.length === 0
@@ -205,6 +241,7 @@ export function RoomChecklistBox({
       if (!result.ok) {
         toast.error(result.error);
       }
+      setBusyItemId(null);
     });
   }
 
@@ -218,31 +255,64 @@ export function RoomChecklistBox({
       {optimisticItems.length === 0 ? (
         <p className="text-xs text-muted-foreground">ไม่มีรายการค้างอยู่</p>
       ) : (
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-3.5">
           {optimisticItems.map((item) => (
-            <div key={item.id} className="flex flex-col gap-1.5">
+            // Each entry is enclosed, the way the sitewide checklist encloses
+            // its own. Before this the entry, its sub-items and its add-a-sub
+            // field were separated by about as much space as one entry was from
+            // the next, so there was nothing to tell the eye where an entry
+            // ended (spec 044 FR-001, FR-003).
+            <div
+              key={item.id}
+              className="flex flex-col gap-2 rounded-xl border border-border/70 bg-card p-3 shadow-sm"
+            >
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0 flex-1">
                   <p className="text-sm text-foreground">{item.text}</p>
+                  <RoomTag emoji={roomEmoji} name={roomName} />
                   {item.due_date && (
                     <p className="text-xs text-muted-foreground">ครบกำหนด {formatThaiDate(item.due_date) ?? item.due_date}</p>
                   )}
                 </div>
-                <StatusSelect
-                  status={item.status}
-                  onChange={(status) => handleStatusTop(item.id, status)}
-                  disabled={!canEdit}
-                  selectClass={colors.select}
-                  label={`สถานะของ ${item.text}`}
-                />
+                {item.room_ids.includes(roomId) ? (
+                  <StatusSelect
+                    status={item.status}
+                    onChange={(status) => handleStatusTop(item.id, status)}
+                    disabled={!canEdit}
+                    busy={busyItemId === item.id}
+                    selectClass={colors.select}
+                    label={`สถานะของ ${item.text}`}
+                  />
+                ) : (
+                  // Reached this page through a sub-item rather than a tag of
+                  // its own, so there is no per-room record here to write to.
+                  // Its status is what the sub-items beneath it add up to —
+                  // shown, not set, exactly as the sitewide checklist shows an
+                  // entry that has sub-items (specs/043 FR-010).
+                  <span
+                    className={[
+                      "shrink-0 rounded-full px-2.5 py-1 text-xs font-medium",
+                      STATUS_COLORS[item.status].badge,
+                    ].join(" ")}
+                  >
+                    {STATUS_LABELS[item.status]}
+                  </span>
+                )}
               </div>
 
               {item.sub_items.length > 0 && (
-                <div className="flex flex-col gap-1.5 pl-6">
+                // Sub-items sit inside their parent's card, each in a box of
+                // its own, so which entry a sub-item belongs to is a matter of
+                // containment rather than of counting indentation (FR-002).
+                <div className="flex flex-col gap-1.5 border-t border-border/60 pt-2">
                   {item.sub_items.map((sub) => (
-                    <div key={sub.id} className="flex items-start justify-between gap-2">
+                    <div
+                      key={sub.id}
+                      className="flex items-start justify-between gap-2 rounded-lg border border-border/50 bg-secondary/40 p-2"
+                    >
                       <div className="min-w-0 flex-1">
                         <p className="text-xs text-muted-foreground">{sub.text}</p>
+                        <RoomTag emoji={roomEmoji} name={roomName} />
                         {sub.due_date && (
                           <p className="text-xs text-muted-foreground">ครบกำหนด {formatThaiDate(sub.due_date) ?? sub.due_date}</p>
                         )}
@@ -251,6 +321,7 @@ export function RoomChecklistBox({
                         status={sub.status}
                         onChange={(status) => handleStatusSub(item.id, sub, status)}
                         disabled={!canEdit}
+                        busy={busyItemId === sub.id}
                         selectClass={colors.select}
                         label={`สถานะของ ${sub.text}`}
                       />
@@ -263,7 +334,6 @@ export function RoomChecklistBox({
                 <AddSubInput
                   parentId={item.id}
                   roomId={roomId}
-                  selectClass={colors.select}
                   onAdded={(subItem) => applyOptimistic({ type: "addSub", parentId: item.id, item: subItem })}
                 />
               )}
@@ -278,10 +348,11 @@ export function RoomChecklistBox({
             placeholder="เพิ่มรายการด่วน..."
             value={text}
             onChange={(event) => setText(event.target.value)}
-            disabled={isPending}
+            disabled={isAdding}
             className="h-8 text-sm"
           />
-          <Button type="submit" size="sm" disabled={isPending || !text.trim()}>
+          <Button type="submit" size="sm" disabled={isAdding || !text.trim()} aria-busy={isAdding || undefined}>
+            {isAdding && <Spinner className="h-3.5 w-3.5" />}
             เพิ่ม
           </Button>
         </form>

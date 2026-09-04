@@ -28,6 +28,8 @@ const { RoomChecklistBox } = await import("@/components/RoomChecklistBox");
 
 const ROOM_ID = "room-uuid-1";
 const ROOM_SLUG = "hong-raek";
+const ROOM_NAME = "ห้องแรก";
+const ROOM_EMOJI = "🏠";
 
 function makeItem(overrides: Partial<ChecklistItem> = {}): ChecklistItem {
   return {
@@ -49,7 +51,14 @@ function makeItem(overrides: Partial<ChecklistItem> = {}): ChecklistItem {
 
 function renderBox(items: ChecklistItem[], canEdit = true) {
   return render(
-    <RoomChecklistBox roomId={ROOM_ID} roomSlug={ROOM_SLUG} items={items} canEdit={canEdit} />
+    <RoomChecklistBox
+      roomId={ROOM_ID}
+      roomSlug={ROOM_SLUG}
+      roomName={ROOM_NAME}
+      roomEmoji={ROOM_EMOJI}
+      items={items}
+      canEdit={canEdit}
+    />
   );
 }
 
@@ -267,5 +276,120 @@ describe("RoomChecklistBox optimistic status changes", () => {
     await waitFor(() => {
       expect(setChecklistItemStatus).toHaveBeenCalledWith("sub-1", "in_progress");
     });
+  });
+});
+
+// specs/041-complete-loading-states FR-004: the box used to share one
+// transition across every row, so writing any row's status disabled all of
+// them. That is worse than showing nothing — it says something is happening
+// to rows that nothing is happening to.
+describe("RoomChecklistBox busy scoping", () => {
+  it("marks only the row being written", async () => {
+    const user = userEvent.setup();
+    let finishWrite: (result: { ok: true }) => void = () => {};
+    setChecklistItemRoomStatus.mockReturnValue(
+      new Promise<{ ok: true }>((resolve) => {
+        finishWrite = resolve;
+      })
+    );
+
+    renderBox([makeItem(), makeItem({ id: "item-2", text: "ตรวจถังดับเพลิง" })]);
+
+    await user.click(screen.getByLabelText("สถานะของ ติดป้ายทางออกฉุกเฉิน"));
+    await user.click(await screen.findByRole("option", { name: "กำลังทำ" }));
+
+    await waitFor(() =>
+      expect(screen.getByLabelText("สถานะของ ติดป้ายทางออกฉุกเฉิน")).toBeDisabled()
+    );
+    expect(screen.getByLabelText("สถานะของ ตรวจถังดับเพลิง")).toBeEnabled();
+
+    finishWrite({ ok: true });
+    await waitFor(() =>
+      expect(screen.getByLabelText("สถานะของ ติดป้ายทางออกฉุกเฉิน")).toBeEnabled()
+    );
+  });
+
+  it("leaves the quick-add form usable while a status is being written", async () => {
+    const user = userEvent.setup();
+    setChecklistItemRoomStatus.mockReturnValue(new Promise(() => {}));
+
+    renderBox([makeItem()]);
+
+    await user.click(screen.getByLabelText("สถานะของ ติดป้ายทางออกฉุกเฉิน"));
+    await user.click(await screen.findByRole("option", { name: "กำลังทำ" }));
+
+    await waitFor(() =>
+      expect(screen.getByLabelText("สถานะของ ติดป้ายทางออกฉุกเฉิน")).toBeDisabled()
+    );
+    expect(screen.getByPlaceholderText("เพิ่มรายการด่วน...")).toBeEnabled();
+  });
+});
+
+// spec 042 FR-009: the account holder asked for the room to be named here too,
+// so a row never leans on the page heading to say what it is about.
+describe("RoomChecklistBox names its room", () => {
+  it("names the room on a top-level row", () => {
+    renderBox([makeItem()]);
+    expect(screen.getAllByText(ROOM_NAME).length).toBeGreaterThan(0);
+  });
+
+  it("names the room on a sub-item row too", () => {
+    renderBox([
+      makeItem({
+        sub_items: [
+          {
+            ...makeItem({ id: "sub-1", text: "ตรวจไฟฉุกเฉิน" }),
+            parent_id: "item-1",
+          },
+        ],
+      }),
+    ]);
+
+    // One for the parent row, one for the sub-item row.
+    expect(screen.getAllByText(ROOM_NAME)).toHaveLength(2);
+  });
+
+  it("names the room on every row when there are several", () => {
+    renderBox([makeItem(), makeItem({ id: "item-2", text: "ตรวจถังดับเพลิง" })]);
+    expect(screen.getAllByText(ROOM_NAME)).toHaveLength(2);
+  });
+});
+
+// specs/043: an entry can now reach this page through a sub-item rather than a
+// tag of its own. It has no per-room record here, so a control would write
+// nowhere — its status is shown instead.
+describe("RoomChecklistBox: an entry reached through its sub-items", () => {
+  function untaggedParent() {
+    return makeItem({
+      text: "ตรวจระบบดับเพลิงทั้งโกดัง",
+      room_ids: [],
+      room_statuses: [],
+      status: "in_progress" as ChecklistStatus,
+      sub_items: [
+        { ...makeItem({ id: "sub-1", text: "ตรวจถังดับเพลิง" }), parent_id: "item-1" },
+      ],
+    });
+  }
+
+  it("shows its status", () => {
+    renderBox([untaggedParent()]);
+    expect(screen.getByText("กำลังทำ")).toBeInTheDocument();
+  });
+
+  it("offers no status control for it, since there is none to write here", () => {
+    renderBox([untaggedParent()]);
+    expect(
+      screen.queryByLabelText("สถานะของ ตรวจระบบดับเพลิงทั้งโกดัง")
+    ).not.toBeInTheDocument();
+  });
+
+  it("still offers the control for an entry tagged to this room", () => {
+    renderBox([makeItem()]);
+    expect(screen.getByLabelText("สถานะของ ติดป้ายทางออกฉุกเฉิน")).toBeInTheDocument();
+  });
+
+  it("still offers a control for the sub-item beneath it", () => {
+    renderBox([untaggedParent()]);
+    expect(screen.getByLabelText("สถานะของ ตรวจถังดับเพลิง")).toBeInTheDocument();
   });
 });

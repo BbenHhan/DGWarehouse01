@@ -1,6 +1,7 @@
 "use client";
 
 import { useOptimistic, useState, useTransition } from "react";
+import { Skeleton } from "@/components/ui/skeleton";
 import Image from "next/image";
 import { FileText, ImageOff, Play, Search, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -64,14 +65,43 @@ function PhotoTileMedia({ photo }: { photo: Photo }) {
     );
   }
 
+  return <PhotoTileImage src={src} alt={photo.file_name} />;
+}
+
+// A tile used to be an empty box until its photo arrived, and stayed one
+// forever if the photo never did. Progress is deliberately not reported here:
+// measuring it would mean fetching the file directly and giving up the
+// screen-sized version next/image serves a phone (FR-014c).
+function PhotoTileImage({ src, alt }: { src: string; alt: string }) {
+  const [state, setState] = useState<"loading" | "ready" | "error">("loading");
+
+  if (state === "error") {
+    return (
+      <span className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-secondary p-3 text-center text-secondary-foreground">
+        <ImageOff className="h-7 w-7 opacity-60" />
+        <span className="text-[11px] opacity-80">โหลดรูปไม่สำเร็จ</span>
+      </span>
+    );
+  }
+
   return (
-    <Image
-      src={src}
-      alt={photo.file_name}
-      fill
-      sizes="220px"
-      className="object-cover transition-transform duration-300 group-hover:scale-105"
-    />
+    <>
+      {state === "loading" && (
+        <span role="status" aria-live="polite" className="absolute inset-0">
+          <span className="sr-only">กำลังโหลดรูป</span>
+          <Skeleton className="h-full w-full rounded-none" />
+        </span>
+      )}
+      <Image
+        src={src}
+        alt={alt}
+        fill
+        sizes="220px"
+        className="object-cover transition-transform duration-300 group-hover:scale-105"
+        onLoad={() => setState("ready")}
+        onError={() => setState("error")}
+      />
+    </>
   );
 }
 

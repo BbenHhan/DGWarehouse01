@@ -189,3 +189,88 @@ describe("Scenario: a task's scope changes mid-flight (specs/032-checklist-detai
     expect(stored?.due_date).toBe("2026-12-01");
   });
 });
+
+// specs/043-room-checklist-sub-visibility. Reproduced against the live database
+// before it was written here: one entry with no room of its own, two sub-items
+// tagged to two rooms, and both room pages returning nothing at all.
+describe("Scenario: an entry covers several rooms through its sub-items (specs/043)", () => {
+  it("shows the entry on each room that owns one of its sub-items", async () => {
+    const { roomA, roomB } = rooms();
+
+    // A heading that belongs to no single room — the work itself is split.
+    const parent = await localAddChecklistItem({
+      text: `${prefix} ตรวจระบบดับเพลิงทั้งโกดัง`,
+      roomIds: [],
+    });
+    await localAddChecklistItem({
+      text: `${prefix} ตรวจถังดับเพลิงห้อง A`,
+      roomIds: [roomA],
+      parentId: parent.id,
+    });
+    await localAddChecklistItem({
+      text: `${prefix} ตรวจถังดับเพลิงห้อง B`,
+      roomIds: [roomB],
+      parentId: parent.id,
+    });
+
+    // Whoever is standing in room A sees the heading and only room A's share.
+    const inRoomA = await localGetRoomChecklistItems(roomA);
+    const headingA = inRoomA.find((item) => item.id === parent.id);
+    expect(headingA).toBeDefined();
+    expect(headingA!.sub_items.map((s) => s.text)).toEqual([`${prefix} ตรวจถังดับเพลิงห้อง A`]);
+
+    // And room B sees the same heading over its own share, not room A's.
+    const inRoomB = await localGetRoomChecklistItems(roomB);
+    const headingB = inRoomB.find((item) => item.id === parent.id);
+    expect(headingB).toBeDefined();
+    expect(headingB!.sub_items.map((s) => s.text)).toEqual([`${prefix} ตรวจถังดับเพลิงห้อง B`]);
+  });
+
+  it("keeps the entry off a room that owns none of its sub-items", async () => {
+    const { roomA, roomB } = rooms();
+
+    const parent = await localAddChecklistItem({ text: `${prefix} งานเฉพาะห้อง A`, roomIds: [] });
+    await localAddChecklistItem({
+      text: `${prefix} ขั้นตอนที่ 1`,
+      roomIds: [roomA],
+      parentId: parent.id,
+    });
+
+    expect((await boxTexts(roomB))).not.toContain(`${prefix} งานเฉพาะห้อง A`);
+  });
+
+  it("drops the entry once this room's sub-item is finished", async () => {
+    const { roomA } = rooms();
+
+    const parent = await localAddChecklistItem({ text: `${prefix} งานที่จะเสร็จ`, roomIds: [] });
+    const sub = await localAddChecklistItem({
+      text: `${prefix} ขั้นตอนเดียว`,
+      roomIds: [roomA],
+      parentId: parent.id,
+    });
+
+    expect(await boxTexts(roomA)).toContain(`${prefix} งานที่จะเสร็จ`);
+
+    await localSetChecklistItemRoomStatus(sub.id, roomA, "done");
+
+    expect(await boxTexts(roomA)).not.toContain(`${prefix} งานที่จะเสร็จ`);
+  });
+
+  it("still lets an untagged sub-item inherit its parent's rooms", async () => {
+    const { roomA } = rooms();
+
+    const parent = await localAddChecklistItem({
+      text: `${prefix} งานของห้อง A`,
+      roomIds: [roomA],
+    });
+    await localAddChecklistItem({
+      text: `${prefix} ขั้นตอนที่ไม่ได้ผูกห้อง`,
+      roomIds: [],
+      parentId: parent.id,
+    });
+
+    const items = await localGetRoomChecklistItems(roomA);
+    const heading = items.find((item) => item.id === parent.id);
+    expect(heading!.sub_items.map((s) => s.text)).toContain(`${prefix} ขั้นตอนที่ไม่ได้ผูกห้อง`);
+  });
+});

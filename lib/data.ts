@@ -1,11 +1,12 @@
 import "server-only";
 
 import { createServiceClient, requireUser } from "@/lib/supabase/server";
+import { cache } from "react";
 import { DATA_SOURCE } from "@/lib/data-config";
 import {
   mockGetChecklistItems,
   mockGetDocumentCategories,
-  mockGetDocumentNotes,
+  mockGetDocumentGroups,
   mockGetDocuments,
   mockGetPhotos,
   mockGetRoomChecklistItems,
@@ -16,7 +17,10 @@ import {
 } from "@/lib/mock/source";
 import {
   localGetChecklistItems,
-  localGetDocumentNotes,
+  localGetDocumentCategories,
+  localGetDocumentCountsByCategory,
+  localGetAllDocumentGroups,
+  localGetDocumentGroups,
   localGetDocuments,
   localGetPhotos,
   localGetRoomChecklistItems,
@@ -24,7 +28,7 @@ import {
   localGetSiteStats,
 } from "@/lib/local/store";
 import type { DateFilter } from "@/lib/date-filter";
-import type { ChecklistItem, Document, DocumentCategory, Photo, Room, WorkType } from "@/lib/types";
+import type { ChecklistItem, Document, DocumentCategory, DocumentGroup, Photo, Room, WorkType } from "@/lib/types";
 
 // Rooms/work types/document categories are the same fixed lookup lists in
 // both non-Supabase modes ("local" and "mock") — neither depends on disk
@@ -82,8 +86,12 @@ export async function getPhotos(
   return data;
 }
 
-export async function getDocumentCategories(): Promise<DocumentCategory[]> {
-  if (DATA_SOURCE !== "supabase") return mockGetDocumentCategories();
+export const getDocumentCategories = cache(async (): Promise<DocumentCategory[]> => {
+  if (DATA_SOURCE === "mock") return mockGetDocumentCategories();
+  // The local backend owns its categories now that they are editable
+  // (specs/040-editable-document-taxonomy) rather than borrowing the mock's
+  // fixed list.
+  if (DATA_SOURCE === "local") return localGetDocumentCategories();
 
   await requireUser();
   const supabase = createServiceClient();
@@ -93,7 +101,7 @@ export async function getDocumentCategories(): Promise<DocumentCategory[]> {
     .order("sort_order");
   if (error) throw error;
   return data;
-}
+});
 
 export async function getDocuments(categoryId: string): Promise<Document[]> {
   if (DATA_SOURCE === "mock") return mockGetDocuments(categoryId);
@@ -110,23 +118,77 @@ export async function getDocuments(categoryId: string): Promise<Document[]> {
   return data;
 }
 
-// Distinct previously-used note (sub-folder/group) values across every
-// document, sitewide — powers the upload control's "reuse an existing group
-// name" suggestion (specs/025-document-upload-categorization) rather than
-// scoping to one category, since the uploader can pick any category anyway.
-export async function getDocumentNotes(): Promise<string[]> {
-  if (DATA_SOURCE === "mock") return mockGetDocumentNotes();
-  if (DATA_SOURCE === "local") return localGetDocumentNotes();
+// One category's sub-groups, in the order an editor set, each carrying how many
+// documents it holds (specs/040-editable-document-taxonomy).
+//
+// Replaces getDocumentNotes(), whose two faults are what made this feature
+// necessary: it could only report names that some document already carried, so
+// a group with no files was invisible, and it scanned every category at once,
+// so one category's page offered another category's groups. Both are fixed by
+// reading real records scoped to the category being viewed (FR-023).
+// How many documents each category holds, for the management panel's rows
+// (FR-020) — so the effect of a deletion is visible before it is attempted.
+export const getDocumentCountsByCategory = cache(async (): Promise<Record<string, number>> => {
+  if (DATA_SOURCE === "mock") return {};
+  if (DATA_SOURCE === "local") return localGetDocumentCountsByCategory();
 
   await requireUser();
   const supabase = createServiceClient();
-  const { data, error } = await supabase.from("documents").select("note");
+  const { data, error } = await supabase.from("documents").select("category_id");
   if (error) throw error;
-  const notes = new Set<string>();
+
+  const counts: Record<string, number> = {};
   for (const row of data) {
-    if (row.note) notes.add(row.note);
+    counts[row.category_id] = (counts[row.category_id] ?? 0) + 1;
   }
-  return [...notes];
+  return counts;
+});
+
+// Every category's groups at once. The per-document move control needs this:
+// a document can be moved to any category and any group inside it (FR-026), so
+// once a different category is chosen the picker has to be able to offer that
+// category's groups, not the ones belonging to the page you happen to be on.
+export const getAllDocumentGroups = cache(async (): Promise<DocumentGroup[]> => {
+  if (DATA_SOURCE === "mock") return [];
+  if (DATA_SOURCE === "local") return localGetAllDocumentGroups();
+
+  await requireUser();
+  const supabase = createServiceClient();
+  const [{ data: groups, error: groupsError }, { data: documents, error: documentsError }] = await Promise.all([
+    supabase.from("document_groups").select("*").order("category_id").order("sort_order"),
+    supabase.from("documents").select("group_id"),
+  ]);
+  if (groupsError) throw groupsError;
+  if (documentsError) throw documentsError;
+
+  const counts = new Map<string, number>();
+  for (const row of documents) {
+    if (row.group_id) counts.set(row.group_id, (counts.get(row.group_id) ?? 0) + 1);
+  }
+  return groups.map((group) => ({ ...group, document_count: counts.get(group.id) ?? 0 }));
+});
+
+export async function getDocumentGroups(categoryId: string): Promise<DocumentGroup[]> {
+  if (DATA_SOURCE === "mock") return mockGetDocumentGroups();
+  if (DATA_SOURCE === "local") return localGetDocumentGroups(categoryId);
+
+  await requireUser();
+  const supabase = createServiceClient();
+  const [{ data: groups, error: groupsError }, { data: documents, error: documentsError }] = await Promise.all([
+    supabase.from("document_groups").select("*").eq("category_id", categoryId).order("sort_order"),
+    supabase.from("documents").select("group_id").eq("category_id", categoryId),
+  ]);
+  if (groupsError) throw groupsError;
+  if (documentsError) throw documentsError;
+
+  // Counted here rather than stored: the numbers are small, and a stored
+  // counter that drifted would make the delete confirmation lie about how many
+  // files are about to be destroyed (FR-011a).
+  const counts = new Map<string, number>();
+  for (const row of documents) {
+    if (row.group_id) counts.set(row.group_id, (counts.get(row.group_id) ?? 0) + 1);
+  }
+  return groups.map((group) => ({ ...group, document_count: counts.get(group.id) ?? 0 }));
 }
 
 // Header stats chips (total photos/documents/distinct photographed days
@@ -244,15 +306,52 @@ export async function getRoomChecklistItems(roomId: string): Promise<ChecklistIt
   await requireUser();
   const supabase = createServiceClient();
 
-  const { data: topLevel, error: topLevelError } = await supabase
+  // An entry belongs on this room's page when it carries the room's own tag, or
+  // when any of its sub-items does. Asking only the first question left an entry
+  // that covers several rooms through its sub-items — and so carries no room tag
+  // of its own — unreachable from every room page in the app, taking its
+  // sub-items with it (specs/043 FR-001).
+  const { data: taggedSubs, error: taggedSubsError } = await supabase
     .from("checklist_items")
-    .select("*, checklist_item_rooms!inner(room_id, status)")
+    .select("parent_id, checklist_item_rooms!inner(room_id, status)")
     .eq("checklist_item_rooms.room_id", roomId)
     .neq("checklist_item_rooms.status", "done")
+    .neq("status", "done")
+    .not("parent_id", "is", null);
+  if (taggedSubsError) throw taggedSubsError;
+
+  const { data: ownTagged, error: ownTaggedError } = await supabase
+    .from("checklist_items")
+    .select("id, checklist_item_rooms!inner(room_id, status)")
+    .eq("checklist_item_rooms.room_id", roomId)
+    .neq("checklist_item_rooms.status", "done")
+    .is("parent_id", null);
+  if (ownTaggedError) throw ownTaggedError;
+
+  const topLevelIds = [
+    ...new Set([
+      ...ownTagged.map((row) => row.id as string),
+      ...taggedSubs.map((row) => row.parent_id as string).filter(Boolean),
+    ]),
+  ];
+  if (topLevelIds.length === 0) return [];
+
+  const { data: topLevelRows, error: topLevelError } = await supabase
+    .from("checklist_items")
+    .select("*, checklist_item_rooms(room_id, status)")
+    .in("id", topLevelIds)
     .is("parent_id", null)
     .order("created_at", { ascending: false });
   if (topLevelError) throw topLevelError;
-  if (topLevel.length === 0) return [];
+  if (topLevelRows.length === 0) return [];
+
+  // Narrowed to this room's own tag, which is what the filtered join used to
+  // produce. An entry reached only through a sub-item has none, and the room
+  // box reads that as "no status of mine to set here" (FR-010).
+  const topLevel = topLevelRows.map((row) => ({
+    ...row,
+    checklist_item_rooms: row.checklist_item_rooms.filter((tag) => tag.room_id === roomId),
+  }));
 
   const { data: subs, error: subsError } = await supabase
     .from("checklist_items")

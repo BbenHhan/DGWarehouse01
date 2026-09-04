@@ -4,7 +4,7 @@ import { readdirSync } from "node:fs";
 import path from "node:path";
 import type { DateFilter } from "@/lib/date-filter";
 import { photoMatchesDateFilter } from "@/lib/date-filter";
-import type { ChecklistItem, Document, DocumentCategory, Photo, Room, WorkType } from "@/lib/types";
+import type { ChecklistItem, Document, DocumentCategory, DocumentGroup, Photo, Room, WorkType } from "@/lib/types";
 
 // Root of the real v7 local folder this mock data layer reads from.
 // Override with MOCK_DATA_ROOT if the folder lives somewhere else.
@@ -215,7 +215,7 @@ function walkDocuments(dir: string, categoryId: string, out: Document[]) {
       category_id: categoryId,
       storage_path: relativePath,
       file_name: entry.name,
-      note: null,
+      group_id: null,
       created_at: "",
       updated_at: "",
     });
@@ -266,7 +266,9 @@ export async function mockGetDocuments(categoryId: string): Promise<Document[]> 
 // Mock-backend documents never have a note (specs/017-bulk-document-import's
 // import script — the only writer of real note values — never ran against
 // this frozen, read-only snapshot), so there's nothing to suggest.
-export async function mockGetDocumentNotes(): Promise<string[]> {
+// The frozen v7 folder snapshot has no taxonomy to expose — same precedent as
+// mockGetChecklistItems below (specs/040-editable-document-taxonomy).
+export async function mockGetDocumentGroups(): Promise<DocumentGroup[]> {
   return [];
 }
 

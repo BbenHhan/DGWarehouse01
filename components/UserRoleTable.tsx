@@ -7,6 +7,7 @@ import type { Account } from "@/lib/types";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { updateUserRole } from "@/app/actions/users";
+import { useDelayedBusy } from "@/lib/use-delayed-busy";
 
 const ROLE_LABEL: Record<Role, string> = {
   viewer: "ผู้ใช้งานทั่วไป (ดูอย่างเดียว)",
@@ -65,41 +66,66 @@ export function UserRoleTable({ accounts }: { accounts: Account[] }) {
       ) : (
         <ul className="space-y-2">
           {filteredAccounts.map((account) => (
-            <li
+            <AccountRow
               key={account.id}
-              className="flex items-center justify-between gap-3 rounded-xl border border-border/60 bg-card p-3 shadow-sm"
-            >
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium text-foreground">
-                  {account.full_name ?? account.email}
-                </p>
-                {account.full_name && (
-                  <p className="truncate text-xs text-muted-foreground">{account.email}</p>
-                )}
-                <p className="text-xs text-muted-foreground">
-                  สมัครเมื่อ {new Date(account.created_at).toLocaleDateString("th-TH")}
-                </p>
-              </div>
-
-              <Select
-                value={roles[account.id]}
-                onValueChange={(value) => value !== null && handleRoleChange(account.id, value as Role)}
-              >
-                <SelectTrigger className="w-[200px]" disabled={pendingId === account.id}>
-                  <SelectValue>{(value: Role) => ROLE_LABEL[value]}</SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  {ROLE_OPTIONS.map((role) => (
-                    <SelectItem key={role} value={role}>
-                      {ROLE_LABEL[role]}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </li>
+              account={account}
+              role={roles[account.id]}
+              busy={pendingId === account.id}
+              onRoleChange={handleRoleChange}
+            />
           ))}
         </ul>
       )}
     </div>
+  );
+}
+
+// One row per account. Extracted so each row can hold its own delayed
+// indicator state — a hook cannot live inside the map callback.
+function AccountRow({
+  account,
+  role,
+  busy,
+  onRoleChange,
+}: {
+  account: Account;
+  role: Role;
+  busy: boolean;
+  onRoleChange: (accountId: string, newRole: Role) => void;
+}) {
+  const showBusy = useDelayedBusy(busy);
+
+  return (
+    <li
+      className="flex items-center justify-between gap-3 rounded-xl border border-border/60 bg-card p-3 shadow-sm"
+    >
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-medium text-foreground">
+          {account.full_name ?? account.email}
+        </p>
+        {account.full_name && (
+          <p className="truncate text-xs text-muted-foreground">{account.email}</p>
+        )}
+        <p className="text-xs text-muted-foreground">
+          สมัครเมื่อ {new Date(account.created_at).toLocaleDateString("th-TH")}
+        </p>
+      </div>
+
+      <Select
+        value={role}
+        onValueChange={(value) => value !== null && onRoleChange(account.id, value as Role)}
+      >
+        <SelectTrigger className="w-[200px]" disabled={busy} busy={showBusy}>
+          <SelectValue>{(value: Role) => ROLE_LABEL[value]}</SelectValue>
+        </SelectTrigger>
+        <SelectContent>
+          {ROLE_OPTIONS.map((role) => (
+            <SelectItem key={role} value={role}>
+              {ROLE_LABEL[role]}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </li>
   );
 }

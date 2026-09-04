@@ -63,12 +63,29 @@ export type DocumentCategory = {
   sort_order: number;
 };
 
+// A named division inside exactly one category (specs/040-editable-document-
+// taxonomy). Replaces the old `documents.note` string: a group is now a record
+// with its own identity and order, so it can exist before any file does, be
+// renamed in one place, and be put in a deliberate order.
+// `document_count` is counted at read time rather than stored — the numbers are
+// small, and a stored counter that drifted would make the delete confirmation
+// lie about how many files are about to be destroyed (FR-011a).
+export type DocumentGroup = {
+  id: string;
+  category_id: string;
+  name_th: string;
+  sort_order: number;
+  document_count: number;
+};
+
 export type Document = {
   id: string;
   category_id: string;
   storage_path: string;
   file_name: string;
-  note: string | null;
+  // null means the document belongs to no sub-group; it renders outside every
+  // group, exactly as an empty `note` did before specs/040.
+  group_id: string | null;
   created_at: string;
   updated_at: string;
 };

@@ -106,13 +106,39 @@ export type Database = {
         Update: Partial<Database["public"]["Tables"]["document_categories"]["Insert"]>;
         Relationships: [];
       };
+      document_groups: {
+        Row: {
+          id: string;
+          category_id: string;
+          name_th: string;
+          sort_order: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          category_id: string;
+          name_th: string;
+          sort_order: number;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["document_groups"]["Insert"]>;
+        Relationships: [
+          {
+            foreignKeyName: "document_groups_category_id_fkey";
+            columns: ["category_id"];
+            isOneToOne: false;
+            referencedRelation: "document_categories";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
       documents: {
         Row: {
           id: string;
           category_id: string;
           storage_path: string;
           file_name: string;
-          note: string | null;
+          group_id: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -121,7 +147,7 @@ export type Database = {
           category_id: string;
           storage_path: string;
           file_name: string;
-          note?: string | null;
+          group_id?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -132,6 +158,13 @@ export type Database = {
             columns: ["category_id"];
             isOneToOne: false;
             referencedRelation: "document_categories";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "documents_group_id_fkey";
+            columns: ["group_id"];
+            isOneToOne: false;
+            referencedRelation: "document_groups";
             referencedColumns: ["id"];
           }
         ];

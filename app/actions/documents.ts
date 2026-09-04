@@ -3,13 +3,21 @@
 import { randomUUID } from "crypto";
 import { revalidatePath } from "next/cache";
 import { createServiceClient, requireRole } from "@/lib/supabase/server";
-import { DOCUMENT_MIME_TYPES, editDocSchema, uploadDocSchema, validateFile } from "@/lib/validation";
+import {
+  DOCUMENT_MIME_TYPES,
+  editDocSchema,
+  moveDocumentsSchema,
+  uploadDocSchema,
+  validateFile,
+} from "@/lib/validation";
 import { DATA_SOURCE } from "@/lib/data-config";
 import { storageKeyFileName } from "@/lib/storage-key";
+import { stripGroupNumber } from "@/lib/taxonomy-label";
 import {
   localDeleteDocument,
   localSaveDocumentFile,
   localUpdateDocument,
+  localResolveDocumentGroup,
 } from "@/lib/local/store";
 import type { ActionResult, Document, UploadDocOutput } from "@/lib/types";
 
@@ -23,6 +31,39 @@ async function assertCanEdit(): Promise<string | null> {
     }
     return "คุณไม่มีสิทธิ์ทำรายการนี้";
   }
+}
+
+// A freely typed group name attaches to that category's existing group, or
+// creates it first (FR-024) — the same path management mode uses, so a group
+// born at upload time is indistinguishable from one made deliberately.
+async function resolveDocumentGroupId(
+  supabase: ReturnType<typeof createServiceClient>,
+  categoryId: string,
+  nameTh: string | null
+): Promise<string | null> {
+  // The picker shows "1.2 งานผนัง"; the stored name is "งานผนัง".
+  const trimmed = stripGroupNumber(nameTh ?? "");
+  if (!trimmed) return null;
+
+  const { data: existing } = await supabase
+    .from("document_groups")
+    .select("id")
+    .eq("category_id", categoryId)
+    .eq("name_th", trimmed)
+    .maybeSingle();
+  if (existing) return existing.id;
+
+  const { count } = await supabase
+    .from("document_groups")
+    .select("id", { count: "exact", head: true })
+    .eq("category_id", categoryId);
+
+  const { data: created } = await supabase
+    .from("document_groups")
+    .insert({ category_id: categoryId, name_th: trimmed, sort_order: (count ?? 0) + 1 })
+    .select("id")
+    .single();
+  return created?.id ?? null;
 }
 
 export async function uploadDoc(
@@ -48,7 +89,8 @@ export async function uploadDoc(
         continue;
       }
 
-      const document = await localSaveDocumentFile(categoryId, parsed.data.note ?? null, file);
+      const groupId = await localResolveDocumentGroup(categoryId, parsed.data.note ?? null);
+      const document = await localSaveDocumentFile(categoryId, groupId, file);
       results.push({ fileName: file.name, success: true, item: document });
     }
 
@@ -81,7 +123,7 @@ export async function uploadDoc(
         category_id: categoryId,
         storage_path: storagePath,
         file_name: file.name,
-        note: parsed.data.note ?? null,
+        group_id: await resolveDocumentGroupId(supabase, categoryId, parsed.data.note ?? null),
       })
       .select("*")
       .single();
@@ -148,7 +190,7 @@ export async function deleteDoc(documentId: string): Promise<ActionResult<{ docu
 export async function editDoc(input: {
   documentId: string;
   fileName?: string;
-  note?: string;
+  groupId?: string | null;
   categoryId?: string;
 }): Promise<ActionResult<Document>> {
   const authError = await assertCanEdit();
@@ -159,10 +201,10 @@ export async function editDoc(input: {
     return { ok: false, error: parsed.error.issues[0]?.message ?? "ข้อมูลไม่ถูกต้อง" };
   }
 
-  const { documentId, fileName, note, categoryId } = parsed.data;
+  const { documentId, fileName, groupId, categoryId } = parsed.data;
 
   if (DATA_SOURCE === "local") {
-    const document = await localUpdateDocument(documentId, { fileName, note, categoryId });
+    const document = await localUpdateDocument(documentId, { fileName, groupId, categoryId });
     if (!document) {
       return { ok: false, error: "แก้ไขข้อมูลไม่สำเร็จ" };
     }
@@ -176,7 +218,7 @@ export async function editDoc(input: {
     .from("documents")
     .update({
       ...(fileName !== undefined ? { file_name: fileName } : {}),
-      ...(note !== undefined ? { note } : {}),
+      ...(groupId !== undefined ? { group_id: groupId } : {}),
       ...(categoryId !== undefined ? { category_id: categoryId } : {}),
     })
     .eq("id", documentId)
@@ -190,4 +232,46 @@ export async function editDoc(input: {
   revalidatePath("/documents/[categorySlug]", "page");
 
   return { ok: true, data: document };
+}
+
+// The bulk form of a move. Phase 7's deletion flow calls this to re-parent a
+// group's or a category's documents before the structure above them is removed,
+// which is what makes "move them instead of deleting them" possible at all
+// (spec FR-011, US6).
+//
+// Metadata only: storage_path is never rewritten, so no file is copied or
+// re-keyed and nothing can be lost part-way through (research.md Decision 5).
+export async function moveDocuments(input: {
+  documentIds: string[];
+  toCategoryId: string;
+  toGroupId: string | null;
+}): Promise<ActionResult<{ moved: number }>> {
+  const authError = await assertCanEdit();
+  if (authError) return { ok: false, error: authError };
+
+  const parsed = moveDocumentsSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0]?.message ?? "ข้อมูลไม่ถูกต้อง" };
+  }
+  const { documentIds, toCategoryId, toGroupId } = parsed.data;
+  if (documentIds.length === 0) return { ok: true, data: { moved: 0 } };
+
+  if (DATA_SOURCE === "local") {
+    for (const documentId of documentIds) {
+      await localUpdateDocument(documentId, { categoryId: toCategoryId, groupId: toGroupId });
+    }
+    revalidatePath("/documents/[categorySlug]", "page");
+    return { ok: true, data: { moved: documentIds.length } };
+  }
+
+  const supabase = createServiceClient();
+  const { error } = await supabase
+    .from("documents")
+    .update({ category_id: toCategoryId, group_id: toGroupId })
+    .in("id", documentIds);
+
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath("/documents/[categorySlug]", "page");
+  return { ok: true, data: { moved: documentIds.length } };
 }

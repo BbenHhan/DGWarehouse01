@@ -4,7 +4,8 @@ import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
-import type { ChecklistItem, Document, Photo } from "@/lib/types";
+import type { ChecklistItem, Document, DocumentCategory, DocumentGroup, Photo } from "@/lib/types";
+import { stripGroupNumber } from "@/lib/taxonomy-label";
 import type { ChecklistStatus } from "@/lib/checklist-status";
 import { rollupChecklistStatus } from "@/lib/checklist-status";
 import type { DateFilter } from "@/lib/date-filter";
@@ -29,8 +30,23 @@ const DB_PATH = path.join(LOCAL_BASE_DIR, "db.json");
 type LocalDb = {
   photos: Photo[];
   documents: Document[];
+  documentCategories: DocumentCategory[];
+  documentGroups: DocumentGroup[];
   checklistItems: ChecklistItem[];
 };
+
+// Categories used to be a fixed list this backend borrowed from the read-only
+// mock source. They are editable now (specs/040-editable-document-taxonomy), so
+// the local backend has to own them like every other table — Constitution III
+// requires it to be a drop-in for Supabase, and the test suite runs here.
+// Seeded once, on the first load that finds none, with the same four the
+// production project was seeded with in 0004_seed_lookups.sql.
+const SEED_CATEGORIES: DocumentCategory[] = [
+  { id: "structure", slug: "structure", name_th: "หมวดที่ 1 โครงสร้างอาคาร", emoji: "🏗️", sort_order: 1 },
+  { id: "electrical", slug: "electrical", name_th: "หมวดที่ 2 ระบบไฟฟ้า", emoji: "⚡", sort_order: 2 },
+  { id: "environment", slug: "environment", name_th: "หมวดที่ 3 สิ่งแวดล้อม", emoji: "🌿", sort_order: 3 },
+  { id: "safety", slug: "safety", name_th: "หมวดที่ 4 ความปลอดภัย", emoji: "🦺", sort_order: 4 },
+];
 
 // No in-memory cache: Next.js bundles Server Actions and Server Component
 // renders into separate module instances even within the same dev process,
@@ -45,18 +61,80 @@ let writeQueue: Promise<void> = Promise.resolve();
 
 async function loadDb(): Promise<LocalDb> {
   if (!existsSync(DB_PATH)) {
-    return { photos: [], documents: [], checklistItems: [] };
+    return { photos: [], documents: [], documentCategories: [...SEED_CATEGORIES], documentGroups: [], checklistItems: [] };
   }
   try {
     const raw = await readFile(DB_PATH, "utf-8");
     const parsed = JSON.parse(raw) as Partial<LocalDb>;
     // checklistItems is a newer field (specs/028-room-checklist) — an
     // existing db.json written before this feature won't have it yet.
-    const db: LocalDb = { photos: [], documents: [], checklistItems: [], ...parsed };
+    const db: LocalDb = {
+      photos: [],
+      documents: [],
+      documentCategories: [],
+      documentGroups: [],
+      checklistItems: [],
+      ...parsed,
+    };
+    if (db.documentCategories.length === 0) db.documentCategories = [...SEED_CATEGORIES];
     db.checklistItems = db.checklistItems.map(normalizeChecklistItem);
+    migrateDocumentNotes(db);
     return db;
   } catch {
-    return { photos: [], documents: [], checklistItems: [] };
+    return { photos: [], documents: [], documentCategories: [...SEED_CATEGORIES], documentGroups: [], checklistItems: [] };
+  }
+}
+
+// The local mirror of migration 0014 (specs/040-editable-document-taxonomy).
+// A db.json written before that feature stores a document's sub-group as a
+// `note` string on the document itself. Promote each distinct (category, note)
+// pair to a real group record and repoint the documents at it, so the local
+// backend keeps the same contract as Supabase (Constitution III) instead of
+// silently dropping everyone's grouping.
+//
+// Ordering matches the SQL: groups sort by their own names, which are already
+// numbered by hand.
+function migrateDocumentNotes(db: LocalDb): void {
+  const legacy = db.documents as Array<Document & { note?: string | null }>;
+  if (!legacy.some((document) => typeof document.note === "string" && document.note.trim() !== "")) return;
+
+  const byCategory = new Map<string, Set<string>>();
+  for (const document of legacy) {
+    const note = document.note?.trim();
+    if (!note) continue;
+    if (!byCategory.has(document.category_id)) byCategory.set(document.category_id, new Set());
+    byCategory.get(document.category_id)!.add(note);
+  }
+
+  for (const [categoryId, names] of byCategory) {
+    const existing = new Set(
+      db.documentGroups.filter((group) => group.category_id === categoryId).map((group) => group.name_th)
+    );
+    let order = db.documentGroups.filter((group) => group.category_id === categoryId).length;
+    for (const name of [...names].sort()) {
+      if (existing.has(name)) continue;
+      order += 1;
+      db.documentGroups.push({
+        id: randomUUID(),
+        category_id: categoryId,
+        name_th: name,
+        sort_order: order,
+        document_count: 0,
+      });
+    }
+  }
+
+  for (const document of legacy) {
+    const note = document.note?.trim();
+    if (note) {
+      const group = db.documentGroups.find(
+        (candidate) => candidate.category_id === document.category_id && candidate.name_th === note
+      );
+      document.group_id = group?.id ?? null;
+    } else if (document.group_id === undefined) {
+      document.group_id = null;
+    }
+    delete document.note;
   }
 }
 
@@ -193,7 +271,7 @@ export async function localGetDocuments(categoryId: string): Promise<Document[]>
 
 export async function localSaveDocumentFile(
   categoryId: string,
-  note: string | null,
+  groupId: string | null,
   file: File
 ): Promise<Document> {
   const db = await loadDb();
@@ -206,7 +284,7 @@ export async function localSaveDocumentFile(
     category_id: categoryId,
     storage_path: storagePath,
     file_name: file.name,
-    note,
+    group_id: groupId,
     created_at: nowIso(),
     updated_at: nowIso(),
   };
@@ -215,17 +293,271 @@ export async function localSaveDocumentFile(
   return document;
 }
 
-// Distinct previously-used note values across every document, sitewide —
-// suggests a naming convention to reuse at upload time
-// (specs/025-document-upload-categorization) rather than every manual
-// upload retyping (or forgetting) the same grouping label.
-export async function localGetDocumentNotes(): Promise<string[]> {
+// specs/040-editable-document-taxonomy. Replaces localGetDocumentNotes, which
+// could only report names some document already carried and drew from every
+// category at once — the two faults that made this feature necessary.
+export async function localGetDocumentCategories(): Promise<DocumentCategory[]> {
   const db = await loadDb();
-  const notes = new Set<string>();
+  return [...db.documentCategories].sort((a, b) => a.sort_order - b.sort_order);
+}
+
+// Name and icon only. The slug is never touched — it is a live URL, so a
+// rename must not break existing links (FR-013).
+export async function localRenameDocumentCategory(
+  id: string,
+  updates: { nameTh?: string; emoji?: string }
+): Promise<DocumentCategory | null> {
+  const db = await loadDb();
+  const category = db.documentCategories.find((candidate) => candidate.id === id);
+  if (!category) return null;
+  if (updates.nameTh !== undefined) category.name_th = updates.nameTh;
+  if (updates.emoji !== undefined) category.emoji = updates.emoji;
+  await persist(db);
+  return category;
+}
+
+export async function localGetDocumentCountsByCategory(): Promise<Record<string, number>> {
+  const db = await loadDb();
+  const counts: Record<string, number> = {};
   for (const document of db.documents) {
-    if (document.note) notes.add(document.note);
+    counts[document.category_id] = (counts[document.category_id] ?? 0) + 1;
   }
-  return [...notes];
+  return counts;
+}
+
+// Same swap-then-renumber shape as localMoveDocumentGroup, over the flat list
+// of categories (research.md Decision 3).
+// `category-N`, N being the smallest positive integer not already taken
+// (research.md Decision 4). The slug is only ever a URL segment; Thai names do
+// not slugify into anything usable, and the four original slugs
+// (structure/electrical/environment/safety) are live URLs that must never be
+// regenerated.
+export function nextCategorySlug(taken: string[]): string {
+  const used = new Set(taken);
+  for (let n = 1; ; n += 1) {
+    const candidate = `category-${n}`;
+    if (!used.has(candidate)) return candidate;
+  }
+}
+
+export async function localCreateDocumentCategory(
+  nameTh: string,
+  emoji: string
+): Promise<DocumentCategory | null> {
+  const db = await loadDb();
+  if (db.documentCategories.some((category) => category.name_th === nameTh)) return null;
+
+  const category: DocumentCategory = {
+    id: randomUUID(),
+    slug: nextCategorySlug(db.documentCategories.map((existing) => existing.slug)),
+    name_th: nameTh,
+    emoji,
+    sort_order: db.documentCategories.length + 1,
+  };
+  db.documentCategories.push(category);
+  await persist(db);
+  return category;
+}
+
+export async function localMoveDocumentCategory(
+  id: string,
+  direction: "up" | "down"
+): Promise<DocumentCategory[] | null> {
+  const db = await loadDb();
+  const ordered = [...db.documentCategories].sort((a, b) => a.sort_order - b.sort_order);
+  const index = ordered.findIndex((category) => category.id === id);
+  if (index === -1) return null;
+
+  const target = direction === "up" ? index - 1 : index + 1;
+  if (target < 0 || target >= ordered.length) return null;
+
+  [ordered[index], ordered[target]] = [ordered[target], ordered[index]];
+  ordered.forEach((category, position) => {
+    category.sort_order = position + 1;
+  });
+  await persist(db);
+  return ordered;
+}
+
+export async function localGetDocumentGroups(categoryId: string): Promise<DocumentGroup[]> {
+  const db = await loadDb();
+  return db.documentGroups
+    .filter((group) => group.category_id === categoryId)
+    .sort((a, b) => a.sort_order - b.sort_order)
+    .map((group) => ({
+      ...group,
+      document_count: db.documents.filter((document) => document.group_id === group.id).length,
+    }));
+}
+
+export async function localGetAllDocumentGroups(): Promise<DocumentGroup[]> {
+  const db = await loadDb();
+  return [...db.documentGroups]
+    .sort((a, b) => a.category_id.localeCompare(b.category_id) || a.sort_order - b.sort_order)
+    .map((group) => ({
+      ...group,
+      document_count: db.documents.filter((document) => document.group_id === group.id).length,
+    }));
+}
+
+export async function localCreateDocumentGroup(categoryId: string, nameTh: string): Promise<DocumentGroup | null> {
+  const db = await loadDb();
+  const siblings = db.documentGroups.filter((group) => group.category_id === categoryId);
+  // Uniqueness is per category (FR-004): the same name under a different
+  // category is fine. Returning null rather than throwing keeps the Server
+  // Action's ActionResult shape.
+  if (siblings.some((group) => group.name_th === nameTh)) return null;
+
+  const group: DocumentGroup = {
+    id: randomUUID(),
+    category_id: categoryId,
+    name_th: nameTh,
+    sort_order: siblings.length + 1,
+    document_count: 0,
+  };
+  db.documentGroups.push(group);
+  await persist(db);
+  return group;
+}
+
+export async function localRenameDocumentGroup(id: string, nameTh: string): Promise<DocumentGroup | null> {
+  const db = await loadDb();
+  const group = db.documentGroups.find((candidate) => candidate.id === id);
+  if (!group) return null;
+  const clash = db.documentGroups.some(
+    (candidate) => candidate.category_id === group.category_id && candidate.name_th === nameTh && candidate.id !== id
+  );
+  if (clash) return null;
+  group.name_th = nameTh;
+  await persist(db);
+  return group;
+}
+
+// Swap with the neighbour, then renumber that category's groups to a
+// contiguous 1..n. Dense renumbering is fine at this size and keeps the
+// numbers readable when inspecting db.json by hand (research.md Decision 3).
+export async function localMoveDocumentGroup(id: string, direction: "up" | "down"): Promise<DocumentGroup[] | null> {
+  const db = await loadDb();
+  const group = db.documentGroups.find((candidate) => candidate.id === id);
+  if (!group) return null;
+
+  const siblings = db.documentGroups
+    .filter((candidate) => candidate.category_id === group.category_id)
+    .sort((a, b) => a.sort_order - b.sort_order);
+  const index = siblings.findIndex((candidate) => candidate.id === id);
+  const target = direction === "up" ? index - 1 : index + 1;
+  if (target < 0 || target >= siblings.length) return null;
+
+  [siblings[index], siblings[target]] = [siblings[target], siblings[index]];
+  siblings.forEach((sibling, position) => {
+    sibling.sort_order = position + 1;
+  });
+  await persist(db);
+  return siblings.map((sibling) => ({
+    ...sibling,
+    document_count: db.documents.filter((document) => document.group_id === sibling.id).length,
+  }));
+}
+
+// Deliberately refuses while documents still point at the group — the caller
+// re-parents or removes them first (contracts/server-actions.md,
+// DocumentDisposition). The equivalent of the SQL's `on delete restrict`.
+export async function localDeleteDocumentGroup(id: string): Promise<{ id: string } | null> {
+  const db = await loadDb();
+  const index = db.documentGroups.findIndex((group) => group.id === id);
+  if (index === -1) return null;
+  if (db.documents.some((document) => document.group_id === id)) return null;
+
+  const [removed] = db.documentGroups.splice(index, 1);
+  const siblings = db.documentGroups
+    .filter((group) => group.category_id === removed.category_id)
+    .sort((a, b) => a.sort_order - b.sort_order);
+  siblings.forEach((sibling, position) => {
+    sibling.sort_order = position + 1;
+  });
+  await persist(db);
+  return { id: removed.id };
+}
+
+// Resolve a freely typed group name to an id, creating the group if this
+// category has never seen it (FR-024). Shared by the upload path so a group
+// born at upload time is indistinguishable from one made in management mode.
+// Removes every document in a group or category, files included, then the
+// structure itself. Used only by the delete flow after the caller has confirmed
+// the count (specs/040-editable-document-taxonomy FR-011a).
+export async function localDeleteDocumentsIn(
+  scope: { groupId: string } | { categoryId: string }
+): Promise<number> {
+  const db = await loadDb();
+  const doomed = db.documents.filter((document) =>
+    "groupId" in scope ? document.group_id === scope.groupId : document.category_id === scope.categoryId
+  );
+  db.documents = db.documents.filter((document) => !doomed.includes(document));
+  await persist(db);
+  for (const document of doomed) {
+    await deleteUploadedFile(document.storage_path);
+  }
+  return doomed.length;
+}
+
+export async function localMoveDocumentsIn(
+  scope: { groupId: string } | { categoryId: string },
+  toCategoryId: string,
+  toGroupId: string | null
+): Promise<number | null> {
+  const db = await loadDb();
+  const moving = db.documents.filter((document) =>
+    "groupId" in scope ? document.group_id === scope.groupId : document.category_id === scope.categoryId
+  );
+  for (const document of moving) {
+    document.category_id = toCategoryId;
+    document.group_id = toGroupId;
+    document.updated_at = nowIso();
+  }
+  await persist(db);
+  return moving.length;
+}
+
+export async function localCountDocumentsIn(
+  scope: { groupId: string } | { categoryId: string }
+): Promise<number> {
+  const db = await loadDb();
+  return db.documents.filter((document) =>
+    "groupId" in scope ? document.group_id === scope.groupId : document.category_id === scope.categoryId
+  ).length;
+}
+
+// Deleting a category takes its groups with it in one action, so the editor is
+// not made to remove them one at a time first (FR-010). Documents must already
+// be gone or moved — the caller enforces that; this mirrors the SQL's
+// `on delete restrict` by refusing while any remain.
+export async function localDeleteDocumentCategory(id: string): Promise<{ id: string } | null> {
+  const db = await loadDb();
+  const index = db.documentCategories.findIndex((category) => category.id === id);
+  if (index === -1) return null;
+  if (db.documents.some((document) => document.category_id === id)) return null;
+
+  db.documentCategories.splice(index, 1);
+  db.documentGroups = db.documentGroups.filter((group) => group.category_id !== id);
+  db.documentCategories
+    .sort((a, b) => a.sort_order - b.sort_order)
+    .forEach((category, position) => {
+      category.sort_order = position + 1;
+    });
+  await persist(db);
+  return { id };
+}
+
+export async function localResolveDocumentGroup(categoryId: string, nameTh: string | null): Promise<string | null> {
+  const trimmed = stripGroupNumber(nameTh ?? "");
+  if (!trimmed) return null;
+  const db = await loadDb();
+  const existing = db.documentGroups.find(
+    (group) => group.category_id === categoryId && group.name_th === trimmed
+  );
+  if (existing) return existing.id;
+  const created = await localCreateDocumentGroup(categoryId, trimmed);
+  return created?.id ?? null;
 }
 
 export async function localDeleteDocument(documentId: string): Promise<Document | null> {
@@ -240,13 +572,13 @@ export async function localDeleteDocument(documentId: string): Promise<Document 
 
 export async function localUpdateDocument(
   documentId: string,
-  updates: { fileName?: string; note?: string; categoryId?: string }
+  updates: { fileName?: string; groupId?: string | null; categoryId?: string }
 ): Promise<Document | null> {
   const db = await loadDb();
   const document = db.documents.find((d) => d.id === documentId);
   if (!document) return null;
   if (updates.fileName !== undefined) document.file_name = updates.fileName;
-  if (updates.note !== undefined) document.note = updates.note;
+  if (updates.groupId !== undefined) document.group_id = updates.groupId;
   if (updates.categoryId !== undefined) document.category_id = updates.categoryId;
   document.updated_at = nowIso();
   await persist(db);
@@ -318,7 +650,20 @@ export async function localGetRoomChecklistItems(roomId: string): Promise<Checkl
     return item.room_ids.includes(roomId) && !!roomStatus && roomStatus.status !== "done";
   }
 
-  const topLevel = db.checklistItems.filter((item) => !item.parent_id && roomNotDone(item)).sort(byCreatedDesc);
+  // An entry belongs on this room's page when it carries the room's own tag,
+  // or when any of its sub-items does. Asking only the first question made an
+  // entry that covers several rooms through its sub-items — and so carries no
+  // room of its own — unreachable from every room page, taking its sub-items
+  // with it (specs/043 FR-001).
+  const parentsReachedByASub = new Set(
+    db.checklistItems
+      .filter((sub) => sub.parent_id && sub.status !== "done" && roomNotDone(sub))
+      .map((sub) => sub.parent_id as string)
+  );
+
+  const topLevel = db.checklistItems
+    .filter((item) => !item.parent_id && (roomNotDone(item) || parentsReachedByASub.has(item.id)))
+    .sort(byCreatedDesc);
 
   return topLevel.map((item) => ({
     ...item,

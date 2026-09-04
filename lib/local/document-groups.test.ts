@@ -1,0 +1,507 @@
+import { beforeEach, describe, expect, it } from "vitest";
+import {
+  localCreateDocumentGroup,
+  localCreateDocumentCategory,
+  localGetDocumentCategories,
+  localMoveDocumentCategory,
+  nextCategorySlug,
+  localRenameDocumentCategory,
+  localDeleteDocumentGroup,
+  localGetDocumentGroups,
+  localMoveDocumentGroup,
+  localRenameDocumentGroup,
+  localResolveDocumentGroup,
+  localSaveDocumentFile,
+  localCountDocumentsIn,
+  localDeleteDocumentCategory,
+  localDeleteDocumentsIn,
+  localGetAllDocumentGroups,
+  localMoveDocumentsIn,
+  localGetDocuments,
+  localUpdateDocument,
+} from "@/lib/local/store";
+
+// vitest.setup.ts points the local store at a disposable temp directory for the
+// whole run. Groups are scoped by category, so each test mints its own category
+// ids and is isolated by construction — no text-prefix filtering needed here.
+let testId: number;
+
+beforeEach(() => {
+  testId = Math.floor(Math.random() * 1_000_000);
+});
+
+function categories() {
+  return { catA: `test-cat-a-${testId}`, catB: `test-cat-b-${testId}` };
+}
+
+function file(name = "doc.pdf") {
+  return new File(["x"], name, { type: "application/pdf" });
+}
+
+describe("localCreateDocumentGroup", () => {
+  it("creates a group in a category holding no documents at all", async () => {
+    const { catA } = categories();
+    const group = await localCreateDocumentGroup(catA, "4.1 ป้ายสัญลักษณ์ความปลอดภัย");
+
+    expect(group?.name_th).toBe("4.1 ป้ายสัญลักษณ์ความปลอดภัย");
+    expect(group?.document_count).toBe(0);
+    expect(await localGetDocumentGroups(catA)).toHaveLength(1);
+  });
+
+  it("refuses a name already used in the same category", async () => {
+    const { catA } = categories();
+    await localCreateDocumentGroup(catA, "งานพื้น");
+
+    expect(await localCreateDocumentGroup(catA, "งานพื้น")).toBeNull();
+    expect(await localGetDocumentGroups(catA)).toHaveLength(1);
+  });
+
+  it("allows the same name under a different category", async () => {
+    const { catA, catB } = categories();
+    await localCreateDocumentGroup(catA, "แปลน");
+
+    expect(await localCreateDocumentGroup(catB, "แปลน")).not.toBeNull();
+  });
+
+  it("appends each new group after the last", async () => {
+    const { catA } = categories();
+    await localCreateDocumentGroup(catA, "หนึ่ง");
+    await localCreateDocumentGroup(catA, "สอง");
+    await localCreateDocumentGroup(catA, "สาม");
+
+    expect((await localGetDocumentGroups(catA)).map((g) => g.name_th)).toEqual(["หนึ่ง", "สอง", "สาม"]);
+  });
+});
+
+describe("localGetDocumentGroups", () => {
+  it("returns only that category's groups", async () => {
+    const { catA, catB } = categories();
+    await localCreateDocumentGroup(catA, "ของ A");
+    await localCreateDocumentGroup(catB, "ของ B");
+
+    expect((await localGetDocumentGroups(catA)).map((g) => g.name_th)).toEqual(["ของ A"]);
+  });
+
+  it("counts the documents in each group", async () => {
+    const { catA } = categories();
+    const group = await localCreateDocumentGroup(catA, "มีไฟล์");
+    await localCreateDocumentGroup(catA, "ว่าง");
+    await localSaveDocumentFile(catA, group!.id, file("a.pdf"));
+    await localSaveDocumentFile(catA, group!.id, file("b.pdf"));
+
+    const groups = await localGetDocumentGroups(catA);
+    expect(groups.find((g) => g.name_th === "มีไฟล์")?.document_count).toBe(2);
+    expect(groups.find((g) => g.name_th === "ว่าง")?.document_count).toBe(0);
+  });
+
+  it("still lists a group that holds nothing — the whole point of the feature", async () => {
+    const { catA } = categories();
+    await localCreateDocumentGroup(catA, "ยังไม่มีไฟล์");
+
+    expect(await localGetDocumentGroups(catA)).toHaveLength(1);
+  });
+});
+
+describe("localRenameDocumentGroup", () => {
+  it("renames without touching the documents in it", async () => {
+    const { catA } = categories();
+    const group = await localCreateDocumentGroup(catA, "ชื่อเดิม");
+    await localSaveDocumentFile(catA, group!.id, file());
+
+    const renamed = await localRenameDocumentGroup(group!.id, "ชื่อใหม่");
+
+    expect(renamed?.name_th).toBe("ชื่อใหม่");
+    const groups = await localGetDocumentGroups(catA);
+    expect(groups[0].name_th).toBe("ชื่อใหม่");
+    expect(groups[0].document_count).toBe(1);
+  });
+
+  it("refuses a name a sibling already uses", async () => {
+    const { catA } = categories();
+    await localCreateDocumentGroup(catA, "หนึ่ง");
+    const second = await localCreateDocumentGroup(catA, "สอง");
+
+    expect(await localRenameDocumentGroup(second!.id, "หนึ่ง")).toBeNull();
+  });
+
+  it("returns null for an id that isn't in the store", async () => {
+    expect(await localRenameDocumentGroup("no-such-id", "x")).toBeNull();
+  });
+});
+
+describe("localMoveDocumentGroup", () => {
+  it("swaps with the neighbour above and renumbers contiguously", async () => {
+    const { catA } = categories();
+    await localCreateDocumentGroup(catA, "หนึ่ง");
+    const second = await localCreateDocumentGroup(catA, "สอง");
+    await localCreateDocumentGroup(catA, "สาม");
+
+    await localMoveDocumentGroup(second!.id, "up");
+
+    const groups = await localGetDocumentGroups(catA);
+    expect(groups.map((g) => g.name_th)).toEqual(["สอง", "หนึ่ง", "สาม"]);
+    expect(groups.map((g) => g.sort_order)).toEqual([1, 2, 3]);
+  });
+
+  it("refuses to move the first row up or the last row down", async () => {
+    const { catA } = categories();
+    const first = await localCreateDocumentGroup(catA, "หนึ่ง");
+    const last = await localCreateDocumentGroup(catA, "สอง");
+
+    expect(await localMoveDocumentGroup(first!.id, "up")).toBeNull();
+    expect(await localMoveDocumentGroup(last!.id, "down")).toBeNull();
+    expect((await localGetDocumentGroups(catA)).map((g) => g.name_th)).toEqual(["หนึ่ง", "สอง"]);
+  });
+
+  it("never reorders another category's groups", async () => {
+    const { catA, catB } = categories();
+    await localCreateDocumentGroup(catB, "บี 1");
+    await localCreateDocumentGroup(catB, "บี 2");
+    await localCreateDocumentGroup(catA, "เอ 1");
+    const a2 = await localCreateDocumentGroup(catA, "เอ 2");
+
+    await localMoveDocumentGroup(a2!.id, "up");
+
+    expect((await localGetDocumentGroups(catB)).map((g) => g.name_th)).toEqual(["บี 1", "บี 2"]);
+  });
+});
+
+describe("localDeleteDocumentGroup", () => {
+  it("deletes a group holding nothing and closes the ordering gap", async () => {
+    const { catA } = categories();
+    await localCreateDocumentGroup(catA, "หนึ่ง");
+    const second = await localCreateDocumentGroup(catA, "สอง");
+    await localCreateDocumentGroup(catA, "สาม");
+
+    await localDeleteDocumentGroup(second!.id);
+
+    const groups = await localGetDocumentGroups(catA);
+    expect(groups.map((g) => g.name_th)).toEqual(["หนึ่ง", "สาม"]);
+    expect(groups.map((g) => g.sort_order)).toEqual([1, 2]);
+  });
+
+  it("refuses while documents still point at it — the caller must move or delete them first", async () => {
+    const { catA } = categories();
+    const group = await localCreateDocumentGroup(catA, "มีไฟล์");
+    await localSaveDocumentFile(catA, group!.id, file());
+
+    expect(await localDeleteDocumentGroup(group!.id)).toBeNull();
+    expect(await localGetDocumentGroups(catA)).toHaveLength(1);
+  });
+
+  it("returns null for an id that isn't in the store", async () => {
+    expect(await localDeleteDocumentGroup("no-such-id")).toBeNull();
+  });
+});
+
+describe("localResolveDocumentGroup", () => {
+  it("reuses an existing group with that name", async () => {
+    const { catA } = categories();
+    const group = await localCreateDocumentGroup(catA, "แปลน");
+
+    expect(await localResolveDocumentGroup(catA, "แปลน")).toBe(group!.id);
+    expect(await localGetDocumentGroups(catA)).toHaveLength(1);
+  });
+
+  it("creates the group when the category has never seen the name", async () => {
+    const { catA } = categories();
+    const id = await localResolveDocumentGroup(catA, "ของใหม่");
+
+    expect(id).not.toBeNull();
+    expect((await localGetDocumentGroups(catA)).map((g) => g.name_th)).toEqual(["ของใหม่"]);
+  });
+
+  it("treats blank and whitespace-only as no group at all", async () => {
+    const { catA } = categories();
+
+    expect(await localResolveDocumentGroup(catA, "")).toBeNull();
+    expect(await localResolveDocumentGroup(catA, "   ")).toBeNull();
+    expect(await localResolveDocumentGroup(catA, null)).toBeNull();
+    expect(await localGetDocumentGroups(catA)).toHaveLength(0);
+  });
+
+  it("trims the name before matching, so ' แปลน ' finds 'แปลน'", async () => {
+    const { catA } = categories();
+    const group = await localCreateDocumentGroup(catA, "แปลน");
+
+    expect(await localResolveDocumentGroup(catA, "  แปลน  ")).toBe(group!.id);
+  });
+});
+
+describe("localRenameDocumentCategory", () => {
+  it("renames a category without touching its slug — the slug is a live URL", async () => {
+    const before = (await localGetDocumentCategories()).find((c) => c.slug === "structure");
+    const renamed = await localRenameDocumentCategory(before!.id, { nameTh: "หมวดที่ 1 โครงสร้างและสถาปัตยกรรม" });
+
+    expect(renamed?.name_th).toBe("หมวดที่ 1 โครงสร้างและสถาปัตยกรรม");
+    expect(renamed?.slug).toBe("structure");
+
+    // restore, so later tests see the seeded name
+    await localRenameDocumentCategory(before!.id, { nameTh: before!.name_th });
+  });
+
+  it("changes the icon on its own", async () => {
+    const category = (await localGetDocumentCategories()).find((c) => c.slug === "safety");
+    const renamed = await localRenameDocumentCategory(category!.id, { emoji: "🧯" });
+
+    expect(renamed?.emoji).toBe("🧯");
+    expect(renamed?.name_th).toBe(category!.name_th);
+
+    await localRenameDocumentCategory(category!.id, { emoji: category!.emoji });
+  });
+
+  it("returns null for an id that isn't in the store", async () => {
+    expect(await localRenameDocumentCategory("no-such-id", { nameTh: "x" })).toBeNull();
+  });
+
+  it("seeds the four real categories first, in order", async () => {
+    // Asserts the leading four rather than the whole list: other tests in this
+    // file add categories of their own, and the store is shared across the run.
+    const categories = await localGetDocumentCategories();
+    expect(categories.slice(0, 4).map((c) => c.slug)).toEqual([
+      "structure",
+      "electrical",
+      "environment",
+      "safety",
+    ]);
+    expect(categories.map((c) => c.sort_order)).toEqual(categories.map((_, i) => i + 1));
+  });
+});
+
+describe("moving documents between groups", () => {
+  it("moves a document into another category's group, updating both counts", async () => {
+    const { catA, catB } = categories();
+    const from = await localCreateDocumentGroup(catA, "ต้นทาง");
+    const to = await localCreateDocumentGroup(catB, "ปลายทาง");
+    const doc = await localSaveDocumentFile(catA, from!.id, file());
+
+    await localUpdateDocument(doc.id, { categoryId: catB, groupId: to!.id });
+
+    expect((await localGetDocumentGroups(catA))[0].document_count).toBe(0);
+    expect((await localGetDocumentGroups(catB))[0].document_count).toBe(1);
+    expect((await localGetDocuments(catB)).map((d) => d.id)).toContain(doc.id);
+  });
+
+  it("moves a document out of every group when the destination is none", async () => {
+    const { catA } = categories();
+    const group = await localCreateDocumentGroup(catA, "มีกลุ่ม");
+    const doc = await localSaveDocumentFile(catA, group!.id, file());
+
+    await localUpdateDocument(doc.id, { groupId: null });
+
+    expect((await localGetDocumentGroups(catA))[0].document_count).toBe(0);
+    const moved = (await localGetDocuments(catA)).find((d) => d.id === doc.id);
+    expect(moved?.group_id).toBeNull();
+  });
+
+  it("never rewrites storage_path — a move is metadata only, so no file is re-keyed", async () => {
+    const { catA, catB } = categories();
+    const group = await localCreateDocumentGroup(catA, "ต้นทาง");
+    const doc = await localSaveDocumentFile(catA, group!.id, file("แปลนอาคาร.pdf"));
+    const originalPath = doc.storage_path;
+
+    await localUpdateDocument(doc.id, { categoryId: catB, groupId: null });
+
+    const moved = (await localGetDocuments(catB)).find((d) => d.id === doc.id);
+    expect(moved?.storage_path).toBe(originalPath);
+  });
+
+  it("frees a group to be deleted once its last document has moved out", async () => {
+    const { catA } = categories();
+    const group = await localCreateDocumentGroup(catA, "จะลบทีหลัง");
+    const doc = await localSaveDocumentFile(catA, group!.id, file());
+
+    expect(await localDeleteDocumentGroup(group!.id)).toBeNull();
+
+    await localUpdateDocument(doc.id, { groupId: null });
+
+    expect(await localDeleteDocumentGroup(group!.id)).not.toBeNull();
+  });
+});
+
+describe("localGetAllDocumentGroups", () => {
+  it("returns groups from every category, so the move picker can span them", async () => {
+    const { catA, catB } = categories();
+    await localCreateDocumentGroup(catA, "ของ A");
+    await localCreateDocumentGroup(catB, "ของ B");
+
+    const names = (await localGetAllDocumentGroups()).map((g) => g.name_th);
+    expect(names).toContain("ของ A");
+    expect(names).toContain("ของ B");
+  });
+});
+
+describe("localMoveDocumentCategory", () => {
+  it("reorders categories and renumbers them contiguously", async () => {
+    const before = await localGetDocumentCategories();
+    const second = before[1];
+
+    await localMoveDocumentCategory(second.id, "up");
+
+    const after = await localGetDocumentCategories();
+    expect(after[0].id).toBe(second.id);
+    expect(after.map((c) => c.sort_order)).toEqual([1, 2, 3, 4]);
+
+    // restore for other tests, which read the seeded order
+    await localMoveDocumentCategory(second.id, "down");
+    expect((await localGetDocumentCategories()).map((c) => c.slug)).toEqual(before.map((c) => c.slug));
+  });
+
+  it("refuses to move the first up or the last down", async () => {
+    const categories = await localGetDocumentCategories();
+
+    expect(await localMoveDocumentCategory(categories[0].id, "up")).toBeNull();
+    expect(await localMoveDocumentCategory(categories[categories.length - 1].id, "down")).toBeNull();
+  });
+
+  it("returns null for an id that isn't in the store", async () => {
+    expect(await localMoveDocumentCategory("no-such-id", "up")).toBeNull();
+  });
+});
+
+describe("reordering settles where the clicks left it", () => {
+  it("three moves up carry a group from last to first", async () => {
+    const { catA } = categories();
+    await localCreateDocumentGroup(catA, "หนึ่ง");
+    await localCreateDocumentGroup(catA, "สอง");
+    await localCreateDocumentGroup(catA, "สาม");
+    const last = await localCreateDocumentGroup(catA, "สี่");
+
+    // Serialized, exactly as the UI queues them — three clicks, three swaps.
+    await localMoveDocumentGroup(last!.id, "up");
+    await localMoveDocumentGroup(last!.id, "up");
+    await localMoveDocumentGroup(last!.id, "up");
+
+    const groups = await localGetDocumentGroups(catA);
+    expect(groups.map((g) => g.name_th)).toEqual(["สี่", "หนึ่ง", "สอง", "สาม"]);
+    expect(groups.map((g) => g.sort_order)).toEqual([1, 2, 3, 4]);
+  });
+});
+
+describe("nextCategorySlug", () => {
+  it("starts at category-1 when nothing is taken", () => {
+    expect(nextCategorySlug([])).toBe("category-1");
+  });
+
+  it("skips numbers already in use", () => {
+    expect(nextCategorySlug(["category-1", "category-2"])).toBe("category-3");
+  });
+
+  it("fills a gap rather than always appending", () => {
+    expect(nextCategorySlug(["category-1", "category-3"])).toBe("category-2");
+  });
+
+  it("ignores the original hand-written slugs", () => {
+    expect(nextCategorySlug(["structure", "electrical", "environment", "safety"])).toBe("category-1");
+  });
+});
+
+describe("localCreateDocumentCategory", () => {
+  it("appends a category last, with a generated slug the caller never supplied", async () => {
+    const name = `หมวดทดสอบ ${testId}`;
+    const created = await localCreateDocumentCategory(name, "📁");
+
+    expect(created?.name_th).toBe(name);
+    expect(created?.slug).toMatch(/^category-\d+$/);
+
+    const all = await localGetDocumentCategories();
+    expect(all[all.length - 1].id).toBe(created!.id);
+    expect(all.map((c) => c.sort_order)).toEqual(all.map((_, i) => i + 1));
+  });
+
+  it("refuses a duplicate name", async () => {
+    const name = `หมวดซ้ำ ${testId}`;
+    await localCreateDocumentCategory(name, "📁");
+
+    expect(await localCreateDocumentCategory(name, "📁")).toBeNull();
+  });
+
+  it("keeps its generated slug through a later rename", async () => {
+    const created = await localCreateDocumentCategory(`หมวดเปลี่ยนชื่อ ${testId}`, "📁");
+    const slug = created!.slug;
+
+    const renamed = await localRenameDocumentCategory(created!.id, { nameTh: `ชื่อใหม่ ${testId}` });
+
+    expect(renamed?.slug).toBe(slug);
+  });
+
+  it("accepts sub-groups and behaves like the original four", async () => {
+    const created = await localCreateDocumentCategory(`หมวดใหม่ ${testId}`, "📁");
+    const group = await localCreateDocumentGroup(created!.id, "กลุ่มแรก");
+
+    expect(group).not.toBeNull();
+    expect((await localGetDocumentGroups(created!.id)).map((g) => g.name_th)).toEqual(["กลุ่มแรก"]);
+  });
+});
+
+describe("the delete flow's building blocks", () => {
+  it("counts what is inside a group and inside a category", async () => {
+    const { catA } = categories();
+    const group = await localCreateDocumentGroup(catA, "นับ");
+    await localSaveDocumentFile(catA, group!.id, file("a.pdf"));
+    await localSaveDocumentFile(catA, group!.id, file("b.pdf"));
+    await localSaveDocumentFile(catA, null, file("c.pdf"));
+
+    expect(await localCountDocumentsIn({ groupId: group!.id })).toBe(2);
+    expect(await localCountDocumentsIn({ categoryId: catA })).toBe(3);
+  });
+
+  it("moves a whole group's documents to a destination without deleting any", async () => {
+    const { catA, catB } = categories();
+    const from = await localCreateDocumentGroup(catA, "ต้นทาง");
+    const to = await localCreateDocumentGroup(catB, "ปลายทาง");
+    await localSaveDocumentFile(catA, from!.id, file("a.pdf"));
+    await localSaveDocumentFile(catA, from!.id, file("b.pdf"));
+
+    const moved = await localMoveDocumentsIn({ groupId: from!.id }, catB, to!.id);
+
+    expect(moved).toBe(2);
+    expect(await localCountDocumentsIn({ groupId: from!.id })).toBe(0);
+    expect(await localCountDocumentsIn({ groupId: to!.id })).toBe(2);
+    // Nothing was destroyed — the documents still exist, elsewhere.
+    expect((await localGetDocuments(catB))).toHaveLength(2);
+  });
+
+  it("deletes a group's documents and their files when that is the chosen disposition", async () => {
+    const { catA } = categories();
+    const group = await localCreateDocumentGroup(catA, "จะลบพร้อมไฟล์");
+    await localSaveDocumentFile(catA, group!.id, file("a.pdf"));
+    await localSaveDocumentFile(catA, group!.id, file("b.pdf"));
+
+    const deleted = await localDeleteDocumentsIn({ groupId: group!.id });
+
+    expect(deleted).toBe(2);
+    expect(await localGetDocuments(catA)).toHaveLength(0);
+    // Only now can the group itself go.
+    expect(await localDeleteDocumentGroup(group!.id)).not.toBeNull();
+  });
+});
+
+describe("localDeleteDocumentCategory", () => {
+  it("takes the category's sub-groups with it in one action", async () => {
+    const created = await localCreateDocumentCategory(`หมวดจะลบ ${testId}`, "📁");
+    await localCreateDocumentGroup(created!.id, "กลุ่ม 1");
+    await localCreateDocumentGroup(created!.id, "กลุ่ม 2");
+
+    await localDeleteDocumentCategory(created!.id);
+
+    expect(await localGetDocumentGroups(created!.id)).toHaveLength(0);
+    expect((await localGetDocumentCategories()).map((c) => c.id)).not.toContain(created!.id);
+  });
+
+  it("refuses while documents remain, mirroring the SQL's on-delete-restrict", async () => {
+    const created = await localCreateDocumentCategory(`หมวดมีไฟล์ ${testId}`, "📁");
+    await localSaveDocumentFile(created!.id, null, file());
+
+    expect(await localDeleteDocumentCategory(created!.id)).toBeNull();
+    expect((await localGetDocumentCategories()).map((c) => c.id)).toContain(created!.id);
+  });
+
+  it("renumbers the remaining categories contiguously", async () => {
+    const created = await localCreateDocumentCategory(`หมวดชั่วคราว ${testId}`, "📁");
+    await localDeleteDocumentCategory(created!.id);
+
+    const remaining = await localGetDocumentCategories();
+    expect(remaining.map((c) => c.sort_order)).toEqual(remaining.map((_, i) => i + 1));
+  });
+});
