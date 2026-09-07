@@ -22,6 +22,13 @@ const nextConfig: NextConfig = {
     serverActions: {
       bodySizeLimit: "300mb",
     },
+    // A separate, earlier ceiling. Middleware runs on every request, including
+    // the POSTs that carry an upload, and truncates the body at 10MB before the
+    // Server Action ever sees it. The action then receives a multipart body
+    // that stops mid-stream and fails with "Unexpected end of form", which
+    // reads as a corrupt file rather than as a size limit. bodySizeLimit above
+    // governs the action; this governs what reaches it.
+    middlewareClientMaxBodySize: "300mb",
   },
 };
 
