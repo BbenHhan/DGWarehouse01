@@ -327,3 +327,66 @@ describe("renaming", () => {
     expect(after!.slug).toBe(category.slug);
   });
 });
+
+// ---------------------------------------------------------------------------
+// The number a category or group shows is derived from its position, so a
+// delete that leaves a gap leaves the numbering wrong until something else
+// happens to reorder. Reported from production: deleting category 6 left the
+// next one still calling itself 7.
+//
+// These run against the local backend, which has always closed the gap — the
+// defect was in the Supabase branch, which no test here reaches. They are
+// written as the contract both backends owe (Constitution III), so a future
+// change that drops renumbering from the local side fails too.
+// ---------------------------------------------------------------------------
+describe("deleting closes the numbering gap", () => {
+  it("renumbers the remaining categories so positions stay contiguous", async () => {
+    const a = await seedCategory("gap-a");
+    const b = await seedCategory("gap-b");
+    const c = await seedCategory("gap-c");
+
+    const before = await localGetDocumentCategories();
+    expect(before.map((x) => x.sort_order)).toEqual(
+      Array.from({ length: before.length }, (_, i) => i + 1)
+    );
+
+    const result = await deleteCategory({ id: b.id, documents: { kind: "none" } });
+    expect(result.ok).toBe(true);
+
+    const after = await localGetDocumentCategories();
+    expect(after.map((x) => x.sort_order)).toEqual(
+      Array.from({ length: after.length }, (_, i) => i + 1)
+    );
+    // the one that sat after the deleted category moved up, rather than
+    // keeping the number it had
+    const moved = after.find((x) => x.id === c.id)!;
+    const stayed = after.find((x) => x.id === a.id)!;
+    expect(moved.sort_order).toBe(stayed.sort_order + 1);
+  });
+
+  it("renumbers the remaining groups within their category", async () => {
+    const category = await seedCategory();
+    const first = await seedGroup(category.id, "หนึ่ง");
+    const second = await seedGroup(category.id, "สอง");
+    const third = await seedGroup(category.id, "สาม");
+    expect([first, second, third].map((g) => g.sort_order)).toEqual([1, 2, 3]);
+
+    const result = await deleteGroup({ id: second.id, documents: { kind: "none" } });
+    expect(result.ok).toBe(true);
+
+    const after = await localGetDocumentGroups(category.id);
+    expect(after.map((g) => g.sort_order)).toEqual([1, 2]);
+    expect(after.map((g) => g.name_th)).toEqual(["หนึ่ง", "สาม"]);
+  });
+
+  it("leaves a gap nowhere, even when the deleted one was last", async () => {
+    const category = await seedCategory();
+    await seedGroup(category.id, "อยู่ต่อ");
+    const last = await seedGroup(category.id, "ตัวท้าย");
+
+    await deleteGroup({ id: last.id, documents: { kind: "none" } });
+
+    const after = await localGetDocumentGroups(category.id);
+    expect(after.map((g) => g.sort_order)).toEqual([1]);
+  });
+});
