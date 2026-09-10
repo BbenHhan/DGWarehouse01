@@ -119,4 +119,21 @@ describe("dragging files onto the document uploader", () => {
     // "1.5 พื้นที่เก็บนอกอาคาร" holds nothing and must still be offerable.
     expect(screen.getByPlaceholderText("เช่น แปลนและแบบก่อสร้าง")).toBeInTheDocument();
   });
+
+  // specs/045-automate-manual-checks — specs/040 quickstart Scenario 3. Opening
+  // the picker and reading the list was on the manual list; what it is really
+  // asserting is that the suggestions are this category's groups and nothing
+  // else, numbered under this category.
+  it("lists this category's groups, numbered under it, and nothing from elsewhere", async () => {
+    const user = userEvent.setup();
+    render(<DocUploader categoryId={CATEGORY_ID} groups={GROUPS} category={CATEGORY} />);
+
+    await user.click(screen.getByPlaceholderText("เช่น แปลนและแบบก่อสร้าง"));
+
+    const options = await screen.findAllByRole("option");
+    expect(options.map((option) => option.textContent)).toEqual([
+      "1.1 แปลนและแบบก่อสร้าง",
+      "1.2 พื้นที่เก็บนอกอาคาร",
+    ]);
+  });
 });

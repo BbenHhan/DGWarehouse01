@@ -22,31 +22,32 @@
 
 ## Phase 2: User Story 3 — the interaction rules (P2)
 
-- [ ] T012 [US3] Create `components/ManageModeProvider.test.tsx` and check unsubmitted typing survives leaving and re-entering management mode (FR-008)
-- [ ] T013 [US3] Check a burst of reorder requests settles in the order requested, each applied in turn rather than overlapping, using fake timers (FR-009, FR-012)
-- [ ] T014 [US3] Extend `components/DocList.test.tsx` to check a video reports how much has arrived and does not withhold playback until complete (FR-010)
+- [X] T012 [US3] Create `components/ManageModeProvider.test.tsx` and check unsubmitted typing survives leaving and re-entering management mode (FR-008)
+- [X] T013 [US3] Check a burst of reorder requests settles in the order requested, each applied in turn rather than overlapping, using fake timers (FR-009, FR-012)
+- [X] T014 [US3] Extend `components/DocList.test.tsx` to check a video reports how much has arrived and does not withhold playback until complete (FR-010)
+- [X] T020 [US3] Cover the remaining ways into the app, so specs/041 Scenario 6 can leave the manual list: sign-up and the forgotten-password form in `app/login/page.test.tsx`, and the new `app/reset-password/page.test.tsx`
 
 ---
 
 ## Phase 3: User Story 4 — an honest manual list (P3)
 
-- [ ] T015 [US4] Remove from the tasks lists of features 040–044 every manual entry now covered by an automated check (FR-014)
-- [ ] T016 [US4] Give each surviving manual entry the reason a person is required — phone-width layout, screen-reader output, and a real download from production storage (FR-013)
+- [X] T015 [US4] Remove from the tasks lists of features 040–044 every manual entry now covered by an automated check (FR-014)
+- [X] T016 [US4] Give each surviving manual entry the reason a person is required — phone-width layout, screen-reader output, and a real download from production storage (FR-013)
 
 ---
 
 ## Phase 4: Verification
 
-- [ ] T017 Confirm each new check fails when the behaviour it protects is reverted, rather than passing regardless (SC-005) — the criterion that decides whether this feature was worth doing
-- [ ] T018 Run the suite several times and confirm no intermittent failures (FR-012, SC-004)
-- [ ] T019 Run `npx vitest run`, `npx tsc --noEmit`, `npm run lint`, then `npm run build` with the dev server stopped
+- [X] T017 Confirm each new check fails when the behaviour it protects is reverted, rather than passing regardless (SC-005) — the criterion that decides whether this feature was worth doing
+- [X] T018 Run the suite several times and confirm no intermittent failures (FR-012, SC-004)
+- [X] T019 Run `npx vitest run`, `npx tsc --noEmit`, `npm run lint`, then `npm run build` with the dev server stopped
 
 ---
 
 ## Dependencies
 
 ```text
-T001 → T002..T011 → T012..T014 → T015, T016 → T017 → T018 → T019
+T001 → T002..T011 → T012..T014, T020 → T015, T016 → T017 → T018 → T019
 ```
 
 ## Parallel opportunities
@@ -59,3 +60,19 @@ T001 → T002..T011 → T012..T014 → T015, T016 → T017 → T018 → T019
 Phase 1 is the whole point: it is the only outstanding check whose failure would be a
 security hole, and the only one guarding against permanent loss of the account holder's
 documents. It is worth landing on its own.
+
+---
+
+## Outcome
+
+The manual list across features 040–044 went from 16 entries to 7. Each survivor
+now states what makes a person necessary: phone-width layout (040 T053, 041 T042,
+042 T010), screen-reader output (041 T043), a real file coming back from
+production storage (040 T032, T050), and one judgement about whether nesting
+reads clearly (044 T007).
+
+T017 was carried out by reverting each protected behaviour in turn and confirming
+the checks went red: the rights gate made to always allow (18 of 36 failed), the
+draft store made to forget (2 failed), the reorder queue made to fire in parallel
+(1 failed), and the video held back until fully downloaded (3 failed). Every
+revert was undone afterwards.

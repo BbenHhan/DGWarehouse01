@@ -17,7 +17,7 @@
 
 ## Phase 2: Verification
 
-- [ ] T007 **[needs a signed-in editor]** Open a room page and confirm, at a glance, which sub-item belongs to which entry (SC-001)
+- [ ] T007 **[a person is needed: a judgement about how it looks]** Open a room page and confirm, at a glance, which sub-item belongs to which entry (SC-001). That the nesting exists is asserted in `components/RoomChecklistBox.test.tsx`; whether the spacing and borders actually make it readable is a judgement, not an assertion
 
 ---
 

@@ -338,3 +338,90 @@ describe("image preview failure", () => {
     await waitFor(() => expect(screen.queryByText("กำลังโหลดรูป")).not.toBeInTheDocument());
   });
 });
+
+// specs/045-automate-manual-checks T014. This was quickstart Scenario 7, which
+// nobody could run without a signed-in editor and a large video in storage. The
+// thing worth protecting (FR-014d) is that the player is handed the direct URL
+// and starts on its own: downloading the file first would report a tidier
+// percentage and cost both early playback and seeking.
+describe("video preview reports what has arrived without withholding playback", () => {
+  function videoDoc(): Document {
+    return { ...doc("doc-1", "grp-1"), file_name: "doc-1.mp4", storage_path: "cat/doc-1.mp4" };
+  }
+
+  async function openVideo(user: ReturnType<typeof userEvent.setup>) {
+    await user.click(screen.getByText(/ระบบดับเพลิง/));
+    await user.click(await screen.findByText("doc-1.mp4"));
+  }
+
+  // jsdom gives every media element duration NaN and no buffered ranges, so the
+  // player's own reporting has to be simulated.
+  function pretendBuffered(video: HTMLVideoElement, fraction: number) {
+    Object.defineProperty(video, "duration", { configurable: true, value: 100 });
+    Object.defineProperty(video, "buffered", {
+      configurable: true,
+      value: { length: 1, start: () => 0, end: () => 100 * fraction },
+    });
+  }
+
+  it("plays from the direct URL rather than downloading the file first", async () => {
+    const user = userEvent.setup();
+    const fetchSpy = vi.fn();
+    vi.stubGlobal("fetch", fetchSpy);
+
+    const { container } = renderList([group(1, "ระบบดับเพลิง", 1)], [videoDoc()]);
+    await openVideo(user);
+
+    const video = container.querySelector("video")!;
+    expect(video).toHaveAttribute("src", "https://example.test/file");
+    expect(fetchSpy).not.toHaveBeenCalled();
+
+    vi.unstubAllGlobals();
+  });
+
+  it("shows the player as soon as the file's metadata arrives, not when it is complete", async () => {
+    const user = userEvent.setup();
+    const { container } = renderList([group(1, "ระบบดับเพลิง", 1)], [videoDoc()]);
+    await openVideo(user);
+
+    const video = container.querySelector("video")!;
+    expect(video.className).toContain("hidden");
+
+    pretendBuffered(video, 0.2);
+    fireEvent.loadedMetadata(video);
+
+    // 20% in and the player is already on screen and usable.
+    expect(video.className).not.toContain("hidden");
+  });
+
+  it("says how much has arrived while the rest is still coming", async () => {
+    const user = userEvent.setup();
+    const { container } = renderList([group(1, "ระบบดับเพลิง", 1)], [videoDoc()]);
+    await openVideo(user);
+
+    const video = container.querySelector("video")!;
+    pretendBuffered(video, 0.4);
+    fireEvent.loadedMetadata(video);
+    fireEvent.progress(video);
+
+    expect(await screen.findByText(/กำลังโหลดวิดีโอ 40%/)).toBeInTheDocument();
+    expect(screen.getByText(/เล่นได้เลยไม่ต้องรอจนครบ/)).toBeInTheDocument();
+  });
+
+  it("drops the message once the whole file has arrived", async () => {
+    const user = userEvent.setup();
+    const { container } = renderList([group(1, "ระบบดับเพลิง", 1)], [videoDoc()]);
+    await openVideo(user);
+
+    const video = container.querySelector("video")!;
+    pretendBuffered(video, 0.4);
+    fireEvent.loadedMetadata(video);
+    fireEvent.progress(video);
+    expect(await screen.findByText(/กำลังโหลดวิดีโอ/)).toBeInTheDocument();
+
+    pretendBuffered(video, 1);
+    fireEvent.progress(video);
+
+    await waitFor(() => expect(screen.queryByText(/กำลังโหลดวิดีโอ/)).not.toBeInTheDocument());
+  });
+});

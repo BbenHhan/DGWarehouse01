@@ -7,13 +7,15 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const signInWithPassword = vi.fn();
 const signInWithOAuth = vi.fn();
+const signUp = vi.fn();
+const resetPasswordForEmail = vi.fn();
 vi.mock("@/lib/supabase/client", () => ({
   createClient: () => ({
     auth: {
       signInWithPassword: (...a: unknown[]) => signInWithPassword(...a),
       signInWithOAuth: (...a: unknown[]) => signInWithOAuth(...a),
-      signUp: vi.fn(),
-      resetPasswordForEmail: vi.fn(),
+      signUp: (...a: unknown[]) => signUp(...a),
+      resetPasswordForEmail: (...a: unknown[]) => resetPasswordForEmail(...a),
     },
   }),
 }));
@@ -81,5 +83,93 @@ describe("sign-in form", () => {
       expect(screen.getByRole("button", { name: "เข้าสู่ระบบ" })).toBeEnabled()
     );
     expect(screen.getByText(/อีเมลหรือรหัสผ่านไม่ถูกต้อง/)).toBeInTheDocument();
+  });
+});
+
+// specs/045-automate-manual-checks. Quickstart Scenario 6 of specs/041 also
+// covers the other two ways into the app. They shared the sign-in form's fault
+// — a button that greyed out and said nothing — and they were only ever checked
+// by hand because they live behind an email round trip.
+describe("sign-up form", () => {
+  async function openSignUp(user: ReturnType<typeof userEvent.setup>) {
+    render(<LoginPage />);
+    await user.click(screen.getByRole("button", { name: "สมัครสมาชิก" }));
+    await user.type(screen.getByPlaceholderText(/อีเมล/i), "somchai@example.com");
+    await user.type(screen.getByPlaceholderText(/รหัสผ่าน/i), "hunter2hunter2");
+    await user.click(screen.getByRole("button", { name: "สมัครสมาชิก" }));
+  }
+
+  it("says it is signing up while the request is in flight", async () => {
+    const user = userEvent.setup();
+    signUp.mockReturnValue(new Promise(() => {}));
+
+    await openSignUp(user);
+
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /กำลังสมัคร/ })).toBeDisabled()
+    );
+  });
+
+  it("stays busy through the navigation when the account is signed in at once", async () => {
+    const user = userEvent.setup();
+    signUp.mockResolvedValue({ data: { session: { access_token: "t" } }, error: null });
+
+    await openSignUp(user);
+
+    await waitFor(() => expect(window.location.assign).toHaveBeenCalledWith("/photos"));
+    expect(screen.getByRole("button", { name: /กำลังสมัคร/ })).toBeDisabled();
+  });
+
+  it("frees the button and shows the reason when sign-up is rejected", async () => {
+    const user = userEvent.setup();
+    signUp.mockResolvedValue({ data: {}, error: { message: "User already registered" } });
+
+    await openSignUp(user);
+
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "สมัครสมาชิก" })).toBeEnabled()
+    );
+    expect(screen.getByText("User already registered")).toBeInTheDocument();
+  });
+});
+
+describe("forgotten-password form", () => {
+  async function openForgot(user: ReturnType<typeof userEvent.setup>) {
+    render(<LoginPage />);
+    await user.click(screen.getByRole("button", { name: "ลืมรหัสผ่าน?" }));
+    await user.type(screen.getByPlaceholderText(/อีเมลของคุณ/i), "somchai@example.com");
+    await user.click(screen.getByRole("button", { name: "ส่งลิงก์ตั้งรหัสผ่าน" }));
+  }
+
+  it("says it is sending while the link is on its way", async () => {
+    const user = userEvent.setup();
+    resetPasswordForEmail.mockReturnValue(new Promise(() => {}));
+
+    await openForgot(user);
+
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /กำลังส่งลิงก์/ })).toBeDisabled()
+    );
+  });
+
+  it("confirms without revealing whether the address had an account", async () => {
+    const user = userEvent.setup();
+    resetPasswordForEmail.mockResolvedValue({ error: null });
+
+    await openForgot(user);
+
+    expect(await screen.findByText(/หากอีเมลนี้มีบัญชีอยู่/)).toBeInTheDocument();
+  });
+
+  it("frees the button and says so when the link cannot be sent", async () => {
+    const user = userEvent.setup();
+    resetPasswordForEmail.mockResolvedValue({ error: { message: "rate limited" } });
+
+    await openForgot(user);
+
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "ส่งลิงก์ตั้งรหัสผ่าน" })).toBeEnabled()
+    );
+    expect(screen.getByText(/ไม่สำเร็จ|ลองใหม่/)).toBeInTheDocument();
   });
 });
