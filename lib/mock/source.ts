@@ -37,6 +37,9 @@ const WORK_TYPES: Array<WorkType & { folderNames: string[] }> = [
   { id: "drainage", slug: "drainage", name_th: "บ่อพัก/รางน้ำ", emoji: "🌊", sort_order: 5, folderNames: ["บ่อพัก", "บ่อน้ำ"] },
   { id: "doors", slug: "doors", name_th: "งานประตูและทางออกฉุกเฉิน", emoji: "🚪", sort_order: 6, folderNames: ["🚪 งานประตูและทางออกฉุกเฉิน (Doors & Exits)"] },
   { id: "overview", slug: "overview", name_th: "ภาพรวมทั่วไป", emoji: "📷", sort_order: 7, folderNames: ["📷 ภาพรวมทั่วไป (General Overview)"] },
+  // No folder for it exists on disk yet, so it shows empty here — listed so the
+  // local and mock backends offer the same categories as Supabase (0016).
+  { id: "fire-alarm", slug: "fire-alarm", name_th: "งานระบบแจ้งเหตุเพลิงไหม้", emoji: "🚨", sort_order: 8, folderNames: [] },
 ];
 
 const DOC_CATEGORIES: Array<DocumentCategory & { folderPrefix: string }> = [
