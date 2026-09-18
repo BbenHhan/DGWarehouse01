@@ -57,7 +57,6 @@ description: "Task list for Editable Document Taxonomy"
 - [X] T019 [US1] Update `components/DocUploader.tsx` to source its group picker from `getDocumentGroups(categoryId)`: every group in this category whether or not it holds files, and none from other categories (FR-023)
 - [X] T020 [US1] Update `uploadDoc` in `app/actions/documents.ts`: resolve a typed group name against existing groups in that category, creating one through the same path `createGroup` uses if it does not exist (FR-024), then attach `group_id`
 - [X] T021 [P] [US1] Create `lib/local/document-groups.test.ts`: creating a group in an empty category, uniqueness within a category, the same name allowed under two different categories, blank and whitespace-only names refused
-- [ ] T022 [US1] Run quickstart Scenarios 2 and 3
 
 **Checkpoint**: The reported problem is fixed — `หมวดที่ 4` can hold topics before it holds files, and the picker is correct.
 
@@ -73,7 +72,6 @@ description: "Task list for Editable Document Taxonomy"
 - [X] T024 [US2] Add `renameGroup` and `renameCategory` to `app/actions/document-taxonomy.ts`, plus their `local` counterparts in `lib/local/store.ts`
 - [X] T025 [US2] Add inline name editing to `components/DocumentTaxonomyManager.tsx` for both levels: click the name to edit, blur to save. Clearing the field restores the previous name rather than saving a blank (FR-012)
 - [X] T026 [P] [US2] Extend `lib/local/document-groups.test.ts`: renaming a group holding documents leaves every document attached to it; renaming to a sibling's name is refused; a category rename leaves `slug` untouched
-- [ ] T027 [US2] Run quickstart Scenario 4
 
 ---
 
@@ -87,7 +85,7 @@ description: "Task list for Editable Document Taxonomy"
 - [X] T029 [US6] Update `editDoc` in `app/actions/documents.ts` to accept and apply `groupId`, and add `moveDocuments({ documentIds, toCategoryId, toGroupId })` as the bulk form Phase 7's disposition will call. Both write database columns only — `storage_path` is never rewritten (research.md Decision 5)
 - [X] T030 [US6] Update the move control in `components/DocList.tsx` from a flat category list to category plus group, with "no sub-group" as an option. Destinations are read live, so a group created moments ago is selectable without a reload (FR-026)
 - [X] T031 [P] [US6] Extend the local-store tests: moving between groups in different categories, moving to no group, counts updating on both sides, `storage_path` unchanged after a move
-- [ ] T032 [US6] Run quickstart Scenario 6, including opening a moved file to confirm it still downloads
+- [ ] T032 **[a person is needed: a real download from production storage]** [US6] Run quickstart Scenario 6. The re-parenting is automated; what is not is opening a moved file and confirming the object still comes back from Supabase Storage, which no local backend can prove
 
 ---
 
@@ -101,7 +99,6 @@ description: "Task list for Editable Document Taxonomy"
 - [X] T034 [US3] Add up/down buttons per row in `components/DocumentTaxonomyManager.tsx` — buttons, not drag (FR-021: this is used on a phone on site). No "up" on the first row, no "down" on the last
 - [X] T035 [US3] Debounce rapid reorder clicks into a single write, so four fast taps settle on the order shown rather than racing (spec Edge Cases, research.md Decision 7)
 - [X] T036 [P] [US3] Extend the local-store tests: a move renumbers contiguously, moving the first row up is a no-op, moving the last down is a no-op, order survives a reload
-- [ ] T037 [US3] Run quickstart Scenario 5
 
 ---
 
@@ -130,16 +127,13 @@ description: "Task list for Editable Document Taxonomy"
 - [X] T047 [US5] Create `components/DeleteTaxonomyDialog.tsx`: one confirmation when nothing holds files; the move-or-delete choice when something does, stating the count; a second confirmation naming the count when delete is chosen (FR-011a). Exclude the subtree being deleted from its own destination list (spec Edge Cases)
 - [X] T048 [P] [US5] Extend the local-store tests: `none` refused when documents exist, `move` relocates every document and deletes nothing, `delete` with a stale `confirmedCount` is refused, a refusal leaves counts unchanged, deleting a category takes its groups
 - [X] T049 [P] [US5] Create `components/DeleteTaxonomyDialog.test.tsx` in jsdom (following `RoomChecklistBox.test.tsx`): the second confirmation appears only for the delete path, dismissing either dialog calls no action, the count shown matches what is passed in
-- [ ] T050 [US5] Run quickstart Scenario 7, all four cases, including confirming the stored file is gone after a destructive delete
+- [ ] T050 **[a person is needed: production storage]** [US5] Run quickstart Scenario 7's destructive case and confirm the stored object is really gone from Supabase Storage. The four guards themselves are automated; whether the file left the bucket is not
 
 ---
 
 ## Phase 8: Polish & Cross-Cutting
 
-- [ ] T051 **[needs a signed-in editor]** [P] Run quickstart Scenario 8: a viewer sees the list unchanged with no management control, and a taxonomy action invoked directly is refused by the server, not merely hidden
-- [ ] T052 **[needs a signed-in editor]** [P] Run quickstart Scenario 9: unsubmitted typing survives leaving and re-entering management mode
-- [ ] T053 **[needs a signed-in editor]** [P] Run quickstart Scenario 10 at 375px: every control reachable, a very long group name does not break the row, no horizontal scrolling (Constitution IV)
-- [ ] T054 **[needs a signed-in editor]** [P] Run quickstart Scenario 11: a failed write is reported and the list returns to the true saved state, never left showing an unsaved change (Constitution V, FR-022)
+- [ ] T053 **[a person is needed: phone-width layout]** [P] Run quickstart Scenario 10 at 375px: every control reachable, a very long group name does not break the row, no horizontal scrolling (Constitution IV). jsdom has no layout engine, so nothing here can be asserted in a test
 - [X] T055 Run `npm test`, `npm run lint`, `npx tsc --noEmit`, and `npm run build` — all clean. Stop the dev server before building; a production build over a running dev server wipes `.next` and breaks it
 - [X] T056 Update `README.md` — checked: it does not describe document groups at all, so nothing to correct
 
@@ -297,3 +291,17 @@ done. `moveDocuments` (the bulk form, also T029) is not written yet.
 sub-folder names to group records through the same create-if-missing path the
 uploader uses, and keys duplicate detection on the group's name joined back in.
 It was missed when the tasks were written.
+
+---
+
+## Now automated (specs/045-automate-manual-checks)
+
+Scenarios 2, 3, 4, 5, 8, 9 and 11 no longer need a person. They are checked by
+`app/actions/document-taxonomy.test.ts` (the rights gate, the delete guards, a
+refused write leaving the store untouched, a rename keeping its documents),
+`components/DocList.test.tsx` (a topic existing before a file does, order held),
+`components/DocUploader.test.tsx` (the picker offering this category's groups and
+no others), `components/CategoryManagePanel.test.tsx` (a refused rename reported
+and reverted, a viewer offered no way in) and
+`components/ManageModeProvider.test.tsx` (unsubmitted typing surviving the mode
+toggle). Only the three entries above still need a person, and each says why.

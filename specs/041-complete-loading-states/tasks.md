@@ -116,11 +116,8 @@ V for the app's daily actions and is a shippable increment.
 - [X] T036 [P] Give every in-place indicator an `aria-live="polite"` status with Thai text and keep spinner glyphs `aria-hidden`, matching the pattern the existing `LoadingRegion` established (FR-010, research §8)
 - [X] T037 Walk the full coverage list in the spec's Assumptions and confirm each of the eleven places shows something while it waits (SC-001)
 - [X] T038 Run `npx vitest run`, `npx tsc --noEmit`, and `npm run lint`, then `npm run build` with the dev server stopped
-- [ ] T039 **[needs a signed-in editor]** Run quickstart Scenarios 1–5 throttled to Slow 4G
-- [ ] T040 **[needs a signed-in editor]** Run quickstart Scenario 6 (sign-in, sign-up, reset)
-- [ ] T041 **[needs a signed-in editor]** Run quickstart Scenario 7 and confirm a video still plays before it has fully arrived and can still be scrubbed (SC-011) — this is the check that FR-014d has not been quietly traded away
-- [ ] T042 **[needs a signed-in editor]** Run quickstart Scenario 9 at 375 px and confirm no row changes size when its indicator appears (SC-005, SC-010)
-- [ ] T043 **[needs a signed-in editor]** Run quickstart Scenario 10 with a screen reader (SC-006)
+- [ ] T042 **[a person is needed: phone-width layout]** Run quickstart Scenario 9 at 375 px and confirm no row changes size when its indicator appears (SC-005, SC-010). Whether a spinner shifts the row is a measured layout question, and jsdom measures nothing
+- [ ] T043 **[a person is needed: screen-reader output]** Run quickstart Scenario 10 with a screen reader (SC-006). The roles and live regions are asserted in tests; what an actual screen reader speaks, and in what order, can only be heard
 
 ---
 
@@ -174,3 +171,17 @@ yet meet the spec. These are gaps in the app, not in the documents.
 - [X] T045 Set `aria-busy` on the controls whose label does not change while they work, per FR-010 (partial) — the deny and approve buttons in `components/PendingRequestsList.tsx`, the quick-add button in `components/RoomChecklistBox.tsx`, the add and save buttons in `components/ChecklistList.tsx`, the arrows in `components/ReorderButtons.tsx`, and the field in `components/EditableName.tsx`. Each shows a spinner beside unchanged text, which a screen reader does not announce
 - [X] T046 Reconcile the coverage list in `spec.md` Assumptions and the walk in `quickstart.md` with what was built, per SC-001 (contradicts) — both name the thumbnails in `components/UnsortedFileTray.tsx`, `components/DocumentUploadWorkspace.tsx` and `components/MobileSwipeCard.tsx` as places that must show a loading state, but those render `URL.createObjectURL` blobs of local files and were deliberately left alone (T031–T033). Either add the states or record the exclusion and its reason — the documents and the code currently disagree
 - [X] T047 Delay the per-tab spinner in `components/CategoryTabs.tsx` per FR-013 (partial) — it renders as soon as `useLinkStatus` reports pending, so a warm client navigation that completes in under 150 ms flashes it
+
+---
+
+## Now automated (specs/045-automate-manual-checks)
+
+Scenarios 1–7 no longer need a person. Delay and minimum-visible timing is
+checked in `lib/use-delayed-busy.test.ts`, per-control busy scoping in
+`components/RoomChecklistBox.test.tsx`, failed writes recovering in
+`components/CategoryManagePanel.test.tsx`, document download progress and the
+video's own reporting — playing from the direct URL, showing the player at
+metadata rather than at completion, and dropping the message at 100% — in
+`components/DocList.test.tsx`, and every way into the app in
+`app/login/page.test.tsx` and `app/reset-password/page.test.tsx`. Only the two
+entries above still need a person, and each says why.

@@ -4,7 +4,7 @@ import "../vitest.setup.dom";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { Document, DocumentCategory, DocumentGroup } from "@/lib/types";
+import type { Document, DocumentCategory, DocumentGroup, GroupRequirement } from "@/lib/types";
 
 vi.mock("@/app/actions/documents", () => ({ deleteDoc: vi.fn(), editDoc: vi.fn() }));
 vi.mock("@/app/actions/document-taxonomy", () => ({
@@ -15,6 +15,14 @@ vi.mock("@/app/actions/document-taxonomy", () => ({
   deleteCategory: vi.fn(),
 }));
 vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
+vi.mock("@/app/actions/group-requirements", () => ({
+  addRequirement: vi.fn(),
+  updateRequirement: vi.fn(),
+  deleteRequirement: vi.fn(),
+  moveRequirement: vi.fn(),
+  setGroupDescription: vi.fn(),
+  setCategoryDescription: vi.fn(),
+}));
 vi.mock("@/lib/storage", () => ({ publicFileUrl: () => "https://example.test/file" }));
 
 const { DocList } = await import("@/components/DocList");
@@ -336,5 +344,146 @@ describe("image preview failure", () => {
     fireEvent.load(image);
 
     await waitFor(() => expect(screen.queryByText("กำลังโหลดรูป")).not.toBeInTheDocument());
+  });
+});
+
+// specs/045-automate-manual-checks T014. This was quickstart Scenario 7, which
+// nobody could run without a signed-in editor and a large video in storage. The
+// thing worth protecting (FR-014d) is that the player is handed the direct URL
+// and starts on its own: downloading the file first would report a tidier
+// percentage and cost both early playback and seeking.
+describe("video preview reports what has arrived without withholding playback", () => {
+  function videoDoc(): Document {
+    return { ...doc("doc-1", "grp-1"), file_name: "doc-1.mp4", storage_path: "cat/doc-1.mp4" };
+  }
+
+  async function openVideo(user: ReturnType<typeof userEvent.setup>) {
+    await user.click(screen.getByText(/ระบบดับเพลิง/));
+    await user.click(await screen.findByText("doc-1.mp4"));
+  }
+
+  // jsdom gives every media element duration NaN and no buffered ranges, so the
+  // player's own reporting has to be simulated.
+  function pretendBuffered(video: HTMLVideoElement, fraction: number) {
+    Object.defineProperty(video, "duration", { configurable: true, value: 100 });
+    Object.defineProperty(video, "buffered", {
+      configurable: true,
+      value: { length: 1, start: () => 0, end: () => 100 * fraction },
+    });
+  }
+
+  it("plays from the direct URL rather than downloading the file first", async () => {
+    const user = userEvent.setup();
+    const fetchSpy = vi.fn();
+    vi.stubGlobal("fetch", fetchSpy);
+
+    const { container } = renderList([group(1, "ระบบดับเพลิง", 1)], [videoDoc()]);
+    await openVideo(user);
+
+    const video = container.querySelector("video")!;
+    expect(video).toHaveAttribute("src", "https://example.test/file");
+    expect(fetchSpy).not.toHaveBeenCalled();
+
+    vi.unstubAllGlobals();
+  });
+
+  it("shows the player as soon as the file's metadata arrives, not when it is complete", async () => {
+    const user = userEvent.setup();
+    const { container } = renderList([group(1, "ระบบดับเพลิง", 1)], [videoDoc()]);
+    await openVideo(user);
+
+    const video = container.querySelector("video")!;
+    expect(video.className).toContain("hidden");
+
+    pretendBuffered(video, 0.2);
+    fireEvent.loadedMetadata(video);
+
+    // 20% in and the player is already on screen and usable.
+    expect(video.className).not.toContain("hidden");
+  });
+
+  it("says how much has arrived while the rest is still coming", async () => {
+    const user = userEvent.setup();
+    const { container } = renderList([group(1, "ระบบดับเพลิง", 1)], [videoDoc()]);
+    await openVideo(user);
+
+    const video = container.querySelector("video")!;
+    pretendBuffered(video, 0.4);
+    fireEvent.loadedMetadata(video);
+    fireEvent.progress(video);
+
+    expect(await screen.findByText(/กำลังโหลดวิดีโอ 40%/)).toBeInTheDocument();
+    expect(screen.getByText(/เล่นได้เลยไม่ต้องรอจนครบ/)).toBeInTheDocument();
+  });
+
+  it("drops the message once the whole file has arrived", async () => {
+    const user = userEvent.setup();
+    const { container } = renderList([group(1, "ระบบดับเพลิง", 1)], [videoDoc()]);
+    await openVideo(user);
+
+    const video = container.querySelector("video")!;
+    pretendBuffered(video, 0.4);
+    fireEvent.loadedMetadata(video);
+    fireEvent.progress(video);
+    expect(await screen.findByText(/กำลังโหลดวิดีโอ/)).toBeInTheDocument();
+
+    pretendBuffered(video, 1);
+    fireEvent.progress(video);
+
+    await waitFor(() => expect(screen.queryByText(/กำลังโหลดวิดีโอ/)).not.toBeInTheDocument());
+  });
+});
+
+// specs/046-subgroup-requirement-checklist US1 — what a sub-group should hold is
+// readable without opening it.
+describe("a sub-group's requirement checklist on the category page", () => {
+  const requirement: GroupRequirement = {
+    id: "req-1",
+    group_id: "grp-1",
+    name_th: "ใบรับรอง Emergency Shower",
+    status: "missing",
+    note: null,
+    sort_order: 1,
+  };
+
+  function renderWithRequirements(groups: DocumentGroup[], requirements: Record<string, GroupRequirement[]>) {
+    return render(
+      <DocList
+        documents={[]}
+        documentGroups={groups}
+        allGroups={groups}
+        categories={CATEGORIES}
+        categoryId={CATEGORY_ID}
+        categoryMoveOptions={[]}
+        canEdit
+        requirements={requirements}
+      />
+    );
+  }
+
+  it("shows the items without the folder being expanded", () => {
+    renderWithRequirements(
+      [{ ...group(1, "ใบรับรองและสเปก"), description: "ใบรับรองของวัสดุที่ติดตั้งจริง" }],
+      { "grp-1": [requirement] }
+    );
+
+    expect(screen.getByText("ใบรับรองของวัสดุที่ติดตั้งจริง")).toBeVisible();
+    expect(screen.getByText("ใบรับรอง Emergency Shower")).toBeVisible();
+  });
+
+  // research Decision 7: a list inside the collapse <button> is invalid markup.
+  it("keeps the items outside the collapse button", () => {
+    renderWithRequirements([group(1, "ใบรับรองและสเปก")], { "grp-1": [requirement] });
+    expect(screen.getByText("ใบรับรอง Emergency Shower").closest("button")).toBeNull();
+  });
+
+  it("still shows the file count on a row that has requirements", () => {
+    renderWithRequirements([group(1, "ใบรับรองและสเปก", 3)], { "grp-1": [requirement] });
+    expect(screen.getByText("0 ไฟล์")).toBeInTheDocument();
+  });
+
+  it("leaves a sub-group with no description or items looking as before", () => {
+    renderWithRequirements([group(1, "ว่าง")], {});
+    expect(screen.queryByRole("list")).not.toBeInTheDocument();
   });
 });

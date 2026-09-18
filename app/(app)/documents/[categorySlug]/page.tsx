@@ -4,6 +4,7 @@ import {
   getDocumentCategories,
   getDocumentGroups,
   getDocuments,
+  getGroupRequirements,
 } from "@/lib/data";
 import { USE_MOCK_DATA } from "@/lib/data-config";
 import { canEdit as roleCanEdit } from "@/lib/roles";
@@ -27,11 +28,12 @@ export default async function DocumentCategoryPage({
     notFound();
   }
 
-  const [documents, currentUser, documentGroups, allGroups] = await Promise.all([
+  const [documents, currentUser, documentGroups, allGroups, requirements] = await Promise.all([
     getDocuments(currentCategory.id),
     getCurrentUser(),
     getDocumentGroups(currentCategory.id),
     getAllDocumentGroups(),
+    getGroupRequirements(currentCategory.id),
   ]);
 
   const userCanEdit = currentUser ? roleCanEdit(currentUser.role) : false;
@@ -61,6 +63,7 @@ export default async function DocumentCategoryPage({
           categoryId={currentCategory.id}
           categoryMoveOptions={categoryMoveOptions}
           canEdit={userCanEdit}
+          requirements={requirements}
         />
       </div>
     </>

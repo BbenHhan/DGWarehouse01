@@ -473,8 +473,32 @@ export async function deleteGroup(input: {
   }
 
   const supabase = createServiceClient();
+  // The category is read before the delete, because afterwards there is no row
+  // left to read it from.
+  const { data: doomed } = await supabase
+    .from("document_groups")
+    .select("category_id")
+    .eq("id", id)
+    .single();
+
   const { error } = await supabase.from("document_groups").delete().eq("id", id);
   if (error) return { ok: false, error: error.message };
+
+  // Positions are what the displayed numbering is derived from, so a delete
+  // that leaves a gap leaves the numbering wrong — 1, 2, 4 — until something
+  // else happens to reorder. The local backend has always closed the gap; this
+  // is the Supabase side catching up (Constitution III).
+  if (doomed) {
+    const { data: rest } = await supabase
+      .from("document_groups")
+      .select("id")
+      .eq("category_id", doomed.category_id)
+      .order("sort_order");
+    if (rest) {
+      const problem = await renumber("document_groups", rest);
+      if (problem) return { ok: false, error: problem };
+    }
+  }
 
   revalidateDocumentPaths();
   return { ok: true, data: { id } };
@@ -508,6 +532,19 @@ export async function deleteCategory(input: {
   // `on delete cascade` on document_groups.category_id, so no separate sweep.
   const { error } = await supabase.from("document_categories").delete().eq("id", id);
   if (error) return { ok: false, error: error.message };
+
+  // Same reason as deleteGroup: the number a category shows is its position,
+  // so deleting the fifth of six must make the sixth become the fifth. Without
+  // this the gap persists in the data, and every later category keeps a number
+  // that no longer matches where it sits.
+  const { data: rest } = await supabase
+    .from("document_categories")
+    .select("id")
+    .order("sort_order");
+  if (rest) {
+    const problem = await renumber("document_categories", rest);
+    if (problem) return { ok: false, error: problem };
+  }
 
   revalidateDocumentPaths();
   return { ok: true, data: { id } };

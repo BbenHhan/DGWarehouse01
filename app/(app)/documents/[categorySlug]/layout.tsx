@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Upload } from "lucide-react";
+import { Download, Upload } from "lucide-react";
 import { notFound } from "next/navigation";
 import {
   getAllDocumentGroups,
@@ -45,11 +45,17 @@ export default async function DocumentCategoryLayout({
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="flex items-center gap-3">
+      {/* Wraps rather than squeezing: at 375px the two buttons and a Thai
+          category name cannot share one row, and without this the manage
+          toggle ran 34px past the viewport with no way to scroll to it
+          (specs/040 quickstart Scenario 10). The buttons take their own row
+          below the title on a phone, and min-w-0 lets the title use the full
+          width instead of collapsing into a three-line column. */}
+      <div className="flex flex-wrap items-center gap-3">
         <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-primary-2 text-xl shadow-[0_4px_18px_rgba(155,94,40,.3)]">
           {currentCategory.emoji}
         </span>
-        <div>
+        <div className="min-w-0 flex-1">
           <h1 className="text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
             {categoryLabel(currentCategory)}
           </h1>
@@ -57,7 +63,7 @@ export default async function DocumentCategoryLayout({
             รายการเอกสาร · {documentCounts[currentCategory.id] ?? 0} ไฟล์
           </p>
         </div>
-        <div className="ml-auto flex items-center gap-2">
+        <div className="flex w-full flex-wrap items-center gap-2 sm:ml-auto sm:w-auto">
           {/* nativeButton={false} because this renders as a link rather than a
               <button> — without it Base UI warns that native button semantics
               have been removed. */}
@@ -74,9 +80,34 @@ export default async function DocumentCategoryLayout({
               }
             />
           )}
+          {/* Downloading is a read, so it is offered to a viewer too — only
+              uploading is gated on the editor role. Plain link, no client
+              state: the browser's own download UI reports progress for what
+              can be a hundred megabytes. */}
+          <Button
+            variant="outline"
+            size="sm"
+            nativeButton={false}
+            render={
+              <a href={`/api/documents/${categorySlug}/zip`}>
+                <Download className="h-4 w-4" />
+                ดาวน์โหลด ZIP
+              </a>
+            }
+          />
           <ManageModeToggle />
         </div>
       </div>
+
+      {/* Full width rather than under the title: a Thai sentence in that
+          column would wrap against the buttons. Renders only where there is
+          something to say, so the categories without a description look
+          exactly as they did. */}
+      {currentCategory.description && (
+        <p className="-mt-2 max-w-3xl text-sm leading-relaxed text-muted-foreground">
+          {currentCategory.description}
+        </p>
+      )}
 
       <CategoryManagePanel
         categories={categories}

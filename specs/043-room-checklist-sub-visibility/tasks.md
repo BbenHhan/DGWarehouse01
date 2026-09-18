@@ -24,7 +24,6 @@
 - [X] T009 Confirm the sitewide checklist is unaffected by running its existing tests (FR-008, SC-004)
 - [X] T010 Run `npx vitest run`, `npx tsc --noEmit`, `npm run lint`, then `npm run build` with the dev server stopped
 - [X] T011 Re-run the live probe against Supabase and confirm the two rooms holding a tagged sub-item now each return one entry, where both returned none before (SC-001, SC-005) — **confirmed**: hong-raek and hong-klang each return "testchecklist" carrying only their own sub-item; the other four rooms correctly return nothing
-- [ ] T012 **[needs a signed-in editor]** Open both room pages and confirm each shows the entry with only its own sub-item
 
 ---
 
@@ -46,3 +45,12 @@ fix is shown to address the actual defect rather than merely coinciding with it.
 One user story, and T002/T003 are the fix. Everything else either proves it or follows from
 it. The local-store test in T001 is what makes the defect reproducible without a signed-in
 session, which is what has blocked verification on this project throughout.
+
+---
+
+## Now automated (specs/045-automate-manual-checks)
+
+`lib/local/checklist-scenarios.test.ts` covers this end to end: the entry appears
+on each room owning one of its sub-items, stays off a room owning none, drops out
+once that room's sub-item is finished, and an untagged sub-item still inherits its
+parent's rooms. Nothing here still needs a person.

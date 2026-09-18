@@ -61,6 +61,11 @@ export type DocumentCategory = {
   name_th: string;
   emoji: string;
   sort_order: number;
+  // What belongs in here, in a sentence (specs/046, migration 0015). Optional
+  // rather than `string | null`: a Supabase project where 0015 has not been run
+  // yet returns rows without the column, and the page has to render them as
+  // having no description rather than break.
+  description?: string | null;
 };
 
 // A named division inside exactly one category (specs/040-editable-document-
@@ -76,6 +81,24 @@ export type DocumentGroup = {
   name_th: string;
   sort_order: number;
   document_count: number;
+  // See DocumentCategory.description. What the sub-group is for; the
+  // requirement items below it say what it must actually contain.
+  description?: string | null;
+};
+
+// specs/046-subgroup-requirement-checklist. One document or piece of evidence a
+// sub-group is expected to hold. Status is set by a person, never inferred from
+// the files present: a file can be in the folder and still not satisfy the item
+// (research Decision 3).
+export type RequirementStatus = "have" | "missing" | "waiting";
+
+export type GroupRequirement = {
+  id: string;
+  group_id: string;
+  name_th: string;
+  status: RequirementStatus;
+  note: string | null;
+  sort_order: number;
 };
 
 export type Document = {

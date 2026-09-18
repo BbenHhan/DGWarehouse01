@@ -4,6 +4,8 @@ import { createCategory, moveCategory, renameCategory } from "@/app/actions/docu
 import { ReorderButtons } from "@/components/ReorderButtons";
 import { DeleteTaxonomyDialog } from "@/components/DeleteTaxonomyDialog";
 import { EditableName } from "@/components/EditableName";
+import { EditableText } from "@/components/EditableText";
+import { setCategoryDescription } from "@/app/actions/group-requirements";
 import { CATEGORY_EMOJI, EmojiPicker } from "@/components/EmojiPicker";
 import { categoryNumber } from "@/lib/taxonomy-label";
 import { useManageMode } from "@/components/ManageModeProvider";
@@ -94,10 +96,8 @@ export function CategoryManagePanel({
       <p className="mb-2 text-xs text-muted-foreground">หมวดใหญ่</p>
       <div className="flex flex-col">
         {categories.map((category, index) => (
-          <div
-            key={category.id}
-            className="flex items-center gap-2 border-b border-border/60 py-1.5 last:border-b-0"
-          >
+          <div key={category.id} className="flex flex-col gap-0.5 border-b border-border/60 py-1.5 last:border-b-0">
+          <div className="flex items-center gap-2">
             <EmojiPicker
               value={category.emoji}
               ariaLabel={`เปลี่ยนไอคอนของ ${category.name_th}`}
@@ -125,6 +125,18 @@ export function CategoryManagePanel({
               categories={categories}
               allGroups={allGroups}
             />
+          </div>
+          {/* specs/046 FR-008/FR-011: the sentence shown under the category
+              header, editable where the rest of the category is managed. */}
+          <div className="flex pl-9">
+            <EditableText
+              value={category.description}
+              placeholder="คำอธิบายหมวด (ไม่บังคับ)"
+              ariaLabel={`คำอธิบายของ ${category.name_th}`}
+              className="text-xs text-muted-foreground"
+              onSave={(description) => setCategoryDescription({ categoryId: category.id, description })}
+            />
+          </div>
           </div>
         ))}
       </div>

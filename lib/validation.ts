@@ -251,3 +251,61 @@ export const documentDispositionSchema = z.discriminatedUnion("kind", [
 
 export const deleteGroupSchema = z.object({ id: uuid, documents: documentDispositionSchema });
 export const deleteCategorySchema = z.object({ id: foreignKeyId, documents: documentDispositionSchema });
+
+// Requirement checklist (specs/046-subgroup-requirement-checklist,
+// contracts/server-actions.md). Names are trimmed and must not be blank (FR-012);
+// a note or description that is only whitespace is stored as none rather than as
+// an empty line.
+const requirementStatusSchema = z.enum(["have", "missing", "waiting"], {
+  message: "สถานะไม่ถูกต้อง",
+});
+
+const requirementName = z
+  .string()
+  .trim()
+  .min(1, "กรุณาระบุชื่อรายการ")
+  .max(300, "ชื่อรายการยาวเกินไป");
+
+const optionalText = (max: number, tooLong: string) =>
+  z
+    .string()
+    .max(max + 1000) // generous pre-trim bound; the real limit is checked after trimming
+    .nullable()
+    .transform((value) => {
+      const trimmed = value?.trim() ?? "";
+      return trimmed.length > 0 ? trimmed : null;
+    })
+    .refine((value) => value === null || value.length <= max, tooLong);
+
+export const addRequirementSchema = z.object({
+  groupId: uuid,
+  nameTh: requirementName,
+  status: requirementStatusSchema.default("missing"),
+  note: optionalText(500, "หมายเหตุยาวเกินไป").optional().default(null),
+});
+
+export const updateRequirementSchema = z
+  .object({
+    id: uuid,
+    nameTh: requirementName.optional(),
+    status: requirementStatusSchema.optional(),
+    note: optionalText(500, "หมายเหตุยาวเกินไป").optional(),
+  })
+  .refine(
+    (input) => input.nameTh !== undefined || input.status !== undefined || input.note !== undefined,
+    { message: "ไม่มีข้อมูลที่จะแก้ไข" }
+  );
+
+export const deleteRequirementSchema = z.object({ id: uuid });
+
+export const moveRequirementSchema = z.object({ id: uuid, direction: moveDirection });
+
+export const setGroupDescriptionSchema = z.object({
+  groupId: uuid,
+  description: optionalText(300, "คำอธิบายยาวเกินไป"),
+});
+
+export const setCategoryDescriptionSchema = z.object({
+  categoryId: foreignKeyId,
+  description: optionalText(300, "คำอธิบายยาวเกินไป"),
+});

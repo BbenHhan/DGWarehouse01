@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
 import "../vitest.setup.dom";
 
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { DocumentCategory, DocumentGroup } from "@/lib/types";
@@ -15,7 +15,17 @@ vi.mock("@/app/actions/document-taxonomy", () => ({
   deleteCategory: vi.fn(),
   deleteGroup: vi.fn(),
 }));
-vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
+const setCategoryDescription = vi.fn();
+vi.mock("@/app/actions/group-requirements", () => ({
+  addRequirement: vi.fn(),
+  updateRequirement: vi.fn(),
+  deleteRequirement: vi.fn(),
+  moveRequirement: vi.fn(),
+  setGroupDescription: vi.fn(),
+  setCategoryDescription: (...a: unknown[]) => setCategoryDescription(...a),
+}));
+const toastError = vi.fn();
+vi.mock("sonner", () => ({ toast: { error: (...a: unknown[]) => toastError(...a), success: vi.fn() } }));
 
 const { CategoryManagePanel } = await import("@/components/CategoryManagePanel");
 const { ManageModeProvider, ManageModeToggle } = await import("@/components/ManageModeProvider");
@@ -134,5 +144,66 @@ describe("finding the add-category control", () => {
     renderPanel(false);
     expect(screen.queryByRole("button", { name: /จัดการหมวด/ })).not.toBeInTheDocument();
     expect(screen.queryByPlaceholderText(/เพิ่มหมวดใหญ่/)).not.toBeInTheDocument();
+  });
+});
+
+// specs/045-automate-manual-checks — specs/040 quickstart Scenario 11, which
+// asked for the dev server to be killed mid-edit. What it is really checking is
+// that a refused write is said out loud and the name on screen goes back to the
+// one that is actually stored (Constitution V, FR-022).
+describe("a rename that the server refuses", () => {
+  async function renameFirstCategory(user: ReturnType<typeof userEvent.setup>) {
+    renderPanel();
+    await user.click(screen.getByRole("button", { name: /จัดการหมวด/ }));
+    const field = screen.getByLabelText(`ชื่อหมวด ${CATEGORIES[0].name_th}`);
+    await user.clear(field);
+    await user.type(field, "ชื่อใหม่ที่จะถูกปฏิเสธ");
+    await user.tab();
+    return field;
+  }
+
+  it("says why it failed instead of leaving the new name sitting there", async () => {
+    const user = userEvent.setup();
+    renameCategory.mockResolvedValue({ ok: false, error: "บันทึกไม่สำเร็จ" });
+
+    const field = await renameFirstCategory(user);
+
+    await waitFor(() => expect(toastError).toHaveBeenCalledWith("บันทึกไม่สำเร็จ"));
+    // Back to the stored name — never left showing an edit that did not save.
+    await waitFor(() => expect(field).toHaveValue(CATEGORIES[0].name_th));
+  });
+
+  it("keeps the new name when the write succeeds", async () => {
+    const user = userEvent.setup();
+    renameCategory.mockResolvedValue({ ok: true });
+
+    const field = await renameFirstCategory(user);
+
+    await waitFor(() => expect(renameCategory).toHaveBeenCalled());
+    expect(toastError).not.toHaveBeenCalled();
+    expect(field).toHaveValue("ชื่อใหม่ที่จะถูกปฏิเสธ");
+  });
+});
+
+// specs/046-subgroup-requirement-checklist FR-008/FR-011.
+describe("a category's description", () => {
+  it("can be written in management mode and is saved for that category", async () => {
+    const user = userEvent.setup();
+    setCategoryDescription.mockResolvedValue({ ok: true, data: { id: "c1", description: "x" } });
+    renderPanel();
+
+    await user.click(screen.getByRole("button", { name: /จัดการหมวด/ }));
+    const field = screen.getByLabelText(`คำอธิบายของ ${CATEGORIES[0].name_th}`);
+    await user.type(field, "ชุดเอกสารยื่นขออนุญาต");
+    await user.tab();
+
+    await waitFor(() =>
+      expect(setCategoryDescription).toHaveBeenCalledWith({ categoryId: "c1", description: "ชุดเอกสารยื่นขออนุญาต" })
+    );
+  });
+
+  it("is not offered outside management mode", () => {
+    renderPanel();
+    expect(screen.queryByLabelText(`คำอธิบายของ ${CATEGORIES[0].name_th}`)).not.toBeInTheDocument();
   });
 });

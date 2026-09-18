@@ -30,8 +30,7 @@
 ## Phase 3: Polish
 
 - [X] T008 Run `npx vitest run`, `npx tsc --noEmit`, `npm run lint`, then `npm run build` with the dev server stopped
-- [ ] T009 **[needs a signed-in editor]** Open the checklist and confirm a one-room and a multi-room item differ only in how many rooms are listed (SC-002, SC-005)
-- [ ] T010 **[needs a signed-in editor]** Check the same at 375 px with the longest room name in the system (SC-004, FR-007)
+- [ ] T010 **[a person is needed: phone-width layout]** Check the same at 375 px with the longest room name in the system (SC-004, FR-007). Whether a long room name wraps or overflows its row is a layout measurement no assertion can make
 
 ---
 
@@ -52,3 +51,11 @@ T001 comes first because the whole approach depends on its answer.
 
 There is one user story and it is the whole feature. T002 is the fix; everything else
 protects it or extends it to the second component.
+
+---
+
+## Now automated (specs/045-automate-manual-checks)
+
+The label itself is checked in `components/ChecklistList.test.tsx`: a one-room
+item names its room, a multi-room item names all of them, and both carry the
+same overall-status badge. Only the phone-width check still needs a person.

@@ -22,13 +22,23 @@ import {
   localGetAllDocumentGroups,
   localGetDocumentGroups,
   localGetDocuments,
+  localGetGroupRequirements,
   localGetPhotos,
   localGetRoomChecklistItems,
   localGetRoomPhotoCounts,
   localGetSiteStats,
 } from "@/lib/local/store";
 import type { DateFilter } from "@/lib/date-filter";
-import type { ChecklistItem, Document, DocumentCategory, DocumentGroup, Photo, Room, WorkType } from "@/lib/types";
+import type {
+  ChecklistItem,
+  Document,
+  DocumentCategory,
+  DocumentGroup,
+  GroupRequirement,
+  Photo,
+  Room,
+  WorkType,
+} from "@/lib/types";
 
 // Rooms/work types/document categories are the same fixed lookup lists in
 // both non-Supabase modes ("local" and "mock") — neither depends on disk
@@ -189,6 +199,49 @@ export async function getDocumentGroups(categoryId: string): Promise<DocumentGro
     if (row.group_id) counts.set(row.group_id, (counts.get(row.group_id) ?? 0) + 1);
   }
   return groups.map((group) => ({ ...group, document_count: counts.get(group.id) ?? 0 }));
+}
+
+// A Supabase project where migration 0015 has not been applied yet has no
+// requirements table. That window is expected — the migration is pasted into the
+// SQL Editor by hand, and the deploy may land first — so it reads as "no items"
+// rather than taking the category page down (specs/046 research Decision 4).
+// Only this one error is swallowed; anything else still surfaces.
+export function isMissingRelationError(error: { code?: string } | null | undefined): boolean {
+  return error?.code === "PGRST205" || error?.code === "42P01";
+}
+
+// Every requirement item for one category's sub-groups, keyed by sub-group id and
+// in display order (specs/046). Read separately from getDocumentGroups because
+// the upload and move pickers use sub-groups on every page and never show items
+// (research Decision 9).
+export async function getGroupRequirements(categoryId: string): Promise<Record<string, GroupRequirement[]>> {
+  if (DATA_SOURCE === "mock") return {};
+  if (DATA_SOURCE === "local") return localGetGroupRequirements(categoryId);
+
+  await requireUser();
+  const supabase = createServiceClient();
+  const { data, error } = await supabase
+    .from("document_group_requirements")
+    .select("id, group_id, name_th, status, note, sort_order, document_groups!inner(category_id)")
+    .eq("document_groups.category_id", categoryId)
+    .order("sort_order");
+  if (error) {
+    if (isMissingRelationError(error)) return {};
+    throw error;
+  }
+
+  const byGroup: Record<string, GroupRequirement[]> = {};
+  for (const row of data) {
+    (byGroup[row.group_id] ??= []).push({
+      id: row.id,
+      group_id: row.group_id,
+      name_th: row.name_th,
+      status: row.status,
+      note: row.note,
+      sort_order: row.sort_order,
+    });
+  }
+  return byGroup;
 }
 
 // Header stats chips (total photos/documents/distinct photographed days
