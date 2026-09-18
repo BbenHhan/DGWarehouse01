@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Upload } from "lucide-react";
+import { Download, Upload } from "lucide-react";
 import { notFound } from "next/navigation";
 import {
   getAllDocumentGroups,
@@ -80,9 +80,34 @@ export default async function DocumentCategoryLayout({
               }
             />
           )}
+          {/* Downloading is a read, so it is offered to a viewer too — only
+              uploading is gated on the editor role. Plain link, no client
+              state: the browser's own download UI reports progress for what
+              can be a hundred megabytes. */}
+          <Button
+            variant="outline"
+            size="sm"
+            nativeButton={false}
+            render={
+              <a href={`/api/documents/${categorySlug}/zip`}>
+                <Download className="h-4 w-4" />
+                ดาวน์โหลด ZIP
+              </a>
+            }
+          />
           <ManageModeToggle />
         </div>
       </div>
+
+      {/* Full width rather than under the title: a Thai sentence in that
+          column would wrap against the buttons. Renders only where there is
+          something to say, so the categories without a description look
+          exactly as they did. */}
+      {currentCategory.description && (
+        <p className="-mt-2 max-w-3xl text-sm leading-relaxed text-muted-foreground">
+          {currentCategory.description}
+        </p>
+      )}
 
       <CategoryManagePanel
         categories={categories}
