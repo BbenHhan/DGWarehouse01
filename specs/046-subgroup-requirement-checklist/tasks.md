@@ -113,7 +113,7 @@ description: "Task list for Sub-group Requirement Checklist"
 - [X] T027 Run `npx vitest run` (twice, no flakes), `npx tsc --noEmit`, `npm run lint`, and `npm run build` with the dev server stopped; clear `.next` and restart dev afterwards
 - [X] T028 Verify in the browser against the local backend at 375px: rows wrap, no horizontal scroll, statuses readable, editor controls reachable (quickstart Scenarios 1, 3)
 - [X] T029 Verify Scenario 0 against the live project before the migration: the documents page still loads with no items and no error
-- [ ] T030 **[a person is needed: SQL Editor access]** Apply `0015_group_requirements.sql` to the live project, then confirm quickstart Scenario 2 (content matches, re-run changes nothing)
+- [X] T030 **[a person is needed: SQL Editor access]** Apply `0015_group_requirements.sql` to the live project, then confirm quickstart Scenario 2 (content matches, re-run changes nothing)
 
 ---
 
