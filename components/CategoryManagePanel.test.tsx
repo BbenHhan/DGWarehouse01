@@ -15,6 +15,15 @@ vi.mock("@/app/actions/document-taxonomy", () => ({
   deleteCategory: vi.fn(),
   deleteGroup: vi.fn(),
 }));
+const setCategoryDescription = vi.fn();
+vi.mock("@/app/actions/group-requirements", () => ({
+  addRequirement: vi.fn(),
+  updateRequirement: vi.fn(),
+  deleteRequirement: vi.fn(),
+  moveRequirement: vi.fn(),
+  setGroupDescription: vi.fn(),
+  setCategoryDescription: (...a: unknown[]) => setCategoryDescription(...a),
+}));
 const toastError = vi.fn();
 vi.mock("sonner", () => ({ toast: { error: (...a: unknown[]) => toastError(...a), success: vi.fn() } }));
 
@@ -173,5 +182,28 @@ describe("a rename that the server refuses", () => {
     await waitFor(() => expect(renameCategory).toHaveBeenCalled());
     expect(toastError).not.toHaveBeenCalled();
     expect(field).toHaveValue("ชื่อใหม่ที่จะถูกปฏิเสธ");
+  });
+});
+
+// specs/046-subgroup-requirement-checklist FR-008/FR-011.
+describe("a category's description", () => {
+  it("can be written in management mode and is saved for that category", async () => {
+    const user = userEvent.setup();
+    setCategoryDescription.mockResolvedValue({ ok: true, data: { id: "c1", description: "x" } });
+    renderPanel();
+
+    await user.click(screen.getByRole("button", { name: /จัดการหมวด/ }));
+    const field = screen.getByLabelText(`คำอธิบายของ ${CATEGORIES[0].name_th}`);
+    await user.type(field, "ชุดเอกสารยื่นขออนุญาต");
+    await user.tab();
+
+    await waitFor(() =>
+      expect(setCategoryDescription).toHaveBeenCalledWith({ categoryId: "c1", description: "ชุดเอกสารยื่นขออนุญาต" })
+    );
+  });
+
+  it("is not offered outside management mode", () => {
+    renderPanel();
+    expect(screen.queryByLabelText(`คำอธิบายของ ${CATEGORIES[0].name_th}`)).not.toBeInTheDocument();
   });
 });

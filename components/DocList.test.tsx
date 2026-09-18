@@ -4,7 +4,7 @@ import "../vitest.setup.dom";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { Document, DocumentCategory, DocumentGroup } from "@/lib/types";
+import type { Document, DocumentCategory, DocumentGroup, GroupRequirement } from "@/lib/types";
 
 vi.mock("@/app/actions/documents", () => ({ deleteDoc: vi.fn(), editDoc: vi.fn() }));
 vi.mock("@/app/actions/document-taxonomy", () => ({
@@ -15,6 +15,14 @@ vi.mock("@/app/actions/document-taxonomy", () => ({
   deleteCategory: vi.fn(),
 }));
 vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
+vi.mock("@/app/actions/group-requirements", () => ({
+  addRequirement: vi.fn(),
+  updateRequirement: vi.fn(),
+  deleteRequirement: vi.fn(),
+  moveRequirement: vi.fn(),
+  setGroupDescription: vi.fn(),
+  setCategoryDescription: vi.fn(),
+}));
 vi.mock("@/lib/storage", () => ({ publicFileUrl: () => "https://example.test/file" }));
 
 const { DocList } = await import("@/components/DocList");
@@ -423,5 +431,59 @@ describe("video preview reports what has arrived without withholding playback", 
     fireEvent.progress(video);
 
     await waitFor(() => expect(screen.queryByText(/กำลังโหลดวิดีโอ/)).not.toBeInTheDocument());
+  });
+});
+
+// specs/046-subgroup-requirement-checklist US1 — what a sub-group should hold is
+// readable without opening it.
+describe("a sub-group's requirement checklist on the category page", () => {
+  const requirement: GroupRequirement = {
+    id: "req-1",
+    group_id: "grp-1",
+    name_th: "ใบรับรอง Emergency Shower",
+    status: "missing",
+    note: null,
+    sort_order: 1,
+  };
+
+  function renderWithRequirements(groups: DocumentGroup[], requirements: Record<string, GroupRequirement[]>) {
+    return render(
+      <DocList
+        documents={[]}
+        documentGroups={groups}
+        allGroups={groups}
+        categories={CATEGORIES}
+        categoryId={CATEGORY_ID}
+        categoryMoveOptions={[]}
+        canEdit
+        requirements={requirements}
+      />
+    );
+  }
+
+  it("shows the items without the folder being expanded", () => {
+    renderWithRequirements(
+      [{ ...group(1, "ใบรับรองและสเปก"), description: "ใบรับรองของวัสดุที่ติดตั้งจริง" }],
+      { "grp-1": [requirement] }
+    );
+
+    expect(screen.getByText("ใบรับรองของวัสดุที่ติดตั้งจริง")).toBeVisible();
+    expect(screen.getByText("ใบรับรอง Emergency Shower")).toBeVisible();
+  });
+
+  // research Decision 7: a list inside the collapse <button> is invalid markup.
+  it("keeps the items outside the collapse button", () => {
+    renderWithRequirements([group(1, "ใบรับรองและสเปก")], { "grp-1": [requirement] });
+    expect(screen.getByText("ใบรับรอง Emergency Shower").closest("button")).toBeNull();
+  });
+
+  it("still shows the file count on a row that has requirements", () => {
+    renderWithRequirements([group(1, "ใบรับรองและสเปก", 3)], { "grp-1": [requirement] });
+    expect(screen.getByText("0 ไฟล์")).toBeInTheDocument();
+  });
+
+  it("leaves a sub-group with no description or items looking as before", () => {
+    renderWithRequirements([group(1, "ว่าง")], {});
+    expect(screen.queryByRole("list")).not.toBeInTheDocument();
   });
 });

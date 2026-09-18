@@ -18,6 +18,8 @@ vi.mock("@/app/actions/document-taxonomy", () => ({
   deleteGroup: vi.fn(),
 }));
 
+vi.mock("@/app/actions/group-requirements", () => ({ setCategoryDescription: vi.fn() }));
+
 const { ManageModeProvider, ManageModeToggle } = await import("@/components/ManageModeProvider");
 const { ReorderButtons } = await import("@/components/ReorderButtons");
 const { CategoryManagePanel } = await import("@/components/CategoryManagePanel");

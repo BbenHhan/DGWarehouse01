@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  addRequirementSchema,
+  setCategoryDescriptionSchema,
+  setGroupDescriptionSchema,
+  updateRequirementSchema,
   MAX_FILE_SIZE_BYTES,
   PHOTO_MIME_TYPES,
   addChecklistItemSchema,
@@ -191,5 +195,48 @@ describe("deleteChecklistItemSchema", () => {
 
   it("rejects a missing id", () => {
     expect(deleteChecklistItemSchema.safeParse({}).success).toBe(false);
+  });
+});
+
+// specs/046-subgroup-requirement-checklist FR-012.
+describe("requirement checklist schemas", () => {
+  const groupId = "8f5c1b8e-2a1b-4c3d-9e4f-0a1b2c3d4e5f";
+
+  it("refuses a blank or whitespace-only item name in Thai", () => {
+    for (const nameTh of ["", "   "]) {
+      const result = addRequirementSchema.safeParse({ groupId, nameTh });
+      expect(result.success).toBe(false);
+      expect(result.error?.issues[0]?.message).toBe("กรุณาระบุชื่อรายการ");
+    }
+  });
+
+  it("trims the name and defaults a new item to missing with no note", () => {
+    const result = addRequirementSchema.parse({ groupId, nameTh: "  ใบรับรอง  " });
+    expect(result).toEqual({ groupId, nameTh: "ใบรับรอง", status: "missing", note: null });
+  });
+
+  it("stores a whitespace-only note as none", () => {
+    expect(addRequirementSchema.parse({ groupId, nameTh: "x", note: "   " }).note).toBeNull();
+    expect(updateRequirementSchema.parse({ id: groupId, note: "  \n " }).note).toBeNull();
+  });
+
+  it("refuses a status outside the three", () => {
+    expect(updateRequirementSchema.safeParse({ id: groupId, status: "done" }).success).toBe(false);
+  });
+
+  it("refuses an update that changes nothing", () => {
+    const result = updateRequirementSchema.safeParse({ id: groupId });
+    expect(result.success).toBe(false);
+    expect(result.error?.issues[0]?.message).toBe("ไม่มีข้อมูลที่จะแก้ไข");
+  });
+
+  it("stores a whitespace-only description as none, for sub-groups and categories", () => {
+    expect(setGroupDescriptionSchema.parse({ groupId, description: "  " }).description).toBeNull();
+    expect(setCategoryDescriptionSchema.parse({ categoryId: "safety", description: "" }).description).toBeNull();
+    expect(setCategoryDescriptionSchema.parse({ categoryId: "safety", description: " ok " }).description).toBe("ok");
+  });
+
+  it("refuses a description longer than the limit", () => {
+    expect(setGroupDescriptionSchema.safeParse({ groupId, description: "ก".repeat(301) }).success).toBe(false);
   });
 });

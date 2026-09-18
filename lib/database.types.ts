@@ -95,6 +95,7 @@ export type Database = {
           name_th: string;
           emoji: string;
           sort_order: number;
+          description: string | null;
         };
         Insert: {
           id?: string;
@@ -102,6 +103,7 @@ export type Database = {
           name_th: string;
           emoji: string;
           sort_order: number;
+          description?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["document_categories"]["Insert"]>;
         Relationships: [];
@@ -113,6 +115,7 @@ export type Database = {
           name_th: string;
           sort_order: number;
           created_at: string;
+          description: string | null;
         };
         Insert: {
           id?: string;
@@ -120,6 +123,7 @@ export type Database = {
           name_th: string;
           sort_order: number;
           created_at?: string;
+          description?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["document_groups"]["Insert"]>;
         Relationships: [
@@ -128,6 +132,38 @@ export type Database = {
             columns: ["category_id"];
             isOneToOne: false;
             referencedRelation: "document_categories";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+      document_group_requirements: {
+        Row: {
+          id: string;
+          group_id: string;
+          name_th: string;
+          status: "have" | "missing" | "waiting";
+          note: string | null;
+          sort_order: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          group_id: string;
+          name_th: string;
+          status?: "have" | "missing" | "waiting";
+          note?: string | null;
+          sort_order: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["document_group_requirements"]["Insert"]>;
+        Relationships: [
+          {
+            foreignKeyName: "document_group_requirements_group_id_fkey";
+            columns: ["group_id"];
+            isOneToOne: false;
+            referencedRelation: "document_groups";
             referencedColumns: ["id"];
           }
         ];

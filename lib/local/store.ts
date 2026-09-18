@@ -4,7 +4,15 @@ import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
-import type { ChecklistItem, Document, DocumentCategory, DocumentGroup, Photo } from "@/lib/types";
+import type {
+  ChecklistItem,
+  Document,
+  DocumentCategory,
+  DocumentGroup,
+  GroupRequirement,
+  Photo,
+  RequirementStatus,
+} from "@/lib/types";
 import { stripGroupNumber } from "@/lib/taxonomy-label";
 import type { ChecklistStatus } from "@/lib/checklist-status";
 import { rollupChecklistStatus } from "@/lib/checklist-status";
@@ -33,6 +41,8 @@ type LocalDb = {
   documentCategories: DocumentCategory[];
   documentGroups: DocumentGroup[];
   checklistItems: ChecklistItem[];
+  // specs/046-subgroup-requirement-checklist — what each sub-group should hold.
+  groupRequirements: GroupRequirement[];
 };
 
 // Categories used to be a fixed list this backend borrowed from the read-only
@@ -61,7 +71,7 @@ let writeQueue: Promise<void> = Promise.resolve();
 
 async function loadDb(): Promise<LocalDb> {
   if (!existsSync(DB_PATH)) {
-    return { photos: [], documents: [], documentCategories: [...SEED_CATEGORIES], documentGroups: [], checklistItems: [] };
+    return { photos: [], documents: [], documentCategories: [...SEED_CATEGORIES], documentGroups: [], checklistItems: [], groupRequirements: [] };
   }
   try {
     const raw = await readFile(DB_PATH, "utf-8");
@@ -74,6 +84,8 @@ async function loadDb(): Promise<LocalDb> {
       documentCategories: [],
       documentGroups: [],
       checklistItems: [],
+      // A db.json written before specs/046 has no requirements yet.
+      groupRequirements: [],
       ...parsed,
     };
     if (db.documentCategories.length === 0) db.documentCategories = [...SEED_CATEGORIES];
@@ -81,7 +93,7 @@ async function loadDb(): Promise<LocalDb> {
     migrateDocumentNotes(db);
     return db;
   } catch {
-    return { photos: [], documents: [], documentCategories: [...SEED_CATEGORIES], documentGroups: [], checklistItems: [] };
+    return { photos: [], documents: [], documentCategories: [...SEED_CATEGORIES], documentGroups: [], checklistItems: [], groupRequirements: [] };
   }
 }
 
@@ -469,6 +481,9 @@ export async function localDeleteDocumentGroup(id: string): Promise<{ id: string
   if (db.documents.some((document) => document.group_id === id)) return null;
 
   const [removed] = db.documentGroups.splice(index, 1);
+  // Requirement items go with their sub-group — the local mirror of the SQL's
+  // `on delete cascade` (specs/046 FR-015).
+  db.groupRequirements = db.groupRequirements.filter((item) => item.group_id !== removed.id);
   const siblings = db.documentGroups
     .filter((group) => group.category_id === removed.category_id)
     .sort((a, b) => a.sort_order - b.sort_order);
@@ -538,7 +553,11 @@ export async function localDeleteDocumentCategory(id: string): Promise<{ id: str
   if (db.documents.some((document) => document.category_id === id)) return null;
 
   db.documentCategories.splice(index, 1);
+  const removedGroupIds = new Set(
+    db.documentGroups.filter((group) => group.category_id === id).map((group) => group.id)
+  );
   db.documentGroups = db.documentGroups.filter((group) => group.category_id !== id);
+  db.groupRequirements = db.groupRequirements.filter((item) => !removedGroupIds.has(item.group_id));
   db.documentCategories
     .sort((a, b) => a.sort_order - b.sort_order)
     .forEach((category, position) => {
@@ -810,4 +829,124 @@ export async function localDeleteChecklistItem(id: string): Promise<ChecklistIte
   db.checklistItems = db.checklistItems.filter((item) => item.parent_id !== id);
   await persist(db);
   return removed;
+}
+
+// ---------------------------------------------------------------------------
+// Requirement checklist (specs/046-subgroup-requirement-checklist). Same
+// contract as the Supabase path in app/actions/group-requirements.ts and
+// lib/data.ts (Constitution III). Functions return null for "not found" so the
+// Server Action can phrase the refusal.
+// ---------------------------------------------------------------------------
+
+function renumberRequirements(db: LocalDb, groupId: string): GroupRequirement[] {
+  const siblings = db.groupRequirements
+    .filter((item) => item.group_id === groupId)
+    .sort((a, b) => a.sort_order - b.sort_order);
+  siblings.forEach((item, position) => {
+    item.sort_order = position + 1;
+  });
+  return siblings;
+}
+
+export async function localGetGroupRequirements(categoryId: string): Promise<Record<string, GroupRequirement[]>> {
+  const db = await loadDb();
+  const groupIds = new Set(
+    db.documentGroups.filter((group) => group.category_id === categoryId).map((group) => group.id)
+  );
+  const byGroup: Record<string, GroupRequirement[]> = {};
+  for (const item of [...db.groupRequirements].sort((a, b) => a.sort_order - b.sort_order)) {
+    if (!groupIds.has(item.group_id)) continue;
+    (byGroup[item.group_id] ??= []).push({ ...item });
+  }
+  return byGroup;
+}
+
+export async function localAddRequirement(input: {
+  groupId: string;
+  nameTh: string;
+  status: RequirementStatus;
+  note: string | null;
+}): Promise<GroupRequirement | null> {
+  const db = await loadDb();
+  if (!db.documentGroups.some((group) => group.id === input.groupId)) return null;
+  const count = db.groupRequirements.filter((item) => item.group_id === input.groupId).length;
+  const item: GroupRequirement = {
+    id: randomUUID(),
+    group_id: input.groupId,
+    name_th: input.nameTh,
+    status: input.status,
+    note: input.note,
+    sort_order: count + 1,
+  };
+  db.groupRequirements.push(item);
+  await persist(db);
+  return { ...item };
+}
+
+export async function localUpdateRequirement(
+  id: string,
+  changes: { nameTh?: string; status?: RequirementStatus; note?: string | null }
+): Promise<GroupRequirement | null> {
+  const db = await loadDb();
+  const item = db.groupRequirements.find((candidate) => candidate.id === id);
+  if (!item) return null;
+  if (changes.nameTh !== undefined) item.name_th = changes.nameTh;
+  if (changes.status !== undefined) item.status = changes.status;
+  if (changes.note !== undefined) item.note = changes.note;
+  await persist(db);
+  return { ...item };
+}
+
+export async function localDeleteRequirement(id: string): Promise<{ id: string } | null> {
+  const db = await loadDb();
+  const index = db.groupRequirements.findIndex((item) => item.id === id);
+  if (index === -1) return null;
+  const [removed] = db.groupRequirements.splice(index, 1);
+  renumberRequirements(db, removed.group_id);
+  await persist(db);
+  return { id };
+}
+
+// "edge" when the item is already first (up) or last (down).
+export async function localMoveRequirement(
+  id: string,
+  direction: "up" | "down"
+): Promise<GroupRequirement[] | "edge" | null> {
+  const db = await loadDb();
+  const item = db.groupRequirements.find((candidate) => candidate.id === id);
+  if (!item) return null;
+  const siblings = renumberRequirements(db, item.group_id);
+  const index = siblings.findIndex((candidate) => candidate.id === id);
+  const target = direction === "up" ? index - 1 : index + 1;
+  if (target < 0 || target >= siblings.length) return "edge";
+  [siblings[index], siblings[target]] = [siblings[target], siblings[index]];
+  siblings.forEach((sibling, position) => {
+    sibling.sort_order = position + 1;
+  });
+  await persist(db);
+  return siblings.map((sibling) => ({ ...sibling }));
+}
+
+export async function localSetGroupDescription(
+  groupId: string,
+  description: string | null
+): Promise<{ id: string; description: string | null } | null> {
+  const db = await loadDb();
+  const group = db.documentGroups.find((candidate) => candidate.id === groupId);
+  if (!group) return null;
+  group.description = description;
+  await persist(db);
+  return { id: groupId, description };
+}
+
+export async function localSetCategoryDescription(
+  categoryId: string,
+  description: string | null
+): Promise<{ id: string; description: string | null } | null> {
+  const db = await loadDb();
+  const category = db.documentCategories.find((candidate) => candidate.id === categoryId);
+  if (!category) return null;
+  category.description = description;
+  await persist(db);
+  return { id: categoryId, description };
 }

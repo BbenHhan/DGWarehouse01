@@ -4,12 +4,14 @@ import { useEffect, useOptimistic, useRef, useState, useTransition } from "react
 import Image from "next/image";
 import { ChevronDown, Download, ExternalLink, FileText, Share2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import type { Document, DocumentCategory, DocumentGroup } from "@/lib/types";
+import type { Document, DocumentCategory, DocumentGroup, GroupRequirement } from "@/lib/types";
 import { useManageMode } from "@/components/ManageModeProvider";
 import { createGroup, moveGroup, renameGroup } from "@/app/actions/document-taxonomy";
 import { ReorderButtons } from "@/components/ReorderButtons";
 import { DeleteTaxonomyDialog } from "@/components/DeleteTaxonomyDialog";
 import { EditableName } from "@/components/EditableName";
+import { GroupRequirements } from "@/components/GroupRequirements";
+import { GroupRequirementsEditor } from "@/components/GroupRequirementsEditor";
 import { groupNumber } from "@/lib/taxonomy-label";
 import { publicFileUrl } from "@/lib/storage";
 import { fileKindFromName } from "@/lib/file-kind";
@@ -481,6 +483,7 @@ export function DocList({
   categoryId,
   categoryMoveOptions,
   canEdit,
+  requirements = {},
 }: {
   documents: Document[];
   documentGroups: DocumentGroup[];
@@ -490,6 +493,8 @@ export function DocList({
   categoryId: string;
   categoryMoveOptions: CategoryMoveOption[];
   canEdit: boolean;
+  /** What each sub-group should hold, keyed by sub-group id (specs/046). */
+  requirements?: Record<string, GroupRequirement[]>;
 }) {
   const { managing } = useManageMode();
   const [, startTransition] = useTransition();
@@ -528,6 +533,8 @@ export function DocList({
     id: group.id,
     name: group.name_th,
     number: groupNumber(group, categorySortOrder),
+    description: group.description,
+    requirements: requirements[group.id] ?? [],
     docs: optimisticDocuments.filter((doc) => doc.group_id === group.id),
   }));
 
@@ -574,6 +581,7 @@ export function DocList({
               header stops being a collapse trigger, because its whole width is
               now an editable field. */}
           {managing ? (
+            <>
             <div className="flex w-full items-center justify-between gap-3 p-3">
               <span className="shrink-0 text-xs text-muted-foreground">{group.number}</span>
               <EditableName
@@ -596,16 +604,30 @@ export function DocList({
                 allGroups={allGroups}
               />
             </div>
+            <GroupRequirementsEditor
+              groupId={group.id}
+              groupName={group.name}
+              description={group.description}
+              items={group.requirements}
+            />
+            </>
           ) : (
-            <CollapsibleTrigger className="group flex w-full items-center justify-between gap-3 p-3 text-left">
-              <span className="min-w-0 truncate text-sm font-medium text-foreground">
-                {group.number} {group.name}
-              </span>
-              <span className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
-                {group.docs.length} ไฟล์
-                <ChevronDown className="h-4 w-4 transition-transform group-data-panel-open:rotate-180" />
-              </span>
-            </CollapsibleTrigger>
+            <>
+              <CollapsibleTrigger className="group flex w-full items-center justify-between gap-3 p-3 text-left">
+                <span className="min-w-0 truncate text-sm font-medium text-foreground">
+                  {group.number} {group.name}
+                </span>
+                <span className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
+                  {group.docs.length} ไฟล์
+                  <ChevronDown className="h-4 w-4 transition-transform group-data-panel-open:rotate-180" />
+                </span>
+              </CollapsibleTrigger>
+              {/* Between the trigger and the collapsible files, not inside the
+                  trigger: always visible without expanding (specs/046 FR-004),
+                  and a list is not valid content for a <button> (research
+                  Decision 7). */}
+              <GroupRequirements description={group.description} items={group.requirements} />
+            </>
           )}
           <CollapsibleContent className="overflow-hidden data-ending-style:h-0 data-starting-style:h-0">
             <div className="space-y-2 border-t border-border/60 p-3 pt-2">
