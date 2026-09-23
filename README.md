@@ -90,6 +90,40 @@ Test files are colocated next to what they test (e.g. `lib/date-range.test.ts`
 next to `lib/date-range.ts`) — `lib/date-range.test.ts` is the simplest one to
 copy as a starting point for a new test.
 
+### Scenarios in a real browser
+
+```bash
+npm run test:e2e
+```
+
+Drives the app in Chromium the way a person would — the document checklist,
+uploading and deleting a file, the ZIP download, a photo, a room's checklist,
+phone width, and the sign-in guard. Nothing needs preparing: the command
+starts the app itself, and rebuilds its test data from scratch each run.
+`npm run test:e2e:headed` shows the browser while it works.
+
+Two settings exist for this run, and for nothing else:
+
+- `NEXT_PUBLIC_DATA_SOURCE=local` points the app at the interim disk backend,
+  with `LOCAL_DATA_DIR` set to a throwaway folder in the system temp directory —
+  so a run never touches the live project, and never touches the `.local-data/`
+  folder `npm run dev` uses.
+- `AUTH_REQUIRED=false` switches sign-in off, because the assistant
+  writing these scenarios cannot hold an account or type a password. **A
+  deployment ignores it**: `lib/auth-config.ts` requires sign-in whenever a
+  deployment environment is present, whatever the variable says, so the site on
+  Vercel cannot be left open by a forgotten setting. `lib/auth-config.test.ts`
+  is what holds that.
+
+The scenario that proves a signed-out visitor is turned away needs the opposite
+setting, so it is a second run of its own (`playwright.guarded.config.ts`),
+against the app started the way production starts it. `npm run test:e2e` does
+both, one after the other — deliberately not at once, since two development
+servers watching one project keep invalidating each other's builds.
+
+Unset, both settings behave exactly as they did before they existed: Supabase,
+and sign-in required.
+
 ## Project structure
 
 ```text

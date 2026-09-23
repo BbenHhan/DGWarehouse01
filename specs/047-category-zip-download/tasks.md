@@ -79,7 +79,7 @@ No shared prerequisites beyond T001 — the draft's writer, folder layout and bu
 
 - [X] T009 Confirm each new check fails when the behaviour it protects is reverted (collision fix, size guard, ASCII fallback), then restore
 - [X] T010 Run `npx vitest run`, `npx tsc --noEmit`, `npm run lint`, and `npm run build` with the dev server stopped; clear `.next` and restart dev afterwards
-- [X] T011 Download a real category from the running app, extract it, and confirm folders, Thai names and contents (quickstart Scenario 1)
+- [X] T011 Download a real category from the running app, extract it, and confirm folders, Thai names and contents (quickstart Scenario 1). Now also automated: `e2e/documents-files.spec.ts` presses the button in a real browser and extracts what comes back with `ditto`, the tool Finder uses (specs/049)
 - [ ] T012 **[a person is needed: a second operating system]** Extract the same archive on Windows and confirm Thai names read correctly (SC-003); macOS is covered by T011
 
 ---

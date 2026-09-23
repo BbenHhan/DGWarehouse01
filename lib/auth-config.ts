@@ -1,8 +1,15 @@
-// TEMPORARY: no Supabase project is configured yet, so auth is disabled
-// end-to-end (middleware redirect + every requireUser() check) to let the
-// app run without signing in.
+// Sign-in is required. A local test run may ask for it to be off — the
+// browser-driven scenarios (specs/049) cannot hold an account or type a
+// password — and a deployment may never ask (FR-009, FR-010).
 //
-// Flip this back to `true` once a real Supabase project + credentials exist
-// (see DEPLOYMENT.md) — every other auth code path (login page, callback
-// route, requireUser()) is already written and just needs this flag.
-export const AUTH_REQUIRED = true;
+// Vercel sets VERCEL in its environment, so an instance that reached a
+// deployment ignores the switch however it is set: the app cannot be left open
+// by a variable somebody forgot to unset. lib/auth-config.test.ts is what holds
+// that rule down.
+//
+// Deliberately not a NEXT_PUBLIC_ name: nothing in the browser reads this, and a
+// private variable is read when the server starts rather than written into the
+// build, so the same build can be served with sign-in on or off.
+const ON_A_DEPLOYMENT = Boolean(process.env.VERCEL);
+
+export const AUTH_REQUIRED = ON_A_DEPLOYMENT || process.env.AUTH_REQUIRED !== "false";

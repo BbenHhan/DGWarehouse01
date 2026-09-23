@@ -6,6 +6,12 @@ const supabaseHostname = process.env.NEXT_PUBLIC_SUPABASE_URL
 
 const nextConfig: NextConfig = {
   outputFileTracingRoot: __dirname,
+  // A browser-driven run (specs/049) builds into a directory of its own, so it
+  // never overwrites the build `npm run dev` is serving — which it did once,
+  // leaving the dev server failing mid-request with a missing module. Unset
+  // everywhere else, so every ordinary run and every deployment builds into
+  // .next exactly as before.
+  distDir: process.env.NEXT_DIST_DIR || ".next",
   images: {
     remotePatterns: [
       ...(supabaseHostname

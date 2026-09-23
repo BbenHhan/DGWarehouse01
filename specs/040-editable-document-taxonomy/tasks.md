@@ -133,7 +133,7 @@ description: "Task list for Editable Document Taxonomy"
 
 ## Phase 8: Polish & Cross-Cutting
 
-- [ ] T053 **[a person is needed: phone-width layout]** [P] Run quickstart Scenario 10 at 375px: every control reachable, a very long group name does not break the row, no horizontal scrolling (Constitution IV). jsdom has no layout engine, so nothing here can be asserted in a test
+- [X] T053 [P] Run quickstart Scenario 10 at 375px: every control reachable, a very long group name does not break the row, no horizontal scrolling (Constitution IV). No longer a person's job — `e2e/mobile.spec.ts` measures it in a real browser (specs/049)
 - [X] T055 Run `npm test`, `npm run lint`, `npx tsc --noEmit`, and `npm run build` — all clean. Stop the dev server before building; a production build over a running dev server wipes `.next` and breaks it
 - [X] T056 Update `README.md` — checked: it does not describe document groups at all, so nothing to correct
 
@@ -305,3 +305,11 @@ no others), `components/CategoryManagePanel.test.tsx` (a refused rename reported
 and reverted, a viewer offered no way in) and
 `components/ManageModeProvider.test.tsx` (unsubmitted typing surviving the mode
 toggle). Only the three entries above still need a person, and each says why.
+
+## Now automated (specs/049-end-to-end-scenarios)
+
+T053 is gone from the manual list too. `e2e/mobile.spec.ts` loads each main page
+at 375px in a real browser and measures what a person used to look for: nothing
+scrolls sideways, no control sits past the right edge, and the sub-group with
+the longest name keeps its row. T032 and T050 stay — both ask whether a file
+really left production storage, which no local run can answer.
