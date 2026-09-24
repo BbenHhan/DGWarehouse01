@@ -13,6 +13,11 @@ export type DataSource = "local" | "mock" | "supabase";
 // initialized directly to one literal for comparisons later in this same
 // file, which would make the line below a same-file type error.
 function resolveDataSource(): DataSource {
+  // Settable so a browser-driven run can point the app at a throwaway directory
+  // instead of the live project (specs/049). Unset — every normal run, and every
+  // deployment — is "supabase", exactly as before.
+  const fromEnv = process.env.NEXT_PUBLIC_DATA_SOURCE;
+  if (fromEnv === "local" || fromEnv === "mock" || fromEnv === "supabase") return fromEnv;
   return "supabase";
 }
 

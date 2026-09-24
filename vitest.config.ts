@@ -1,5 +1,5 @@
 import path from "node:path";
-import { defineConfig } from "vitest/config";
+import { configDefaults, defineConfig } from "vitest/config";
 import tsconfigPaths from "vite-tsconfig-paths";
 
 export default defineConfig({
@@ -19,6 +19,9 @@ export default defineConfig({
     jsx: { runtime: "automatic" },
   },
   test: {
+    // e2e/ belongs to Playwright, which brings its own `test` and `expect`.
+    // Vitest would otherwise try to collect those files and fail on the import.
+    exclude: [...configDefaults.exclude, "e2e/**"],
     environment: "node",
     setupFiles: ["./vitest.setup.ts"],
   },

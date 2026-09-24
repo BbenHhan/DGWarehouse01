@@ -12,7 +12,9 @@ const compat = new FlatCompat({ baseDirectory: __dirname });
 
 const eslintConfig = defineConfig([
   ...compat.extends("next/core-web-vitals", "next/typescript"),
-  globalIgnores([".next/**", "out/**", "build/**", "next-env.d.ts"]),
+  // .next-e2e/ is the build the browser-driven run makes (specs/049) — build
+  // output, the same as .next/, and not ours to lint.
+  globalIgnores([".next/**", ".next-e2e/**", "out/**", "build/**", "next-env.d.ts"]),
 ]);
 
 export default eslintConfig;

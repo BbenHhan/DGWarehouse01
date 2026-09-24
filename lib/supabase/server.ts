@@ -108,7 +108,11 @@ export async function getCurrentUser(): Promise<{
   hasPendingRequest: boolean;
 } | null> {
   if (!AUTH_REQUIRED) {
-    return null;
+    // requireUser() and requireRole() already treat this mode as full access;
+    // reporting nobody here would leave the pages hiding every editing control,
+    // so the display side says the same thing (specs/049 research Decision 7).
+    // Unreachable on a deployment: AUTH_REQUIRED cannot be false there.
+    return { email: "dev@local", name: "Dev", avatarUrl: null, role: "admin", hasPendingRequest: false };
   }
 
   const supabase = await createSessionClient();

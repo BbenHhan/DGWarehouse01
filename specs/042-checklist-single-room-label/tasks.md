@@ -30,7 +30,7 @@
 ## Phase 3: Polish
 
 - [X] T008 Run `npx vitest run`, `npx tsc --noEmit`, `npm run lint`, then `npm run build` with the dev server stopped
-- [ ] T010 **[a person is needed: phone-width layout]** Check the same at 375 px with the longest room name in the system (SC-004, FR-007). Whether a long room name wraps or overflows its row is a layout measurement no assertion can make
+- [X] T010 Check the same at 375 px with the longest room name in the system (SC-004, FR-007). No longer a person's job — `e2e/mobile.spec.ts` measures it in a real browser (specs/049)
 
 ---
 
@@ -58,4 +58,10 @@ protects it or extends it to the second component.
 
 The label itself is checked in `components/ChecklistList.test.tsx`: a one-room
 item names its room, a multi-room item names all of them, and both carry the
-same overall-status badge. Only the phone-width check still needs a person.
+same overall-status badge.
+
+## Now automated (specs/049-end-to-end-scenarios)
+
+The phone-width check is no longer a person's either: `e2e/mobile.spec.ts` opens
+the checklist and a room page at 375px and measures that neither scrolls
+sideways and that no control lands past the edge. Nothing manual is left here.

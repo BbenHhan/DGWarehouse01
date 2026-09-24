@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { createSupabaseStub, type StubResult } from "@/lib/supabase-stub";
 
 // specs/046-subgroup-requirement-checklist research Decision 4 / quickstart
 // Scenario 0. Migration 0015 is pasted into the SQL Editor by hand, so the code
@@ -9,26 +10,11 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("@/lib/data-config", () => ({ DATA_SOURCE: "supabase", USE_MOCK_DATA: false }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 
-type Result = { data?: unknown; error: { code: string; message: string } | null; count?: number };
-
-// A stand-in for the query builder: every call chains, and awaiting it yields
-// the result configured for that table.
-function chain(result: Result) {
-  const builder: Record<string, unknown> = {
-    then: (resolve: (value: Result) => unknown, reject: (reason: unknown) => unknown) =>
-      Promise.resolve(result).then(resolve, reject),
-  };
-  for (const method of ["select", "eq", "order", "insert", "update", "delete", "maybeSingle", "single", "limit"]) {
-    builder[method] = () => builder;
-  }
-  return builder;
-}
-
-const tables: Record<string, Result> = {};
+const tables: Record<string, StubResult> = {};
 vi.mock("@/lib/supabase/server", () => ({
   requireUser: vi.fn(async () => ({ id: "u1" })),
   requireRole: vi.fn(async () => ({ role: "editor" })),
-  createServiceClient: () => ({ from: (table: string) => chain(tables[table] ?? { data: null, error: null }) }),
+  createServiceClient: () => createSupabaseStub({ tables }).client,
 }));
 
 const MISSING_TABLE = {

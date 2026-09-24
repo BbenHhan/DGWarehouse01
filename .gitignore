@@ -50,3 +50,10 @@ next-env.d.ts
 
 # database backups — may contain user emails/PII, never committed
 /supabase/backups/
+
+# Playwright (specs/049) — reports
+/test-results/
+/playwright-report/
+
+# The build directory a browser-driven run uses (specs/049)
+/.next-e2e/
