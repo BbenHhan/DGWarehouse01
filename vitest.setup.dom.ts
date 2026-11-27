@@ -17,3 +17,14 @@ afterEach(() => {
   // the body afterwards keeps each test looking only at its own DOM.
   document.body.innerHTML = "";
 });
+
+// jsdom has never implemented URL.createObjectURL. Until jsdom 30.1 a call with
+// a File built from Node's own File class happened to return a blob: URL; from
+// 30.1 it throws ("Cannot read properties of undefined (reading '_buffer')")
+// because that File is not one of jsdom's Blobs. Components that preview a
+// picked file call it for every file they hold, so without a stand-in the whole
+// tray fails to build and the DOM never appears. The URL's value is never
+// asserted on — only that an element carries one — so a counter is enough.
+let objectUrlSerial = 0;
+URL.createObjectURL = () => `blob:test/${++objectUrlSerial}`;
+URL.revokeObjectURL = () => {};

@@ -7,8 +7,8 @@ import nextConfig from "./next.config";
 // bug report to find, because nothing about the message points at a ceiling.
 //
 // Two separate limits have to agree, and the pair is easy to break by editing
-// one: bodySizeLimit governs the action, middlewareClientMaxBodySize governs
-// what reaches it. Stored documents run to 30MB and Constitution VIII asks the
+// one: bodySizeLimit governs the action, proxyClientMaxBodySize governs what
+// reaches it. Stored documents run to 30MB and Constitution VIII asks the
 // ceiling to admit real video, so both must stay well above that.
 function toBytes(size: string): number {
   const match = /^(\d+(?:\.\d+)?)(kb|mb|gb)$/i.exec(size.trim());
@@ -20,18 +20,18 @@ function toBytes(size: string): number {
 describe("upload size ceilings", () => {
   const experimental = nextConfig.experimental!;
   const actionLimit = experimental.serverActions!.bodySizeLimit as string;
-  const middlewareLimit = experimental.middlewareClientMaxBodySize as string;
+  const proxyLimit = experimental.proxyClientMaxBodySize as string;
 
-  it("lets the middleware pass a body at least as large as the action accepts", () => {
-    expect(toBytes(middlewareLimit)).toBeGreaterThanOrEqual(toBytes(actionLimit));
+  it("lets the proxy pass a body at least as large as the action accepts", () => {
+    expect(toBytes(proxyLimit)).toBeGreaterThanOrEqual(toBytes(actionLimit));
   });
 
   it("admits a real video, well past the 30MB documents already stored", () => {
-    expect(toBytes(middlewareLimit)).toBeGreaterThan(toBytes("100mb"));
+    expect(toBytes(proxyLimit)).toBeGreaterThan(toBytes("100mb"));
     expect(toBytes(actionLimit)).toBeGreaterThan(toBytes("100mb"));
   });
 
-  it("is set at all — the default middleware ceiling is 10MB and silently truncates", () => {
-    expect(middlewareLimit).toBeDefined();
+  it("is set at all — the default proxy ceiling is 10MB and silently truncates", () => {
+    expect(proxyLimit).toBeDefined();
   });
 });
